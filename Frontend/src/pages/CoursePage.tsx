@@ -4,7 +4,7 @@ import CourseFilters from "../components/courses/CourseFilters";
 import type { Course } from "../app/types/course.type";
 
 const CoursesPage = () => {
-  // ✅ mock data stays inside the page (as you requested)
+
   const courses: Course[] = [
     {
       id: "c1",

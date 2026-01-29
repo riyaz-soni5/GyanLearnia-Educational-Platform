@@ -1,4 +1,4 @@
-// src/pages/instructor/UploadCoursePage.tsx
+
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -8,7 +8,7 @@ type LessonDraft = {
   id: string;
   title: string;
   type: LessonType;
-  durationMin: number; // for notes you can keep 0 or estimate
+  durationMin: number; 
   isPreview: boolean;
 };
 

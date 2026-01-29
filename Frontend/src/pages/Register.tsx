@@ -1,6 +1,6 @@
-// src/pages/RegisterPage.tsx
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import Logo from "../assets/icon.svg";
 
 type Role = "student" | "instructor";
 
@@ -52,9 +52,25 @@ const Icon = {
       />
     </svg>
   ),
+  Chevron: (props: React.SVGProps<SVGSVGElement>) => (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
+      <path
+        d="M6 8l4 4 4-4"
+        className="stroke-current"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
 };
 
 const roleLabel = (r: Role) => (r === "student" ? "Student" : "Instructor");
+
+const inputBase =
+  "w-full rounded-lg border border-base bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-basec " +
+  "placeholder:text-gray-400 dark:placeholder:text-gray-500 " +
+  "focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900";
 
 const RegisterPage = () => {
   const nav = useNavigate();
@@ -66,7 +82,9 @@ const RegisterPage = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Optional instructor details (collapsed UI to avoid overflow)
+  const [showPw, setShowPw] = useState(false);
+  const [showPw2, setShowPw2] = useState(false);
+
   const [showInstructorFields, setShowInstructorFields] = useState(false);
   const [expertise, setExpertise] = useState("");
   const [institution, setInstitution] = useState("");
@@ -87,24 +105,28 @@ const RegisterPage = () => {
     }
 
     return baseValid;
-  }, [fullName, email, password, confirmPassword, role, showInstructorFields, expertise]);
+  }, [
+    fullName,
+    email,
+    password,
+    confirmPassword,
+    role,
+    showInstructorFields,
+    expertise,
+  ]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
     if (!canSubmit) {
-      setError("Please fill all required fields correctly.");
+      setError("Please check the fields — passwords must match and be at least 6 characters.");
       return;
     }
 
     setLoading(true);
 
     try {
-      // ✅ Later: API call
-      // await api.post("/auth/register", { fullName, email, password, role, expertise, institution });
-
-      // ✅ Static demo session store
       localStorage.setItem(
         "gyanlearnia_session",
         JSON.stringify({
@@ -115,7 +137,6 @@ const RegisterPage = () => {
         })
       );
 
-      // ✅ Redirect to login (or dashboard if you want)
       nav("/login", { replace: true });
     } catch {
       setError("Registration failed. Please try again.");
@@ -125,104 +146,80 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="w-screen grid place-items-center">
-      <div className="w-full max-w-5xl rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <div className="grid md:grid-cols-2">
-          {/* Left brand panel (same as login) */}
-          <div className="hidden md:block bg-gray-900 text-white p-10">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-white/10 grid place-items-center">
-                <span className="text-sm font-bold">GL</span>
-              </div>
-              <div>
-                <p className="text-lg font-semibold">GyanLearnia</p>
-                <p className="text-xs text-gray-300">Learn smarter, Nepal-focused.</p>
-              </div>
-            </div>
-
-            <div className="mt-10 space-y-4">
-              <p className="text-2xl font-bold leading-tight">
-                Create your account and start learning.
-              </p>
-              <p className="text-sm text-gray-300">
-                Join courses, ask questions, and connect with mentors across Nepal.
-              </p>
-
-              <div className="mt-8 space-y-3">
-                {[
-                  "Ask academic questions anytime",
-                  "Get verified mentor support",
-                  "Learn skills and earn certificates",
-                ].map((t) => (
-                  <div key={t} className="flex items-start gap-3">
-                    <span className="mt-1 h-2 w-2 rounded-full bg-indigo-400" />
-                    <p className="text-sm text-gray-200">{t}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-10 rounded-xl bg-white/5 p-4">
-                <p className="text-xs text-gray-300">
-                  Tip: Instructor accounts can request verification later (admin approves).
-                </p>
-              </div>
+    <div className="min-h-screen w-full grid place-items-center bg-[rgb(var(--bg))] px-4">
+      <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-base bg-surface shadow-sm">
+        <div className="grid md:grid-cols-12">
+          {/* Left panel: logo only (same as login) */}
+          <div className="hidden md:flex md:col-span-4 flex-col items-center justify-center bg-gray-900 p-8 text-white">
+            <div className="bg-white p-2 rounded">
+              <img
+                src={Logo}
+                alt="GyanLearnia"
+                className="w-full max-w-[220px] select-none"
+                draggable={false}
+              />
             </div>
           </div>
 
-          {/* Right form panel */}
-          <div className="p-8 sm:p-10">
-            <h1 className="text-2xl font-bold text-gray-900">Register</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Create your account to get started.
-            </p>
+          {/* Right panel */}
+          <div className="md:col-span-8 p-8 sm:p-10">
+            <h1 className="text-2xl font-bold text-basec">Create account</h1>
+            <h5 className="text-muted tracking-tight">
+              Join GyanLearnia now!
+            </h5>
 
-            {/* Role selector (matches login style buttons) */}
-            <div className="mt-6">
-              <p className="text-xs font-medium text-gray-700">Register as</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {(["student", "instructor"] as Role[]).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => {
-                      setRole(r);
-                      if (r === "student") setShowInstructorFields(false);
-                    }}
-                    className={[
-                      "rounded-lg px-3 py-2 text-sm font-semibold border transition",
-                      role === r
-                        ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
-                    ].join(" ")}
-                  >
-                    {roleLabel(r)}
-                  </button>
-                ))}
+            {/* Role segmented control */}
+            <div className="mt-2">
+              <p className="text-xs font-medium text-muted">Register as</p>
+
+              <div className="mt-2 inline-flex rounded-xl border border-base bg-[rgb(var(--bg))] p-1">
+                {(["student", "instructor"] as Role[]).map((r) => {
+                  const active = role === r;
+                  return (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => {
+                        setRole(r);
+                        if (r === "student") setShowInstructorFields(false);
+                      }}
+                      className={[
+                        "rounded-lg px-3 py-2 text-sm font-semibold transition",
+                        active
+                          ? "bg-surface text-basec shadow-sm"
+                          : "text-muted hover:text-basec",
+                      ].join(" ")}
+                    >
+                      {roleLabel(r)}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <form onSubmit={onSubmit} className="mt-6 space-y-4">
+            <form onSubmit={onSubmit} className="mt-2 space-y-4">
               {/* Full name */}
               <div>
-                <label className="text-xs font-medium text-gray-700">Full Name</label>
+                <label className="text-xs font-medium text-muted">Full name</label>
                 <div className="mt-2 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
                     <Icon.User className="h-4 w-4" />
                   </span>
                   <input
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Your full name"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className={`${inputBase} pl-10`}
+                    autoComplete="name"
                   />
                 </div>
               </div>
 
               {/* Email */}
               <div>
-                <label className="text-xs font-medium text-gray-700">Email</label>
+                <label className="text-xs font-medium text-muted">Email</label>
                 <div className="mt-2 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
                     <Icon.Mail className="h-4 w-4" />
                   </span>
                   <input
@@ -230,85 +227,117 @@ const RegisterPage = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className={`${inputBase} pl-10`}
+                    autoComplete="email"
                   />
                 </div>
               </div>
 
               {/* Password */}
               <div>
-                <label className="text-xs font-medium text-gray-700">Password</label>
-                <div className="mt-2 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <label className="text-xs font-medium text-muted">Password</label>
+                <div className="relative mt-2">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
                     <Icon.Lock className="h-4 w-4" />
                   </span>
                   <input
-                    type="password"
+                    type={showPw ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    placeholder="At least 6 characters"
+                    className={`${inputBase} pl-10 pr-14`}
+                    autoComplete="new-password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted hover:text-basec"
+                  >
+                    {showPw ? "Hide" : "Show"}
+                  </button>
                 </div>
               </div>
 
               {/* Confirm password */}
               <div>
-                <label className="text-xs font-medium text-gray-700">Confirm Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Re-enter password"
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                />
+                <label className="text-xs font-medium text-muted">Confirm password</label>
+                <div className="relative mt-2">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
+                    <Icon.Lock className="h-4 w-4" />
+                  </span>
+                  <input
+                    type={showPw2 ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className={`${inputBase} pl-10 pr-14`}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPw2((s) => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-muted hover:text-basec"
+                  >
+                    {showPw2 ? "Hide" : "Show"}
+                  </button>
+                </div>
+
+                {confirmPassword.length > 0 && password.length > 0 && password !== confirmPassword ? (
+                  <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                    Passwords don’t match.
+                  </p>
+                ) : null}
               </div>
 
-              {/* Instructor extra fields (collapsed to prevent overflow) */}
+              {/* Instructor accordion */}
               {role === "instructor" ? (
-                <div className="rounded-xl border border-gray-200 bg-white p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Instructor details (optional now)
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))]">
+                  <button
+                    type="button"
+                    onClick={() => setShowInstructorFields((v) => !v)}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-basec">
+                        Instructor details
+                        <span className="ml-2 text-xs font-medium text-muted">(optional)</span>
                       </p>
-                      <p className="mt-1 text-xs text-gray-600">
-                        Add later; verification can be requested after signup.
+                      <p className="mt-0.5 text-xs text-muted">
+                        Add now or later — this helps students discover you.
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setShowInstructorFields((v) => !v)}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    <span
+                      className={[
+                        "text-muted transition",
+                        showInstructorFields ? "rotate-180" : "rotate-0",
+                      ].join(" ")}
                     >
-                      {showInstructorFields ? "Hide" : "Add"}
-                    </button>
-                  </div>
+                      <Icon.Chevron className="h-5 w-5" />
+                    </span>
+                  </button>
 
                   {showInstructorFields ? (
-                    <div className="mt-4 space-y-4">
+                    <div className="px-4 pb-4 space-y-4">
                       <div>
-                        <label className="text-xs font-medium text-gray-700">
-                          Expertise (e.g., Physics, MERN)
-                        </label>
+                        <label className="text-xs font-medium text-muted">Expertise</label>
                         <input
                           value={expertise}
                           onChange={(e) => setExpertise(e.target.value)}
-                          placeholder="Your main subject/skill"
-                          className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                          placeholder="e.g., Physics, MERN, Accounting"
+                          className={`${inputBase} mt-2`}
                         />
                       </div>
 
                       <div>
-                        <label className="text-xs font-medium text-gray-700">
+                        <label className="text-xs font-medium text-muted">
                           Institution (optional)
                         </label>
                         <input
                           value={institution}
                           onChange={(e) => setInstitution(e.target.value)}
                           placeholder="School/College name"
-                          className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                          className={`${inputBase} mt-2`}
                         />
                       </div>
                     </div>
@@ -317,41 +346,31 @@ const RegisterPage = () => {
               ) : null}
 
               {/* Error */}
-              {error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error && (
+                <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800">
                   {error}
                 </div>
-              ) : null}
+              )}
 
+              {/* Submit */}
               <button
                 type="submit"
                 disabled={!canSubmit || loading}
-                className={[
-                  "w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
+                className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
                   !canSubmit || loading
                     ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700",
-                ].join(" ")}
+                    : "bg-indigo-600 hover:bg-indigo-700"
+                }`}
               >
                 {loading ? "Creating account..." : "Create account"}
               </button>
 
-              <p className="text-center text-sm text-gray-600">
+              <p className="text-center text-sm text-muted">
                 Already have an account?{" "}
-                <Link
-                  to="/login"
-                  className="font-semibold text-indigo-700 hover:text-indigo-800"
-                >
-                  Login
+                <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-700">
+                  Sign in
                 </Link>
               </p>
-
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-4">
-                <p className="text-xs font-medium text-gray-700">Demo</p>
-                <p className="mt-1 text-xs text-gray-600">
-                  Static UI for now — backend registration will be connected later.
-                </p>
-              </div>
             </form>
           </div>
         </div>

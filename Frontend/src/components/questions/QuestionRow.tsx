@@ -24,7 +24,7 @@ const QuestionRow = ({ q }: { q: Question }) => {
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm hover:shadow-md transition">
       <div className="grid gap-4 md:grid-cols-12 md:items-start">
-        {/* Left: stats */}
+        
         <div className="flex gap-3 md:col-span-3 md:flex-col md:gap-2">
           <div className="flex flex-1 items-center justify-between rounded-xl bg-gray-50 px-4 py-3 md:flex-col md:items-start md:gap-1">
             <p className="text-xs text-gray-500">Votes</p>
@@ -42,7 +42,7 @@ const QuestionRow = ({ q }: { q: Question }) => {
           </div>
         </div>
 
-        {/* Middle: title + excerpt + tags */}
+        
         <div className="md:col-span-7">
           <div className="flex flex-wrap items-center gap-2">
             {q.hasVerifiedAnswer ? <Badge text="Verified Answer" tone="indigo" /> : null}
@@ -72,7 +72,7 @@ const QuestionRow = ({ q }: { q: Question }) => {
           </div>
         </div>
 
-        {/* Right: meta + actions */}
+      
         <div className="md:col-span-2 md:text-right">
           <p className="text-xs text-gray-500">asked {q.createdAt}</p>
           <p className="mt-1 text-sm font-medium text-gray-900">{q.author}</p>

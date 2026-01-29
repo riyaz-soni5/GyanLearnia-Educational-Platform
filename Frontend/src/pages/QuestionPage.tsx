@@ -1,4 +1,3 @@
-// src/pages/QuestionsPage.tsx
 import { useMemo, useState } from "react";
 import QuestionsToolbar from "../components/questions/QuestionToolbar";
 import QuestionsList from "../components/questions/QuestionList";

@@ -1,4 +1,3 @@
-// src/pages/PricingPage.tsx
 import { Link } from "react-router-dom";
 
 const Icon = {
@@ -278,25 +277,6 @@ const PricingPage = () => {
             "Bookmark & save posts (static for now)",
           ]}
           ctaText="Create free account"
-          ctaTo="/register"
-        />
-
-        <PricingCard
-          title="Plus"
-          subtitle="For exam preparation and faster help"
-          price="NPR 199 / month"
-          tag="Most Popular"
-          tone="indigo"
-          icon={<Icon.Spark className="h-5 w-5" />}
-          highlighted
-          features={[
-            "Priority Q&A (faster responses)",
-            "Verified instructor answers (limited)",
-            "Examination Mode (practice sets)",
-            "Downloadable notes (limited)",
-            "Basic completion certificates",
-          ]}
-          ctaText="Start Plus"
           ctaTo="/register"
         />
 

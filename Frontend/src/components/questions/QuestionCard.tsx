@@ -105,7 +105,7 @@ const QuestionCard = ({ question }: { question: Question }) => {
   return (
     <article className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
       <div className="flex items-start gap-4">
-        {/* Stats: only take needed space */}
+      
         <div className="shrink-0">
           <div className="flex gap-3 md:flex-col">
             <StatPill
@@ -127,7 +127,7 @@ const QuestionCard = ({ question }: { question: Question }) => {
           </div>
         </div>
 
-        {/* Content grows */}
+      
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             {question.hasVerifiedAnswer ? (
@@ -173,7 +173,7 @@ const QuestionCard = ({ question }: { question: Question }) => {
           </div>
         </div>
 
-        {/* Meta: minimal */}
+        
         <div className="shrink-0 whitespace-nowrap text-left md:text-right">
           <p className="text-xs text-gray-500">asked {question.createdAt}</p>
           <p className="mt-1 text-sm font-medium text-gray-900">
