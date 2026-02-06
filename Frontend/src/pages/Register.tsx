@@ -1,71 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "../assets/icon.svg";
+import { useToast } from "../components/toast";
 
 type Role = "student" | "instructor";
 
-const Icon = {
-  User: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"
-        className="stroke-current"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M4 20a8 8 0 0 1 16 0"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Mail: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M4 6h16v12H4V6z"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4 7l8 6 8-6"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  Lock: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M7 11V8a5 5 0 0 1 10 0v3"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M6 11h12v10H6V11z"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  Chevron: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M6 8l4 4 4-4"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-};
 
 const roleLabel = (r: Role) => (r === "student" ? "Student" : "Instructor");
+
 
 const inputBase =
   "w-full rounded-lg border border-base bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-basec " +
@@ -74,6 +16,7 @@ const inputBase =
 
 const RegisterPage = () => {
   const nav = useNavigate();
+  const { showToast } = useToast();
 
   const [role, setRole] = useState<Role>("student");
 
@@ -116,34 +59,52 @@ const RegisterPage = () => {
   ]);
 
   const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  e.preventDefault();
+  setError(null);
 
-    if (!canSubmit) {
-      setError("Please check the fields — passwords must match and be at least 6 characters.");
-      return;
+  if (!canSubmit) {
+    setError("Please check the fields — passwords must match and be at least 6 characters.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const payload = {
+      fullName: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+      role,
+      // only send if instructor + expanded
+      expertise: role === "instructor" && showInstructorFields ? expertise.trim() : undefined,
+      institution: role === "instructor" && showInstructorFields ? institution.trim() : undefined,
+    };
+
+    const res = await fetch("http://localhost:5000/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Registration failed");
     }
 
-    setLoading(true);
+    showToast("Account created successfully", "success");
 
-    try {
-      localStorage.setItem(
-        "gyanlearnia_session",
-        JSON.stringify({
-          id: "u_demo",
-          name: fullName,
-          role,
-          email,
-        })
-      );
-
+    setTimeout(() => {
       nav("/login", { replace: true });
-    } catch {
-      setError("Registration failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, 1200);
+
+  } catch (err: any) {
+    showToast(err.message || "Registration failed", "error");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen w-full grid place-items-center bg-[rgb(var(--bg))] px-4">
@@ -202,14 +163,11 @@ const RegisterPage = () => {
               <div>
                 <label className="text-xs font-medium text-muted">Full name</label>
                 <div className="mt-2 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                    <Icon.User className="h-4 w-4" />
-                  </span>
                   <input
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Your full name"
-                    className={`${inputBase} pl-10`}
+                    className={`${inputBase}`}
                     autoComplete="name"
                   />
                 </div>
@@ -219,15 +177,12 @@ const RegisterPage = () => {
               <div>
                 <label className="text-xs font-medium text-muted">Email</label>
                 <div className="mt-2 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                    <Icon.Mail className="h-4 w-4" />
-                  </span>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
-                    className={`${inputBase} pl-10`}
+                    className={`${inputBase}`}
                     autoComplete="email"
                   />
                 </div>
@@ -237,15 +192,12 @@ const RegisterPage = () => {
               <div>
                 <label className="text-xs font-medium text-muted">Password</label>
                 <div className="relative mt-2">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                    <Icon.Lock className="h-4 w-4" />
-                  </span>
                   <input
                     type={showPw ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 6 characters"
-                    className={`${inputBase} pl-10 pr-14`}
+                    className={`${inputBase}`}
                     autoComplete="new-password"
                   />
                   <button
@@ -262,15 +214,12 @@ const RegisterPage = () => {
               <div>
                 <label className="text-xs font-medium text-muted">Confirm password</label>
                 <div className="relative mt-2">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted">
-                    <Icon.Lock className="h-4 w-4" />
-                  </span>
                   <input
                     type={showPw2 ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter password"
-                    className={`${inputBase} pl-10 pr-14`}
+                    className={`${inputBase}`}
                     autoComplete="new-password"
                   />
                   <button
@@ -307,14 +256,6 @@ const RegisterPage = () => {
                       </p>
                     </div>
 
-                    <span
-                      className={[
-                        "text-muted transition",
-                        showInstructorFields ? "rotate-180" : "rotate-0",
-                      ].join(" ")}
-                    >
-                      <Icon.Chevron className="h-5 w-5" />
-                    </span>
                   </button>
 
                   {showInstructorFields ? (
