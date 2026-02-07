@@ -177,7 +177,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                   "supports-[backdrop-filter]:bg-surface/90 supports-[backdrop-filter]:backdrop-blur",
                 ].join(" ")}
               >
-                <div className="flex gap-3 p-4">
+                <div className="flex gap-3 p-2">
                   <div
                     className={[
                       "mt-0.5 grid h-10 w-10 place-items-center rounded-xl",

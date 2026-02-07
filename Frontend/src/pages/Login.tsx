@@ -1,16 +1,14 @@
+// src/pages/Login.tsx
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "../assets/icon.svg";
-
-type Role = "student" | "instructor" | "admin";
-
-const roleLabel = (r: Role) =>
-  r === "student" ? "Student" : r === "instructor" ? "Instructor" : "Admin";
+import { useToast } from "../components/toast";
+import { loginApi } from "../services/auth";
 
 const LoginPage = () => {
   const nav = useNavigate();
+  const { showToast } = useToast();
 
-  const [role] = useState<Role>("student");
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -24,31 +22,32 @@ const LoginPage = () => {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
 
+    // ✅ only show errors inside the page (no toast)
     if (!canSubmit) {
       setError("Please enter valid login credentials.");
       return;
     }
 
+    setError(null);
     setLoading(true);
 
     try {
-      localStorage.setItem(
-        "gyanlearnia_session",
-        JSON.stringify({
-          id: "u1",
-          name: roleLabel(role),
-          role,
-          emailOrUsername,
-        })
-      );
+      const data = await loginApi(emailOrUsername.trim().toLowerCase(), password);
 
-      if (role === "admin") nav("/admin", { replace: true });
-      else if (role === "instructor") nav("/instructor/upload-course", { replace: true });
-      else nav("/dashboard", { replace: true });
-    } catch {
-      setError("Login failed. Please try again.");
+      localStorage.setItem("gyanlearnia_token", data.token);
+      localStorage.setItem("gyanlearnia_user", JSON.stringify(data.user));
+
+      // ✅ only success uses toast
+      showToast("Login successful", "success");
+
+      setTimeout(() => {
+        if (data.user.role === "admin") nav("/admin", { replace: true });
+        else nav("/", { replace: true });
+      }, 700);
+    } catch (err: any) {
+      // ✅ errors shown in-page
+      setError(err?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -57,35 +56,35 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen w-full grid place-items-center bg-[rgb(var(--bg))] px-4">
       <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-base bg-surface shadow-sm">
-        {/* Reduced left panel width using 12-col grid */}
         <div className="grid md:grid-cols-12">
-          {/* Left panel: image + welcome back only */}
+          {/* Left panel */}
           <div className="hidden md:flex md:col-span-4 flex-col items-center justify-center gap-6 bg-gray-900 p-8 text-white">
-            {/* Image */}
             <div className="bg-white p-2 rounded">
               <img
-              src={Logo}
-              alt="Welcome"
-              className="w-full max-w-[220px] select-none"
-              draggable={false}
+                src={Logo}
+                alt="Welcome"
+                className="w-full max-w-[220px] select-none"
+                draggable={false}
               />
             </div>
-
           </div>
 
           {/* Right form */}
           <div className="md:col-span-8 p-8 sm:p-10">
             <h1 className="text-2xl font-bold text-basec">Sign in</h1>
-            <h5 className="text-muted font-bold tracking-tight">Welcome back</h5>
 
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
               {/* Email */}
               <div>
-                <label className="text-xs font-medium text-muted">Email or Username</label>
+                <label className="text-xs font-medium text-muted">Email</label>
                 <input
                   value={emailOrUsername}
-                  onChange={(e) => setEmailOrUsername(e.target.value)}
+                  onChange={(e) => {
+                    setEmailOrUsername(e.target.value);
+                    if (error) setError(null);
+                  }}
                   className="mt-2 w-full rounded-lg border border-base bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-basec focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900"
+                  autoComplete="email"
                 />
               </div>
 
@@ -96,8 +95,12 @@ const LoginPage = () => {
                   <input
                     type={showPw ? "text" : "password"}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError(null);
+                    }}
                     className="w-full rounded-lg border border-base bg-[rgb(var(--bg))] px-3 py-2.5 pr-14 text-sm text-basec focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900"
+                    autoComplete="current-password"
                   />
                   <button
                     type="button"
@@ -109,10 +112,10 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              {/* Error */}
+              {/* Error (in-page) */}
               {error && (
-                <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:border-red-800">
-                  {error}
+                <div className="text-[12px] text-red-500 transition">
+                  *{error}
                 </div>
               )}
 
@@ -131,7 +134,10 @@ const LoginPage = () => {
 
               <p className="text-center text-sm text-muted">
                 Don&apos;t have an account?{" "}
-                <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
+                <Link
+                  to="/register"
+                  className="font-semibold text-indigo-600 hover:text-indigo-700"
+                >
                   Create one
                 </Link>
               </p>
