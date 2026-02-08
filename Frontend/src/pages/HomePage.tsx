@@ -59,7 +59,7 @@ const HomePage = () => {
           {/* LEFT */}
           <div className="lg:col-span-7">
             <h1 className="text-4xl font-bold leading-tight text-basec sm:text-5xl">
-              GyanLearnia boosts scores!
+              GyanLearnia
             </h1>
 
             <p className="mt-4 max-w-2xl text-lg text-muted">

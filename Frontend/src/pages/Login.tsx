@@ -11,6 +11,7 @@ const LoginPage = () => {
 
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true); // ✅ new
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,7 +24,6 @@ const LoginPage = () => {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ only show errors inside the page (no toast)
     if (!canSubmit) {
       setError("Please enter valid login credentials.");
       return;
@@ -33,20 +33,22 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      const data = await loginApi(emailOrUsername.trim().toLowerCase(), password);
+      const data = await loginApi(
+        emailOrUsername.trim().toLowerCase(),
+        password,
+        rememberMe
+      );
 
-      localStorage.setItem("gyanlearnia_token", data.token);
-      localStorage.setItem("gyanlearnia_user", JSON.stringify(data.user));
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem("gyanlearnia_user", JSON.stringify(data.user));
 
-      // ✅ only success uses toast
       showToast("Login successful", "success");
 
       setTimeout(() => {
         if (data.user.role === "admin") nav("/admin", { replace: true });
-        else nav("/", { replace: true });
+        else nav("/courses", { replace: true });
       }, 700);
     } catch (err: any) {
-      // ✅ errors shown in-page
       setError(err?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
@@ -112,12 +114,28 @@ const LoginPage = () => {
                 </div>
               </div>
 
+              {/* Remember me */}
+              <div className="flex items-center justify-between">
+                <label className="inline-flex items-center gap-2 text-sm text-muted select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border border-base"
+                  />
+                  Remember me
+                </label>
+
+                <Link
+                  to="/forgot-password"
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+
               {/* Error (in-page) */}
-              {error && (
-                <div className="text-[12px] text-red-500 transition">
-                  *{error}
-                </div>
-              )}
+              {error && <div className="text-[12px] text-red-500 transition">*{error}</div>}
 
               {/* Submit */}
               <button
@@ -134,10 +152,7 @@ const LoginPage = () => {
 
               <p className="text-center text-sm text-muted">
                 Don&apos;t have an account?{" "}
-                <Link
-                  to="/register"
-                  className="font-semibold text-indigo-600 hover:text-indigo-700"
-                >
+                <Link to="/register" className="font-semibold text-indigo-600 hover:text-indigo-700">
                   Create one
                 </Link>
               </p>

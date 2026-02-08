@@ -7,7 +7,7 @@ import User from "../models/User.model.js";
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password are required" });
@@ -22,12 +22,19 @@ export const login = async (req: Request, res: Response) => {
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET as string,
-      { expiresIn: "7d" }
+      { expiresIn: rememberMe ? "7d" : "2h" }
     );
+
+    // ✅ httpOnly cookie (session cookie if rememberMe is false)
+    res.cookie("access_token", token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false, // set true in production https
+      ...(rememberMe ? { maxAge: 7 * 24 * 60 * 60 * 1000 } : {}), // no maxAge => session cookie
+    });
 
     return res.json({
       message: "Login successful",
-      token,
       user: {
         id: user._id,
         role: user.role,

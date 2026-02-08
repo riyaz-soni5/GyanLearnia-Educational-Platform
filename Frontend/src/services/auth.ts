@@ -1,3 +1,4 @@
+// src/services/auth.ts
 const API_URL = import.meta.env.VITE_API_URL;
 
 export type LoginResponse = {
@@ -11,11 +12,19 @@ export type LoginResponse = {
   };
 };
 
-export async function loginApi(email: string, password: string): Promise<LoginResponse> {
+export async function loginApi(
+  email: string,
+  password: string,
+  rememberMe: boolean
+): Promise<LoginResponse> {
   const res = await fetch(`${API_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+
+    // ✅ allow browser to receive/set cookies from backend
+    credentials: "include",
+
+    body: JSON.stringify({ email, password, rememberMe }),
   });
 
   const data = await res.json();
