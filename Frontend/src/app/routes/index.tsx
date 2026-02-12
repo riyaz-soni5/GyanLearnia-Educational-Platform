@@ -22,6 +22,7 @@ import CourseApprovalsPage from "../../pages/admin/CourseApprovalsPage";
 import ManageUsersPage from "../../pages/admin/ManageUserPage";
 import ReportsPage from "../../pages/admin/ReportsPage";
 import SettingsPage from "../../pages/admin/SettingsPage";
+import AskQuestionPage from "../../pages/AskQuestionPage";
 
 export const router = createBrowserRouter([
   // Auth pages (no header/footer)
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
       { path: "courses", element: <CoursesPage /> },
       { path: "courses/:id", element: <CourseDetailsPage /> },
 
+      {path: "/question/ask", element: <AskQuestionPage />},
       { path: "questions", element: <QuestionsPage /> },
       { path: "questions/:id", element: <QuestionDetailsPage /> },
 

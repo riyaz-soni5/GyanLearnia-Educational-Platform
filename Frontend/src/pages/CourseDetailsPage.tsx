@@ -1,15 +1,8 @@
 // src/pages/CourseDetailsPage.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { Course } from "../app/types/course.type";
-
-type Lesson = {
-  id: string;
-  title: string;
-  durationMin: number;
-  type: "Video" | "Note" | "Quiz";
-  isPreview?: boolean;
-};
+import { coursesApi, type Lesson } from "../app/api/courses.api";
 
 const Icon = {
   Star: (props: React.SVGProps<SVGSVGElement>) => (
@@ -71,11 +64,7 @@ const Icon = {
   ),
   Note: (props: React.SVGProps<SVGSVGElement>) => (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M7 3h10v18H7V3z"
-        className="stroke-current"
-        strokeWidth="1.8"
-      />
+      <path d="M7 3h10v18H7V3z" className="stroke-current" strokeWidth="1.8" />
       <path
         d="M9 7h6M9 11h6M9 15h5"
         className="stroke-current"
@@ -86,11 +75,7 @@ const Icon = {
   ),
   Quiz: (props: React.SVGProps<SVGSVGElement>) => (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M7 3h10v18H7V3z"
-        className="stroke-current"
-        strokeWidth="1.8"
-      />
+      <path d="M7 3h10v18H7V3z" className="stroke-current" strokeWidth="1.8" />
       <path
         d="M9 8h6M9 12h6"
         className="stroke-current"
@@ -141,7 +126,9 @@ const Badge = ({
       : "bg-gray-50 text-gray-700 ring-gray-200";
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${cls}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${cls}`}
+    >
       {text}
     </span>
   );
@@ -156,95 +143,73 @@ const lessonIcon = (type: Lesson["type"]) => {
 const CourseDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
 
-  // ✅ Same mock data style as your CoursesPage (replace with API later)
-  const courses: Course[] = [
-    {
-      id: "c1",
-      title: "Mathematics (Class 10 - SEE)",
-      subtitle: "Algebra, Geometry, Trigonometry — exam-focused practice",
-      level: "Class 10 (SEE)",
-      type: "Academic",
-      priceType: "Free",
-      rating: 4.6,
-      lessons: 24,
-      hours: 18,
-      instructorName: "Verified Teacher",
-      enrolled: 5320,
-      badge: "Popular",
-    },
-    {
-      id: "c2",
-      title: "Physics (+2) — Mechanics",
-      subtitle: "Concept + numericals with structured notes",
-      level: "+2",
-      type: "Academic",
-      priceType: "Paid",
-      priceNpr: 1499,
-      rating: 4.7,
-      lessons: 30,
-      hours: 22,
-      instructorName: "Astha Sharma",
-      enrolled: 2180,
-      badge: "Certified",
-    },
-    {
-      id: "c3",
-      title: "Web Development (MERN Basics)",
-      subtitle: "HTML, CSS, JS, React essentials + mini projects",
-      level: "Skill",
-      type: "Technical",
-      priceType: "Paid",
-      priceNpr: 1999,
-      rating: 4.5,
-      lessons: 28,
-      hours: 20,
-      instructorName: "Srawan Shrestha",
-      enrolled: 1630,
-      badge: "New",
-    },
-  ];
-
-  const course = useMemo(() => courses.find((c) => c.id === id), [courses, id]);
-
-  // ✅ Static lesson list (different based on course, optional)
-  const lessons: Lesson[] = useMemo(() => {
-    if (!course) return [];
-    if (course.id === "c1")
-      return [
-        { id: "l1", title: "Algebra Basics (SEE)", durationMin: 30, type: "Video", isPreview: true },
-        { id: "l2", title: "Factorization & Identities", durationMin: 35, type: "Video" },
-        { id: "l3", title: "Quadratic Equations (Steps)", durationMin: 20, type: "Note", isPreview: true },
-        { id: "l4", title: "Practice Set: Quadratic (SEE)", durationMin: 15, type: "Quiz" },
-        { id: "l5", title: "Geometry: Triangles & Circles", durationMin: 40, type: "Video" },
-      ];
-
-    if (course.id === "c2")
-      return [
-        { id: "l1", title: "Vectors & Units (Quick Revision)", durationMin: 25, type: "Note", isPreview: true },
-        { id: "l2", title: "Newton’s Laws (Concept + Numericals)", durationMin: 45, type: "Video", isPreview: true },
-        { id: "l3", title: "Friction (Common Exam Problems)", durationMin: 35, type: "Video" },
-        { id: "l4", title: "Work, Energy, Power", durationMin: 40, type: "Video" },
-        { id: "l5", title: "Quiz: Mechanics", durationMin: 20, type: "Quiz" },
-      ];
-
-    return [
-      { id: "l1", title: "HTML + CSS Setup (Vite)", durationMin: 30, type: "Video", isPreview: true },
-      { id: "l2", title: "React Components & Props", durationMin: 40, type: "Video", isPreview: true },
-      { id: "l3", title: "TypeScript Basics for React", durationMin: 35, type: "Note" },
-      { id: "l4", title: "Mini Project: UI Layout", durationMin: 50, type: "Video" },
-      { id: "l5", title: "Quiz: React Fundamentals", durationMin: 20, type: "Quiz" },
-    ];
-  }, [course]);
+  const [course, setCourse] = useState<Course | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>("");
 
   const [isEnrolled, setIsEnrolled] = useState(false);
 
+  useEffect(() => {
+    if (!id) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [c, l] = await Promise.all([coursesApi.getById(id), coursesApi.lessons(id)]);
+
+        if (!cancelled) {
+          setCourse(c);
+          setLessons(l);
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || "Failed to load course details");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Loading UI
+  if (loading) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+        <p className="text-sm font-semibold text-gray-900">Loading course...</p>
+        <p className="mt-2 text-sm text-gray-600">Please wait a moment.</p>
+      </div>
+    );
+  }
+
+  // Error UI
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-10 text-center">
+        <p className="text-lg font-semibold text-red-800">Could not load course</p>
+        <p className="mt-2 text-sm text-red-700">{error}</p>
+        <Link
+          to="/courses"
+          className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          Back to Courses
+        </Link>
+      </div>
+    );
+  }
+
+  // Not found UI
   if (!course) {
     return (
       <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
         <p className="text-lg font-semibold text-gray-900">Course not found</p>
-        <p className="mt-2 text-sm text-gray-600">
-          The course you are trying to open doesn’t exist (static demo).
-        </p>
+        <p className="mt-2 text-sm text-gray-600">The course you are trying to open doesn’t exist.</p>
         <Link
           to="/courses"
           className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
@@ -258,10 +223,17 @@ const CourseDetailsPage = () => {
   const priceText =
     course.priceType === "Free" ? "Free" : `NPR ${course.priceNpr?.toLocaleString()}`;
 
+  const badgeTone = useMemo(() => {
+    if (!course.badge) return "gray" as const;
+    if (course.badge === "Certified") return "green" as const;
+    if (course.badge === "Popular") return "indigo" as const;
+    return "yellow" as const;
+  }, [course.badge]);
+
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       {/* Main */}
-      <div className="lg:col-span-8 space-y-6">
+      <div className="space-y-6 lg:col-span-8">
         {/* Breadcrumb */}
         <div className="text-sm text-gray-600">
           <Link to="/courses" className="font-semibold text-indigo-700 hover:text-indigo-800">
@@ -273,14 +245,10 @@ const CourseDetailsPage = () => {
         {/* Course header */}
         <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
-            {course.badge ? (
-              <Badge
-                text={course.badge}
-                tone={course.badge === "Certified" ? "green" : course.badge === "Popular" ? "indigo" : "yellow"}
-              />
-            ) : null}
+            {course.badge ? <Badge text={course.badge} tone={badgeTone} /> : null}
             <Badge text={course.level} tone="gray" />
             <Badge text={course.type} tone="gray" />
+
             <span className="ml-auto inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
               {priceText}
             </span>
@@ -296,7 +264,7 @@ const CourseDetailsPage = () => {
                 <Icon.Star className="h-5 w-5 text-gray-700" />
                 {course.rating.toFixed(1)}
               </p>
-              <p className="mt-1 text-xs text-gray-500">Preview value (static)</p>
+              <p className="mt-1 text-xs text-gray-500">Based on enrollments</p>
             </div>
 
             <div className="rounded-2xl bg-gray-50 p-5">
@@ -330,7 +298,7 @@ const CourseDetailsPage = () => {
             <button
               type="button"
               className="rounded-lg border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-              onClick={() => alert("Static UI: Save course later")}
+              onClick={() => alert("Save feature later")}
             >
               Save Course
             </button>
@@ -344,11 +312,11 @@ const CourseDetailsPage = () => {
           </div>
         </section>
 
-        {/* Overview + Outcomes */}
+        {/* Overview + Outcomes (still static text; you can fetch later) */}
         <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           <h2 className="text-xl font-bold text-gray-900">Course Overview</h2>
           <p className="mt-3 text-sm text-gray-600">
-            This is a demo overview for your FYP. Replace with real course description from backend later.
+            Replace this overview with course.description from backend later.
           </p>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -380,19 +348,17 @@ const CourseDetailsPage = () => {
           </div>
         </section>
 
-        {/* Lessons */}
+        {/* Lessons (NOW dynamic) */}
         <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">Lessons</h2>
               <p className="mt-1 text-sm text-gray-600">
-                Preview lessons are accessible without enrollment (static demo).
+                Preview lessons are accessible without enrollment.
               </p>
             </div>
 
-            <span className="text-sm font-semibold text-gray-900">
-              Total: {lessons.length} items
-            </span>
+            <span className="text-sm font-semibold text-gray-900">Total: {lessons.length} items</span>
           </div>
 
           <div className="mt-6 divide-y divide-gray-100 rounded-2xl border border-gray-200">
@@ -419,11 +385,11 @@ const CourseDetailsPage = () => {
                       "rounded-lg px-3 py-2 text-sm font-semibold transition",
                       l.isPreview || isEnrolled
                         ? "bg-gray-900 text-white hover:bg-gray-800"
-                        : "border border-gray-300 bg-white text-gray-400 cursor-not-allowed",
+                        : "cursor-not-allowed border border-gray-300 bg-white text-gray-400",
                     ].join(" ")}
                     onClick={() => {
                       if (!(l.isPreview || isEnrolled)) return;
-                      alert("Static UI: open lesson player/notes later");
+                      alert("Open lesson player later");
                     }}
                     disabled={!(l.isPreview || isEnrolled)}
                   >
@@ -434,26 +400,28 @@ const CourseDetailsPage = () => {
             ))}
           </div>
 
-          <p className="mt-4 text-xs text-gray-500">
-            Note: Lesson playback/notes viewer can be implemented later as separate pages/components.
-          </p>
+          {lessons.length === 0 ? (
+            <p className="mt-4 text-xs text-gray-500">No lessons available for this course yet.</p>
+          ) : (
+            <p className="mt-4 text-xs text-gray-500">
+              Note: Lesson player/notes viewer can be implemented later.
+            </p>
+          )}
         </section>
       </div>
 
       {/* Sidebar */}
-      <aside className="lg:col-span-4 space-y-6">
+      <aside className="space-y-6 lg:col-span-4">
         {/* Enrollment card */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900">Enrollment</h3>
-          <p className="mt-2 text-sm text-gray-600">
-            Get access to full lessons, notes, and quizzes.
-          </p>
+          <p className="mt-2 text-sm text-gray-600">Get access to full lessons, notes, and quizzes.</p>
 
           <div className="mt-5 rounded-2xl bg-gray-50 p-5">
             <p className="text-xs text-gray-500">Price</p>
             <p className="mt-2 text-2xl font-bold text-gray-900">{priceText}</p>
             <p className="mt-1 text-xs text-gray-500">
-              {course.priceType === "Free" ? "Free course access" : "One-time demo price (static)"}
+              {course.priceType === "Free" ? "Free course access" : "One-time price"}
             </p>
           </div>
 
@@ -471,7 +439,7 @@ const CourseDetailsPage = () => {
           <button
             type="button"
             className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-            onClick={() => alert("Static UI: share link later")}
+            onClick={() => alert("Share feature later")}
           >
             Share Course
           </button>
@@ -480,16 +448,20 @@ const CourseDetailsPage = () => {
         {/* Instructor card */}
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900">Instructor</h3>
-          <p className="mt-2 text-sm text-gray-600">Profile preview (static).</p>
+          <p className="mt-2 text-sm text-gray-600">Profile preview.</p>
 
           <div className="mt-4 flex items-start gap-3">
-            <div className="h-11 w-11 rounded-xl bg-gray-900 text-white grid place-items-center text-sm font-bold">
-              GL
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-gray-900 text-sm font-bold text-white">
+              {course.instructorName
+                .split(" ")
+                .slice(0, 2)
+                .map((w) => w[0]?.toUpperCase())
+                .join("")}
             </div>
 
             <div className="min-w-0">
               <p className="text-sm font-semibold text-gray-900">{course.instructorName}</p>
-              <p className="mt-1 text-xs text-gray-500">Verified Instructor (demo)</p>
+              <p className="mt-1 text-xs text-gray-500">Verified Instructor</p>
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
@@ -514,7 +486,7 @@ const CourseDetailsPage = () => {
         <div className="rounded-2xl bg-gray-900 p-6 text-white">
           <h3 className="text-lg font-bold">Need help with this course?</h3>
           <p className="mt-2 text-sm text-gray-300">
-            Ask course-related questions in the Q&A section and get verified support.
+            Ask course-related questions in the Q&amp;A section and get verified support.
           </p>
           <Link
             to="/questions"

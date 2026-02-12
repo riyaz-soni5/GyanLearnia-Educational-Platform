@@ -1,3 +1,6 @@
+
+import { Link } from "react-router-dom";
+
 type Props = {
   query: string;
   setQuery: (v: string) => void;
@@ -28,12 +31,12 @@ const QuestionsToolbar = ({
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Newest Questions</h1>
         </div>
 
-        <button
-          type="button"
+        <Link
+          to="/questions/ask"
           className="inline-flex w-fit items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
         >
           Ask Question
-        </button>
+        </Link>
       </div>
 
       

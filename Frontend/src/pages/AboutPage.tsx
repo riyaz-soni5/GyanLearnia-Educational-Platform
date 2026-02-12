@@ -314,28 +314,6 @@ const AboutPage = () => {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="rounded-2xl bg-gray-900 p-10 text-center text-white">
-        <h2 className="text-2xl font-bold">Ready to start learning?</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-gray-300">
-          Join GyanLearnia to explore courses, ask questions, and connect with mentors.
-        </p>
-
-        <div className="mt-6 flex justify-center gap-3">
-          <Link
-            to="/register"
-            className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-100"
-          >
-            Create Account
-          </Link>
-          <Link
-            to="/courses"
-            className="rounded-lg border border-gray-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
-          >
-            Browse Courses
-          </Link>
-        </div>
-      </section>
     </div>
   );
 };

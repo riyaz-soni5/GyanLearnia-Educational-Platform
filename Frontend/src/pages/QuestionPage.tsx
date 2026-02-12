@@ -1,105 +1,58 @@
-import { useMemo, useState } from "react";
+// src/pages/QuestionsPage.tsx
+import { useEffect, useMemo, useState } from "react";
 import QuestionsToolbar from "../components/questions/QuestionToolbar";
 import QuestionsList from "../components/questions/QuestionList";
 import Leaderboard from "../components/questions/Leaderboard";
 import type { Question } from "../app/types/question.types";
+import { fetchQuestions } from "../services/questions";
 
 const QuestionsPage = () => {
-  const questions: Question[] = [
-    {
-      id: "q1",
-      title: "How to solve quadratic equations using factorization?",
-      excerpt:
-        "I’m confused about selecting factors that add up to the middle term. Can someone show step-by-step for SEE-level?",
-      subject: "Mathematics",
-      level: "Class 10 (SEE)",
-      tags: ["SEE", "Math", "Exam"],
-      author: "Student A",
-      authorType: "Student",
-      answersCount: 4,
-      views: 980,
-      votes: 23,
-      status: "Answered",
-      createdAt: "2 days ago",
-      hasVerifiedAnswer: true,
-    },
-    {
-      id: "q2",
-      title: "Explain Kirchhoff’s Laws with a numerical example",
-      excerpt:
-        "Need a clear explanation with one solved numerical for +2 Physics. Also how to apply sign convention properly?",
-      subject: "Physics",
-      level: "+2",
-      tags: ["+2", "Physics", "Exam"],
-      author: "Learner B",
-      authorType: "Student",
-      answersCount: 2,
-      views: 620,
-      votes: 12,
-      status: "Answered",
-      createdAt: "1 day ago",
-    },
-    {
-      id: "q3",
-      title: "Difference between debit and credit in accounting (simple)",
-      excerpt:
-        "I keep mixing debit and credit. Please explain with one example for each and a small rule to remember.",
-      subject: "Accountancy",
-      level: "+2",
-      tags: ["+2", "Accountancy", "Notes"],
-      author: "Student C",
-      authorType: "Student",
-      answersCount: 0,
-      views: 210,
-      votes: 5,
-      status: "Unanswered",
-      createdAt: "5 hours ago",
-      isFastResponse: true,
-    },
-    {
-      id: "q4",
-      title: "Write an essay on environmental pollution (Class 9 format)",
-      excerpt:
-        "Need an exam-style essay structure with introduction, causes, effects and conclusion — around 250 words.",
-      subject: "English",
-      level: "Class 9",
-      tags: ["Class 9", "English", "Exam"],
-      author: "Tutor D",
-      authorType: "Tutor",
-      answersCount: 1,
-      views: 410,
-      votes: 7,
-      status: "Answered",
-      createdAt: "3 days ago",
-    },
-  ];
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
   const [subject, setSubject] = useState("All");
   const [level, setLevel] = useState("All");
   const [sort, setSort] = useState("Newest");
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+  // if you want "Unanswered" as a filter, map it to status
+  const status = useMemo(() => (sort === "Unanswered" ? "Unanswered" : "All"), [sort]);
 
-    let list = questions.filter((item) => {
-      const matchesQuery =
-        !q ||
-        item.title.toLowerCase().includes(q) ||
-        item.excerpt.toLowerCase().includes(q);
+  useEffect(() => {
+    let alive = true;
 
-      const matchesSubject = subject === "All" || item.subject === subject;
-      const matchesLevel = level === "All" || item.level === level;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const res = await fetchQuestions({
+          q: query,
+          subject,
+          level,
+          sort,
+          status,
+          page: 1,
+          limit: 30,
+        });
+        if (!alive) return;
+        setQuestions(res.items ?? []);
+      } catch (e: any) {
+        if (!alive) return;
+        setErr(e?.message || "Failed to load questions");
+      } finally {
+        if (!alive) return;
+        setLoading(false);
+      }
+    })();
 
-      return matchesQuery && matchesSubject && matchesLevel;
-    });
+    return () => {
+      alive = false;
+    };
+  }, [query, subject, level, sort, status]);
 
-    if (sort === "Most Viewed") list = [...list].sort((a, b) => b.views - a.views);
-    if (sort === "Most Voted") list = [...list].sort((a, b) => b.votes - a.votes);
-    if (sort === "Unanswered") list = list.filter((x) => x.answersCount === 0);
-
-    return list;
-  }, [questions, query, subject, level, sort]);
+  // Your UI components remain the same
+  const filtered = useMemo(() => questions, [questions]);
 
   return (
     <div className="space-y-8">
@@ -118,7 +71,17 @@ const QuestionsPage = () => {
       {/* Left list + Right leaderboard */}
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <QuestionsList questions={filtered} />
+          {loading ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600">
+              Loading questions...
+            </div>
+          ) : err ? (
+            <div className="rounded-2xl border border-red-200 bg-white p-8 text-sm text-red-600">
+              {err}
+            </div>
+          ) : (
+            <QuestionsList questions={filtered} />
+          )}
         </div>
 
         <div className="lg:col-span-4">
