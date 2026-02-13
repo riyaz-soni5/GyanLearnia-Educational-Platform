@@ -26,6 +26,28 @@ const formatRole = (role?: string) => {
   return role;
 };
 
+// ✅ turn HTML -> plain text (for card preview only)
+const htmlToText = (html?: string) => {
+  const raw = (html ?? "").trim();
+  if (!raw) return "";
+
+  // If it doesn't look like HTML, return as-is
+  if (!/[<>&]/.test(raw)) return raw;
+
+  // Browser-safe plain text extraction
+  const tmp = document.createElement("div");
+  tmp.innerHTML = raw;
+
+  // remove Quill UI spans if present
+  tmp.querySelectorAll(".ql-ui").forEach((n) => n.remove());
+
+  const text = (tmp.textContent || tmp.innerText || "").replace(/\s+/g, " ").trim();
+  return text;
+};
+
+// ✅ optional: keep preview short even before line-clamp
+const truncate = (s: string, max = 180) => (s.length > max ? s.slice(0, max - 1).trim() + "…" : s);
+
 const Badge = ({
   text,
   tone,
@@ -78,6 +100,9 @@ const QuestionCard = ({ question }: { question: Question & { categoryName?: stri
     }
   };
 
+  // ✅ plain text preview for cards
+  const excerptPlain = truncate(htmlToText(question.excerpt ?? ""), 180);
+
   return (
     <article
       role="button"
@@ -120,7 +145,10 @@ const QuestionCard = ({ question }: { question: Question & { categoryName?: stri
             {question.title}
           </Link>
 
-          <p className="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">{question.excerpt}</p>
+          {/* ✅ Plain text only */}
+          <p className="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
+            {excerptPlain || "No details provided."}
+          </p>
 
           <div className="mt-3 flex flex-wrap gap-2">
             {(question.tags ?? []).map((t) => (

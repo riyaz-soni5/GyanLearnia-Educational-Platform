@@ -23,32 +23,79 @@ export default function RichTextEditor({
     const container = containerRef.current;
     if (!container) return;
 
-    // ✅ StrictMode-safe: if React remounts, wipe previous DOM
+    // ✅ StrictMode-safe: wipe previous DOM
     container.innerHTML = "";
 
-    // Quill needs an inner element to mount into
     const editorEl = document.createElement("div");
     container.appendChild(editorEl);
+
+    // ✅ your backend base URL
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
     const q = new Quill(editorEl, {
       theme: "snow",
       placeholder,
       modules: {
-        toolbar: [
-          [{ header: [1, 2, 3, false] }],
-          ["bold", "italic", "underline", "strike"],
-          [{ list: "ordered" }, { list: "bullet" }],
-          [{ align: [] }],
-          ["blockquote", "code-block"],
-          ["link"],
-          ["clean"],
-        ],
+        toolbar: {
+          container: [
+            [{ header: [1, 2, 3, false] }],
+            ["bold", "italic", "underline", "strike"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            [{ align: [] }],
+            ["blockquote", "code-block"],
+            ["link", "image"], // ✅ add image button
+            ["clean"],
+          ],
+          handlers: {
+            image: () => {
+              const input = document.createElement("input");
+              input.type = "file";
+              input.accept = "image/*";
+
+              input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file) return;
+
+                // optional size limit (match backend)
+                if (file.size > 2 * 1024 * 1024) {
+                  alert("Max 2MB image allowed.");
+                  return;
+                }
+
+                try {
+                  const fd = new FormData();
+                  fd.append("image", file);
+
+                  const res = await fetch(`${API_BASE}/api/images`, {
+                    method: "POST",
+                    body: fd,
+                  });
+
+                  if (!res.ok) throw new Error("Image upload failed");
+                  const data = await res.json(); // { id, url }
+
+                  // ✅ insert returned URL into editor
+                  const range = q.getSelection(true);
+                  const index = range ? range.index : q.getLength();
+                  const imgUrl = data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
+
+                  q.insertEmbed(index, "image", imgUrl, "user");
+                  q.setSelection(index + 1);
+                } catch (e: any) {
+                  alert(e?.message || "Upload failed");
+                }
+              };
+
+              input.click();
+            },
+          },
+        },
       },
     });
 
     quillRef.current = q;
 
-    // set initial HTML
+    // ✅ set initial HTML
     if (value) {
       q.clipboard.dangerouslyPasteHTML(value);
       lastHtmlRef.current = value;
@@ -63,17 +110,14 @@ export default function RichTextEditor({
     q.on("text-change", handler);
 
     return () => {
-      // ✅ remove listener
       q.off("text-change", handler);
-
-      // ✅ destroy DOM Quill created (prevents duplicate toolbar)
       quillRef.current = null;
       if (containerRef.current) containerRef.current.innerHTML = "";
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // If parent updates value (rare), sync it
+  // ✅ Sync value changes from parent
   useEffect(() => {
     const q = quillRef.current;
     if (!q) return;

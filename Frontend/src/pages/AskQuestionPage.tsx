@@ -167,7 +167,7 @@ const AskQuestionPage = () => {
         <div>
           <label className="text-xs font-medium text-gray-700">Question Details</label>
 
-          <div className="mt-2 rounded-xl border border-gray-300 overflow-hidden">
+          <div className="mt-2 rounded-l border border-gray-300 overflow-hidden quill-editor">
             <RichTextEditor
               value={excerpt}
               onChange={setExcerpt}
