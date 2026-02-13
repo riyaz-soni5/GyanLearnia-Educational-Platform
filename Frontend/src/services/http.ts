@@ -15,12 +15,20 @@ export async function http<T>(
   });
 
   // try to read json error
-  if (!res.ok) {
+    if (!res.ok) {
     let msg = "Request failed";
+
+    const contentType = res.headers.get("content-type") || "";
     try {
-      const data = await res.json();
-      msg = data?.message || msg;
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        msg = data?.message || data?.error || msg;
+      } else {
+        const text = await res.text();
+        msg = text?.slice(0, 300) || msg;
+      }
     } catch {}
+
     throw new Error(msg);
   }
 

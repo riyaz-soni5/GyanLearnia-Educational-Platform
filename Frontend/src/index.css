@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "quill/dist/quill.core.css";
+@import "quill/dist/quill.snow.css";
 
 /* Tailwind v4: enable class-based dark mode */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -47,4 +49,34 @@ body {
   .text-basec { color: rgb(var(--text)); }
   .text-muted { color: rgb(var(--muted)); }
   .border-base { border-color: rgb(var(--border)); }
+}
+
+
+/* Quill editor text size fix */
+.ql-editor {
+  font-size: 16px;
+  line-height: 1.7;
+  font-family: inherit;
+}
+
+/* headings inside editor */
+.ql-editor h1 { font-size: 26px; }
+.ql-editor h2 { font-size: 22px; }
+.ql-editor h3 { font-size: 18px; }
+
+/* spacing */
+.ql-editor p { margin-bottom: 0.6rem; }
+
+/* Fixed editor size */
+.ql-container {
+  height: 320px;          /* total editor height */
+}
+
+/* Actual typing area */
+.ql-editor {
+  height: 280px;          /* typing space */
+  overflow-y: auto;       /* enables scroll */
+  font-size: 16px;
+  line-height: 1.7;
+  padding: 16px;
 }

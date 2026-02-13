@@ -1,20 +1,59 @@
 // src/pages/AskQuestionPage.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { createQuestion } from "../services/questions";
+import { fetchCategories } from "../services/category";
+import type { CategoryDTO } from "../services/category";
+import RichTextEditor from "../components/RichTextEditor";
+
+const LEVELS = ["School", "+2/High School", "Bachelor", "Master", "PhD", "Others"] as const;
 
 const AskQuestionPage = () => {
   const nav = useNavigate();
 
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
-  const [subject, setSubject] = useState("Mathematics");
-  const [level, setLevel] = useState("Class 10 (SEE)");
-  const [tagsText, setTagsText] = useState("SEE, Exam");
+
+  // ✅ category from DB
+  const [categories, setCategories] = useState<CategoryDTO[]>([]);
+  const [categoryId, setCategoryId] = useState<string>("");
+
+  // ✅ fixed levels
+  const [level, setLevel] = useState<(typeof LEVELS)[number]>("School");
+
+  const [tagsText, setTagsText] = useState("");
   const [fast, setFast] = useState(false);
 
   const [posting, setPosting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // load categories once
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const res = await fetchCategories();
+        if (!alive) return;
+
+        const items = res.items ?? [];
+        setCategories(items);
+
+        // default to first category
+        if (items.length && !categoryId) {
+          setCategoryId(items[0].id);
+        }
+      } catch (e: any) {
+        if (!alive) return;
+        setErr(e?.message || "Failed to load categories");
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tags = useMemo(() => {
     return tagsText
@@ -29,26 +68,24 @@ const AskQuestionPage = () => {
 
     if (title.trim().length < 10) return setErr("Title must be at least 10 characters.");
     if (excerpt.trim().length < 20) return setErr("Question details must be at least 20 characters.");
-    if (!subject) return setErr("Please select a subject.");
+    if (!categoryId) return setErr("Please select a category.");
     if (!level) return setErr("Please select a level.");
 
     setPosting(true);
     try {
-      const res = await createQuestion({
+      const res: any = await createQuestion({
         title: title.trim(),
         excerpt: excerpt.trim(),
-        subject,
+        categoryId, // ✅ backend expects categoryId
         level,
         tags,
         isFastResponse: fast,
       });
 
-      // ✅ handle different backend shapes
-      const newId = res.item.id;
-      nav(`/questions/${newId}`);
+      const item = res?.item ?? res?.question ?? res?.data ?? res;
+      const newId = item?.id ?? item?._id;
 
       if (!newId) {
-        // fallback: go back to list
         nav("/questions");
         return;
       }
@@ -73,9 +110,6 @@ const AskQuestionPage = () => {
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
         <h1 className="text-2xl font-bold text-gray-900">Ask a Question</h1>
-        <p className="text-sm text-gray-600">
-          Keep it clear and exam-friendly. Add subject, level, and a few tags.
-        </p>
 
         {err ? (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -88,7 +122,7 @@ const AskQuestionPage = () => {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g., How to solve quadratic equations by factorization?"
+            placeholder="e.g., How to center a div in Tailwind?"
             className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
           <p className="mt-1 text-xs text-gray-500">Minimum 10 characters.</p>
@@ -99,41 +133,49 @@ const AskQuestionPage = () => {
             <label className="text-xs font-medium text-gray-700">Level</label>
             <select
               value={level}
-              onChange={(e) => setLevel(e.target.value)}
+              onChange={(e) => setLevel(e.target.value as any)}
               className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             >
-              <option>Class 8</option>
-              <option>Class 9</option>
-              <option>Class 10 (SEE)</option>
-              <option>+2</option>
+              {LEVELS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
             </select>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-gray-700">Subject</label>
+            <label className="text-xs font-medium text-gray-700">Category</label>
             <select
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
               className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             >
-              <option>Mathematics</option>
-              <option>Physics</option>
-              <option>Chemistry</option>
-              <option>English</option>
-              <option>Accountancy</option>
+              {categories.length ? (
+                categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))
+              ) : (
+                <option value="">Loading categories...</option>
+              )}
             </select>
           </div>
         </div>
 
         <div>
           <label className="text-xs font-medium text-gray-700">Question Details</label>
-          <textarea
-            value={excerpt}
-            onChange={(e) => setExcerpt(e.target.value)}
-            rows={7}
-            placeholder="Explain what you tried, what is confusing, and what format you want (steps, example, etc.)"
-            className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-          />
+
+          <div className="mt-2 rounded-xl border border-gray-300 overflow-hidden">
+            <RichTextEditor
+              value={excerpt}
+              onChange={setExcerpt}
+              placeholder="Explain Your Question Details here"
+              className="bg-white"
+            />
+          </div>
+
           <p className="mt-1 text-xs text-gray-500">Minimum 20 characters.</p>
         </div>
 
@@ -142,10 +184,10 @@ const AskQuestionPage = () => {
           <input
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
-            placeholder="SEE, Exam, Algebra"
+            placeholder="React, SEE, Algebra"
             className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
           />
-          <p className="mt-1 text-xs text-gray-500">Example: SEE, Exam, Algebra (max 8)</p>
+          <p className="mt-1 text-xs text-gray-500">Example: React, Exam, Algebra (max 8)</p>
         </div>
 
         <label className="flex items-center gap-3 text-sm text-gray-700">
