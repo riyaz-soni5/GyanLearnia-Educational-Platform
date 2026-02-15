@@ -57,7 +57,7 @@ export const listQuestions = async (req: Request, res: Response) => {
     isFastResponse: q.isFastResponse ?? false,
     hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
 
-    status: (q.answersCount ?? 0) > 0 ? "Answered" : "Unanswered",
+    status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
 
     createdAt: q.createdAt
       ? new Date(q.createdAt).toISOString()
@@ -128,7 +128,7 @@ export const getQuestion = async (req: Request, res: Response) => {
     isFastResponse: q.isFastResponse ?? false,
     hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
 
-    status: (q.answersCount ?? 0) > 0 ? "Answered" : "Unanswered",
+    status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
 
     createdAt: q.createdAt
       ? new Date(q.createdAt).toISOString()
@@ -189,4 +189,66 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
       createdAt: doc.createdAt,
     },
   });
+};
+
+
+export const updateQuestion = async (req: AuthedRequest, res: Response) => {
+  const { id } = req.params;
+  const { title, excerpt } = req.body || {};
+
+  if (title && String(title).trim().length < 10) {
+    return res.status(400).json({ message: "Title must be at least 10 characters." });
+  }
+  if (excerpt && String(excerpt).trim().length < 20) {
+    return res.status(400).json({ message: "Question details must be at least 20 characters." });
+  }
+
+  const q = await Question.findById(id);
+  if (!q) return res.status(404).json({ message: "Question not found" });
+
+  // ✅ only owner can edit
+  if (String(q.authorId) !== String(req.user?.id)) {
+    return res.status(403).json({ message: "Not allowed" });
+  }
+
+  if (title !== undefined) q.title = String(title).trim();
+  if (excerpt !== undefined) q.excerpt = String(excerpt).trim();
+
+  await q.save();
+
+  return res.json({
+    message: "Question updated",
+    item: {
+      id: String(q._id),
+      title: q.title,
+      excerpt: q.excerpt,
+      categoryId: String(q.categoryId),
+      level: q.level,
+      tags: q.tags ?? [],
+      isFastResponse: q.isFastResponse ?? false,
+      votes: q.votes ?? 0,
+      views: q.views ?? 0,
+      answersCount: q.answersCount ?? 0,
+      hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
+      status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
+      createdAt: q.createdAt ? new Date(q.createdAt).toISOString() : undefined,
+      updatedAt: q.updatedAt ? new Date(q.updatedAt).toISOString() : undefined,
+      authorId: String(q.authorId),
+    },
+  });
+};
+
+export const deleteQuestion = async (req: AuthedRequest, res: Response) => {
+  const { id } = req.params;
+
+  const q = await Question.findById(id);
+  if (!q) return res.status(404).json({ message: "Question not found" });
+
+  if (String(q.authorId) !== String(req.user?.id)) {
+    return res.status(403).json({ message: "Not allowed" });
+  }
+
+  await Question.findByIdAndDelete(id);
+
+  return res.json({ message: "Question deleted" });
 };

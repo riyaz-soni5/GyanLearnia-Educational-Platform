@@ -5,11 +5,15 @@ import { createQuestion } from "../services/questions";
 import { fetchCategories } from "../services/category";
 import type { CategoryDTO } from "../services/category";
 import RichTextEditor from "../components/RichTextEditor";
+import { useToast } from "../components/toast";
+
 
 const LEVELS = ["School", "+2/High School", "Bachelor", "Master", "PhD", "Others"] as const;
 
 const AskQuestionPage = () => {
   const nav = useNavigate();
+
+  const { showToast } = useToast();
 
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
@@ -64,39 +68,53 @@ const AskQuestionPage = () => {
   }, [tagsText]);
 
   const submit = async () => {
-    setErr(null);
+  setErr(null);
 
-    if (title.trim().length < 10) return setErr("Title must be at least 10 characters.");
-    if (excerpt.trim().length < 20) return setErr("Question details must be at least 20 characters.");
-    if (!categoryId) return setErr("Please select a category.");
-    if (!level) return setErr("Please select a level.");
+  if (title.trim().length < 10) {
+    showToast("Title must be at least 10 characters.", "error");
+    return;
+  }
+  if (excerpt.trim().length < 20) {
+    showToast("Question details must be at least 20 characters.", "error");
+    return;
+  }
+  if (!categoryId) {
+    showToast("Please select a category.", "error");
+    return;
+  }
+  if (!level) {
+    showToast("Please select a level.", "error");
+    return;
+  }
 
-    setPosting(true);
-    try {
-      const res: any = await createQuestion({
-        title: title.trim(),
-        excerpt: excerpt.trim(),
-        categoryId, // ✅ backend expects categoryId
-        level,
-        tags,
-        isFastResponse: fast,
-      });
+  setPosting(true);
+  showToast("Posting your question...", "info", { durationMs: 1200 });
 
-      const item = res?.item ?? res?.question ?? res?.data ?? res;
-      const newId = item?.id ?? item?._id;
+  try {
+    const res: any = await createQuestion({
+      title: title.trim(),
+      excerpt: excerpt.trim(),
+      categoryId,
+      level,
+      tags,
+      isFastResponse: fast,
+    });
 
-      if (!newId) {
-        nav("/questions");
-        return;
-      }
+    const item = res?.item ?? res?.question ?? res?.data ?? res;
+    const newId = item?.id ?? item?._id;
 
-      nav(`/questions/${newId}`);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to create question");
-    } finally {
-      setPosting(false);
-    }
-  };
+    showToast("Question posted successfully", "success");
+
+    if (newId) nav(`/questions/${newId}`);
+    else nav("/questions");
+  } catch (e: any) {
+    const msg = e?.message || "Failed to create question";
+    setErr(msg);
+    showToast(msg, "error", { durationMs: 3500 });
+  } finally {
+    setPosting(false);
+  }
+};
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

@@ -13,4 +13,6 @@ const AnswerSchema = new Schema(
   { timestamps: true }
 );
 
+AnswerSchema.index({ questionId: 1, authorId: 1 }, { unique: true });
+
 export default model("Answer", AnswerSchema);

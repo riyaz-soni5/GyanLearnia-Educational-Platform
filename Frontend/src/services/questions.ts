@@ -93,3 +93,16 @@ export async function postAnswer(questionId: string, content: string) {
     body: JSON.stringify({ content }),
   });
 }
+
+export async function updateQuestion(id: string, payload: any) {
+  return http<QuestionDetailsResponse>(`/api/questions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteQuestion(id: string) {
+  return http<{ message: string }>(`/api/questions/${id}`, {
+    method: "DELETE",
+  });
+}

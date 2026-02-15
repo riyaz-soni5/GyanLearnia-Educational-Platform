@@ -79,3 +79,40 @@ body {
   font-size: 14px;
   line-height: 1.6;
 }
+
+
+/* =========================
+   ✅ Fix Quill width growth (unbroken text)
+   ========================= */
+
+/* Quill containers should never exceed parent width */
+.ql-container,
+.ql-editor {
+  max-width: 100%;
+}
+
+/* Force wrapping for normal content */
+.ql-editor {
+  overflow-wrap: anywhere;  /* best for long strings */
+  word-break: break-word;
+  white-space: pre-wrap;    /* allow wrapping + keep new lines */
+}
+
+/* IMPORTANT: code blocks are the real issue (they use white-space: pre) */
+.ql-editor pre,
+.ql-editor code {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+/* Images should also never overflow */
+.ql-editor img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Optional: prevent layout blowout if some element still tries to overflow */
+.ql-container {
+  overflow-x: hidden;
+}
