@@ -80,76 +80,121 @@ authorType: authorObj?.role || "student",
 res.json({ items: mapped, total, page: Number(page), limit: Number(limit) });
 };
 
-export const getQuestion = async (req: Request, res: Response) => {
+export const getQuestion = async (req: AuthedRequest, res: Response) => {
   const { id } = req.params;
 
-  const q = (await Question.findByIdAndUpdate(
-    id,
-    { $inc: { views: 1 } },
-    { new: true }
-  )
-    .populate("categoryId", "name")
-    .populate("authorId", "firstName lastName fullName name username role")
-    .lean()) as any;
+  const userId = req.user?.id;
+
+  const ipRaw =
+    (req.headers["x-forwarded-for"] as string) ||
+    req.socket.remoteAddress ||
+    "";
+  const ip = String(ipRaw).split(",")[0].trim();
+  const ua = String(req.headers["user-agent"] || "");
+  const guestKey = `${ip}::${ua}`;
+
+  let q: any = null;
+
+  // ✅ Logged-in user logic
+  if (userId) {
+    q = await Question.findOneAndUpdate(
+      {
+        _id: id,
+        authorId: { $ne: userId },   // owner view should NOT count
+        viewedBy: { $ne: userId },   // already viewed should NOT count
+      },
+      {
+        $inc: { views: 1 },
+        $addToSet: { viewedBy: userId },
+      },
+      { new: true }
+    )
+      .populate("categoryId", "name")
+      .populate("authorId", "firstName lastName fullName name username role")
+      .lean();
+  } 
+  // ✅ Guest logic
+  else {
+    q = await Question.findOneAndUpdate(
+      {
+        _id: id,
+        viewedKeys: { $ne: guestKey },
+      },
+      {
+        $inc: { views: 1 },
+        $addToSet: { viewedKeys: guestKey },
+      },
+      { new: true }
+    )
+      .populate("categoryId", "name")
+      .populate("authorId", "firstName lastName fullName name username role")
+      .lean();
+  }
+
+  // If not incremented, just fetch normally
+  if (!q) {
+    q = await Question.findById(id)
+      .populate("categoryId", "name")
+      .populate("authorId", "firstName lastName fullName name username role")
+      .lean();
+  }
 
   if (!q) return res.status(404).json({ message: "Question not found" });
+  const meId = req.user?.id ? String(req.user.id) : null;
+
+const myVote =
+  meId
+    ? (q.voters?.find((v: any) => String(v.userId) === meId)?.value ?? null)
+    : null;
 
   const authorObj = q.authorId as any;
 
-  // ✅ move these OUTSIDE the object
   const authorName =
-  authorObj?.firstName && authorObj?.lastName
-    ? `${authorObj.firstName} ${authorObj.lastName}`
-    : authorObj?.fullName ||
-      authorObj?.name ||
-      authorObj?.username ||
-      "Anonymous";
+    authorObj?.firstName && authorObj?.lastName
+      ? `${authorObj.firstName} ${authorObj.lastName}`
+      : authorObj?.fullName ||
+        authorObj?.name ||
+        authorObj?.username ||
+        "Anonymous";
 
-  const authorType =
-    authorObj?.role || "student";
+  const authorType = authorObj?.role || "student";
 
-  const item = {
-    id: String(q._id),
-    title: q.title,
-    excerpt: q.excerpt,
+  return res.json({
+    item: {
+      id: String(q._id),
+      title: q.title,
+      excerpt: q.excerpt,
 
-    categoryId: q.categoryId?._id
-      ? String(q.categoryId._id)
-      : q.categoryId
-      ? String(q.categoryId)
-      : undefined,
-    categoryName: q.categoryId?.name,
+      categoryId: q.categoryId?._id
+        ? String(q.categoryId._id)
+        : String(q.categoryId),
+      categoryName: q.categoryId?.name,
 
-    level: q.level,
-    tags: q.tags ?? [],
-    votes: q.votes ?? 0,
-    views: q.views ?? 0,
-    answersCount: q.answersCount ?? 0,
-    isFastResponse: q.isFastResponse ?? false,
-    hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
+      level: q.level,
+      tags: q.tags ?? [],
 
-    status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
+      votes: q.votes ?? 0,
+      myVote,
+      views: q.views ?? 0,
+      answersCount: q.answersCount ?? 0,
+      isFastResponse: q.isFastResponse ?? false,
+      hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
+      acceptedAnswerId: q.acceptedAnswerId ?? null,
 
-    createdAt: q.createdAt
-      ? new Date(q.createdAt).toISOString()
-      : undefined,
-    updatedAt: q.updatedAt
-      ? new Date(q.updatedAt).toISOString()
-      : undefined,
+      status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
 
-    author: authorName,
-    authorType,
+      createdAt: q.createdAt ? new Date(q.createdAt).toISOString() : undefined,
+      updatedAt: q.updatedAt ? new Date(q.updatedAt).toISOString() : undefined,
 
-    authorId: authorObj?._id
-      ? String(authorObj._id)
-      : q.authorId
-      ? String(q.authorId)
-      : undefined,
-  };
+      author: authorName,
+      authorType,
 
-  return res.json({ item });
+      authorId: authorObj?._id
+        ? String(authorObj._id)
+        : String(q.authorId),
+    },
+  });
 };
-
 
 export const createQuestion = async (req: AuthedRequest, res: Response) => {
   const { title, excerpt, categoryId, level, tags = [], isFastResponse = false } = req.body || {};
@@ -251,4 +296,77 @@ export const deleteQuestion = async (req: AuthedRequest, res: Response) => {
   await Question.findByIdAndDelete(id);
 
   return res.json({ message: "Question deleted" });
+};
+
+
+const applyVote = (existing: number | null, next: 1 | -1) => {
+  if (existing === next) return { newValue: null, delta: -next };
+  if (existing === null) return { newValue: next, delta: next };
+  return { newValue: next, delta: next - existing };
+};
+
+// POST /api/questions/:id/upvote
+export const upvoteQuestion = async (req: AuthedRequest, res: Response) => {
+  try {
+    const { id: questionId } = req.params;
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const q: any = await Question.findById(questionId);
+    if (!q) return res.status(404).json({ message: "Question not found" });
+
+    const userId = String(req.user.id);
+
+    const idx = q.voters.findIndex((v: any) => String(v.userId) === userId);
+    const existing = idx >= 0 ? Number(q.voters[idx].value) : null;
+
+    const { newValue, delta } = applyVote(existing, 1);
+
+    if (newValue === null) {
+      q.voters = q.voters.filter((v: any) => String(v.userId) !== userId);
+    } else if (idx >= 0) {
+      q.voters[idx].value = newValue;
+    } else {
+      q.voters.push({ userId: req.user.id, value: newValue });
+    }
+
+    q.votes = Number(q.votes || 0) + delta;
+    await q.save();
+
+    return res.json({ message: "Voted", votes: q.votes, myVote: newValue });
+  } catch {
+    return res.status(500).json({ message: "Failed to upvote question" });
+  }
+};
+
+// POST /api/questions/:id/downvote
+export const downvoteQuestion = async (req: AuthedRequest, res: Response) => {
+  try {
+    const { id: questionId } = req.params;
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+
+    const q: any = await Question.findById(questionId);
+    if (!q) return res.status(404).json({ message: "Question not found" });
+
+    const userId = String(req.user.id);
+
+    const idx = q.voters.findIndex((v: any) => String(v.userId) === userId);
+    const existing = idx >= 0 ? Number(q.voters[idx].value) : null;
+
+    const { newValue, delta } = applyVote(existing, -1);
+
+    if (newValue === null) {
+      q.voters = q.voters.filter((v: any) => String(v.userId) !== userId);
+    } else if (idx >= 0) {
+      q.voters[idx].value = newValue;
+    } else {
+      q.voters.push({ userId: req.user.id, value: newValue });
+    }
+
+    q.votes = Number(q.votes || 0) + delta;
+    await q.save();
+
+    return res.json({ message: "Voted", votes: q.votes, myVote: newValue });
+  } catch {
+    return res.status(500).json({ message: "Failed to downvote question" });
+  }
 };

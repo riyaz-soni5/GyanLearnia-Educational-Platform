@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import QuestionsToolbar from "../components/questions/QuestionToolbar";
 import QuestionsList from "../components/questions/QuestionList";
-import Leaderboard from "../components/questions/Leaderboard";
+import Leaderboard from "../components/Leaderboard";
 import type { Question } from "../app/types/question.types";
 import { fetchQuestions } from "../services/questions";
 import { fetchCategories } from "../services/category";

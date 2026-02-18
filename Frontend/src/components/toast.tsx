@@ -117,20 +117,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                       <p className="text-sm text-basec text-center font-semibold leading-relaxed">
                         {t.message}
                       </p>
-
-                      <button
-                        type="button"
-                        onClick={() => removeToast(t.id)}
-                        className="rounded-lg p-1 text-muted hover:text-basec"
-                        aria-label="Close toast"
-                      >
-                        <IoClose className="h-5 w-5" />
-                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* ✅ progress bar removed (as you requested) */}
               </div>
             );
           })}

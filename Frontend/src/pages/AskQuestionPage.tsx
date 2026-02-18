@@ -24,9 +24,10 @@ const AskQuestionPage = () => {
 
   // ✅ fixed levels
   const [level, setLevel] = useState<(typeof LEVELS)[number]>("School");
-
-  const [tagsText, setTagsText] = useState("");
   const [fast, setFast] = useState(false);
+
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
   const [posting, setPosting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -59,13 +60,35 @@ const AskQuestionPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const tags = useMemo(() => {
-    return tagsText
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean)
-      .slice(0, 8);
-  }, [tagsText]);
+  const addTag = (value: string) => {
+  const v = value.trim();
+  if (!v) return;
+  if (tags.includes(v)) return;
+  if (tags.length >= 8) {
+    showToast("Maximum 8 tags allowed", "error");
+    return;
+  }
+
+  setTags((prev) => [...prev, v]);
+};
+
+const removeTag = (tag: string) => {
+  setTags((prev) => prev.filter((t) => t !== tag));
+};
+
+const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addTag(tagInput);
+    setTagInput("");
+  }
+
+  // remove last tag when backspace and input empty
+  if (e.key === "Backspace" && !tagInput && tags.length) {
+    setTags((prev) => prev.slice(0, prev.length - 1));
+  }
+};
+
 
   const submit = async () => {
   setErr(null);
@@ -88,7 +111,6 @@ const AskQuestionPage = () => {
   }
 
   setPosting(true);
-  showToast("Posting your question...", "info", { durationMs: 1200 });
 
   try {
     const res: any = await createQuestion({
@@ -198,14 +220,35 @@ const AskQuestionPage = () => {
         </div>
 
         <div>
-          <label className="text-xs font-medium text-gray-700">Tags (comma separated)</label>
-          <input
-            value={tagsText}
-            onChange={(e) => setTagsText(e.target.value)}
-            placeholder="React, SEE, Algebra"
-            className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-          />
-          <p className="mt-1 text-xs text-gray-500">Example: React, Exam, Algebra (max 8)</p>
+          <label className="text-xs font-medium text-gray-700">Tags</label>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-100">
+            
+            {/* existing tags */}
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+              >
+                {tag}
+                <button
+                  type="button"
+                  onClick={() => removeTag(tag)}
+                  className="text-indigo-500 hover:text-red-600"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+
+            {/* input */}
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={onTagKeyDown}
+              className="flex-1 min-w-[120px] border-none bg-transparent text-sm focus:outline-none"
+            />
+          </div>
         </div>
 
         <label className="flex items-center gap-3 text-sm text-gray-700">

@@ -17,6 +17,8 @@ const UserSchema = new Schema(
     institution: { type: String, trim: true },
 
     isVerified: { type: Boolean, default: false },
+    points: { type: Number, default: 0 },         // ✅ NEW
+    acceptedAnswers: { type: Number, default: 0 }, // ✅ NEW (optional but useful)
   },
   { timestamps: true }
 );
