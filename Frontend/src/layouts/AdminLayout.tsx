@@ -37,8 +37,9 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="w-screen h-screen bg-gray-50">
-      {/* Admin topbar */}
+    // ✅ min-h-screen so background extends with long content
+    // ✅ flex flex-col so header + content layout is stable
+    <div className="min-h-screen w-full bg-gray-50 flex flex-col">
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
@@ -62,48 +63,50 @@ const AdminLayout = () => {
             >
               Logout
               <Icon.Logout className="h-4 w-4" color="red" />
-              
             </button>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-12">
-        {/* Admin sidebar */}
-        <aside className="lg:col-span-3">
-          <nav className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
-            <div className="space-y-1">
-              {navItems.map((it) => {
-                const Ico = it.icon;
-                return (
-                  <NavLink
-                    key={it.to}
-                    to={it.to}
-                    end={it.end as any}
-                    className={({ isActive }) =>
-                      [
-                        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
-                        isActive
-                          ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200"
-                          : "text-gray-700 hover:bg-gray-50",
-                      ].join(" ")
-                    }
-                  >
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white ring-1 ring-gray-200 text-gray-800">
-                      <Ico className="h-5 w-5" />
-                    </span>
-                    <span className="truncate">{it.label}</span>
-                  </NavLink>
-                );
-              })}
+      {/* ✅ flex-1 so this section takes remaining height but can grow beyond it */}
+      <div className="flex-1">
+        <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-12">
+          <aside className="lg:col-span-3">
+            <div className="lg:sticky lg:top-20">
+              <nav className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+                <div className="space-y-1">
+                  {navItems.map((it) => {
+                    const Ico = it.icon;
+                    return (
+                      <NavLink
+                        key={it.to}
+                        to={it.to}
+                        end={it.end as any}
+                        className={({ isActive }) =>
+                          [
+                            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition",
+                            isActive
+                              ? "bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200"
+                              : "text-gray-700 hover:bg-gray-50",
+                          ].join(" ")
+                        }
+                      >
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white ring-1 ring-gray-200 text-gray-800">
+                          <Ico className="h-5 w-5" />
+                        </span>
+                        <span className="truncate">{it.label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </nav>
             </div>
-          </nav>
-        </aside>
+          </aside>
 
-        {/* Admin content */}
-        <main className="lg:col-span-9">
-          <Outlet />
-        </main>
+          <main className="lg:col-span-9">
+            <Outlet />
+          </main>
+        </div>
       </div>
     </div>
   );

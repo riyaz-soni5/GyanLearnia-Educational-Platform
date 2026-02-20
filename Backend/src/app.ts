@@ -8,6 +8,7 @@ import imagesRoute from "./routes/images.routes.js";
 import instructorDocRoutes from "./routes/instructorDoc.routes.js";
 import adminVerificationRoutes from "./routes/adminVerification.route.js";
 import instructorVerificationRoutes from "./routes/instructorVerification.route.js";
+import adminUsersRoute from "./routes/admin.users.route.js";
 
 
 
@@ -29,5 +30,6 @@ app.use("/api", imagesRoute);
 app.use("/api", instructorDocRoutes);
 app.use("/api", adminVerificationRoutes);
 app.use("/api", instructorVerificationRoutes);
+app.use("/api/admin", adminUsersRoute);
 
 export default app;

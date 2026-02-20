@@ -1,126 +1,21 @@
 // src/pages/admin/ManageUsersPage.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { FiSearch, FiUser, FiTrash2, FiRefreshCcw } from "react-icons/fi";
 
-type UserRole = "student" | "instructor" | "admin";
-type UserStatus = "Active" | "Suspended";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import { useToast } from "../../components/toast";
+import {
+  type AdminUser,
+  type AdminRoleFilter,
+  type AdminRoleKey,
+  deleteUserById,
+  fetchAdminUsers,
+  updateUserRoleById,
+} from "../../services/adminUsers";
 
-type AdminUser = {
-  id: string;
-  name: string;
-  username: string;
-  email: string;
-  role: UserRole;
-  status: UserStatus;
-  verifiedInstructor?: boolean; // only for instructors
-  rank?: number; // for students/mentors idea
-  joinedAt: string;
-  lastActive: string;
-};
+type Tone = "gray" | "indigo" | "green" | "yellow" | "red";
 
-const Icon = {
-  Search: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
-        className="stroke-current"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M21 21l-4.3-4.3"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  User: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"
-        className="stroke-current"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M3 22a9 9 0 0 1 18 0"
-        className="stroke-current"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Shield: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z"
-        className="stroke-current"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 12l2 2 4-5"
-        className="stroke-current"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Pause: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M8 6v12M16 6v12"
-        className="stroke-current"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Play: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M9 6l10 6-10 6V6z"
-        className="stroke-current"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  Trash: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M4 7h16"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M10 11v7M14 11v7"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M6 7l1 14h10l1-14"
-        className="stroke-current"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M9 7V4h6v3"
-        className="stroke-current"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-};
-
-const Badge = ({
-  text,
-  tone,
-}: {
-  text: string;
-  tone: "gray" | "indigo" | "green" | "yellow" | "red";
-}) => {
+function Badge({ text, tone }: { text: string; tone: Tone }) {
   const cls =
     tone === "indigo"
       ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
@@ -133,161 +28,278 @@ const Badge = ({
       : "bg-gray-50 text-gray-700 ring-gray-200";
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${cls}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${cls}`}
+    >
       {text}
     </span>
   );
-};
+}
 
-const roleTone = (r: UserRole) => (r === "admin" ? "indigo" : r === "instructor" ? "green" : "gray");
-const statusTone = (s: UserStatus) => (s === "Active" ? "green" : "red");
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toISOString().slice(0, 10);
+}
 
-const ManageUsersPage = () => {
-  // ✅ static demo users
-  const [users, setUsers] = useState<AdminUser[]>([
-    {
-      id: "u1",
-      name: "Salomi Kumari",
-      username: "salomi_k",
-      email: "salomi@email.com",
-      role: "student",
-      status: "Active",
-      rank: 142,
-      joinedAt: "2025-09-12",
-      lastActive: "2 hours ago",
-    },
-    {
-      id: "u2",
-      name: "Astha Sharma",
-      username: "astha_sharma",
-      email: "astha@example.com",
-      role: "instructor",
-      status: "Active",
-      verifiedInstructor: true,
-      joinedAt: "2025-08-03",
-      lastActive: "1 day ago",
-    },
-    {
-      id: "u3",
-      name: "Srawan Shrestha",
-      username: "srawan_s",
-      email: "srawan@example.com",
-      role: "instructor",
-      status: "Suspended",
-      verifiedInstructor: false,
-      joinedAt: "2025-10-01",
-      lastActive: "2 weeks ago",
-    },
-    {
-      id: "u4",
-      name: "Admin",
-      username: "admin",
-      email: "admin@gyanlearnia.com",
-      role: "admin",
-      status: "Active",
-      joinedAt: "2025-01-10",
-      lastActive: "Online",
-    },
-  ]);
+/** ✅ UI role label (Verified/Unverified Instructor) */
+function getRoleKey(u: AdminUser): AdminRoleKey {
+  if (u.role === "admin") return "admin";
+  if (u.role === "student") return "student";
+  const verified = u.isVerified || u.verificationStatus === "Verified";
+  return verified ? "verified_instructor" : "unverified_instructor";
+}
+
+function roleLabel(key: AdminRoleKey) {
+  if (key === "student") return "STUDENT";
+  if (key === "admin") return "ADMIN";
+  if (key === "verified_instructor") return "VERIFIED INSTRUCTOR";
+  return "UNVERIFIED INSTRUCTOR";
+}
+
+function roleToneByKey(key: AdminRoleKey): Tone {
+  if (key === "admin") return "indigo";
+  if (key === "verified_instructor") return "green";
+  if (key === "unverified_instructor") return "yellow";
+  return "gray";
+}
+
+export default function ManageUsersPage() {
+  const { showToast } = useToast();
 
   const [query, setQuery] = useState("");
-  const [role, setRole] = useState<UserRole | "All">("All");
-  const [status, setStatus] = useState<UserStatus | "All">("All");
+  const [role, setRole] = useState<AdminRoleFilter>("All");
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return users.filter((u) => {
-      const matchQuery =
-        !q ||
-        u.name.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q);
+  const [page, setPage] = useState(1);
+  const limit = 10;
 
-      const matchRole = role === "All" || u.role === role;
-      const matchStatus = status === "All" || u.status === status;
+  const [rows, setRows] = useState<AdminUser[]>([]);
+  const [total, setTotal] = useState(0);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(total / limit)),
+    [total, limit]
+  );
 
-      return matchQuery && matchRole && matchStatus;
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // per-row role selection
+  const [rolePick, setRolePick] = useState<Record<string, AdminRoleKey>>({});
+  const [roleSaving, setRoleSaving] = useState<Record<string, boolean>>({});
+
+  // confirm dialog state (delete only)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<null | (() => Promise<void>)>(null);
+  const [confirmTitle, setConfirmTitle] = useState("Confirm");
+  const [confirmDesc, setConfirmDesc] = useState<string | undefined>(undefined);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    setErr(null);
+    try {
+      const data = await fetchAdminUsers({ q: query, role, page, limit });
+      setRows(data.items);
+      setTotal(data.total);
+
+      // init rolePick for visible rows (sync from backend)
+      setRolePick((prev) => {
+        const next = { ...prev };
+        for (const u of data.items) {
+          next[u.id] = getRoleKey(u);
+        }
+        return next;
+      });
+    } catch (e: any) {
+      setErr(e?.message || "Failed to load users");
+      showToast(e?.message || "Failed to load users", "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, role]);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, query, role]);
+
+  const showingFrom = useMemo(
+    () => (total === 0 ? 0 : (page - 1) * limit + 1),
+    [page, limit, total]
+  );
+  const showingTo = useMemo(
+    () => Math.min(page * limit, total),
+    [page, limit, total]
+  );
+
+  function openDeleteConfirm(u: AdminUser) {
+    setConfirmTitle("Delete user?");
+    setConfirmDesc("This action cannot be undone.");
+    setConfirmAction(() => async () => {
+      const prev = rows;
+      setRows((p) => p.filter((x) => x.id !== u.id)); // optimistic
+      try {
+        await deleteUserById(u.id);
+        showToast("User deleted", "success");
+        await load();
+      } catch (e: any) {
+        setRows(prev);
+        const msg = e?.message || "Delete failed";
+        setErr(msg);
+        showToast(msg, "error");
+        throw e;
+      }
     });
-  }, [users, query, role, status]);
+    setConfirmOpen(true);
+  }
 
-  const toggleSuspend = (id: string) => {
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === id
-          ? { ...u, status: u.status === "Active" ? "Suspended" : "Active" }
-          : u
-      )
+  async function handleRoleChange(u: AdminUser, nextRoleKey: AdminRoleKey) {
+    const current = getRoleKey(u);
+    if (nextRoleKey === current) return;
+
+    // optimistic dropdown update (already changed in UI)
+    setRoleSaving((p) => ({ ...p, [u.id]: true }));
+    const prevRows = rows;
+    const prevPick = rolePick[u.id] ?? current;
+
+    // optimistic row update (so Role badge changes immediately)
+    setRows((p) =>
+      p.map((x) => {
+        if (x.id !== u.id) return x;
+
+        if (nextRoleKey === "student") {
+          return { ...x, role: "student" as const };
+        }
+        if (nextRoleKey === "admin") {
+          return { ...x, role: "admin" as const };
+        }
+        if (nextRoleKey === "verified_instructor") {
+          return {
+            ...x,
+            role: "instructor" as const,
+            isVerified: true,
+            verificationStatus: "Verified" as const,
+          };
+        }
+        // unverified instructor
+        return {
+          ...x,
+          role: "instructor" as const,
+          isVerified: false,
+          verificationStatus:
+            x.verificationStatus === "Verified"
+              ? ("Pending" as const)
+              : x.verificationStatus,
+        };
+      })
     );
-  };
 
-  const deleteUser = (id: string) => {
-    const ok = confirm("Delete user? (demo)");
-    if (!ok) return;
-    setUsers((prev) => prev.filter((u) => u.id !== id));
-  };
+    try {
+      const out = await updateUserRoleById(u.id, nextRoleKey);
+
+      // apply server truth
+      setRows((p) =>
+        p.map((x) =>
+          x.id === out.id
+            ? {
+                ...x,
+                role: out.role,
+                isVerified: out.isVerified,
+                verificationStatus: out.verificationStatus,
+              }
+            : x
+        )
+      );
+
+      showToast(`Role updated to ${roleLabel(nextRoleKey)}`, "success");
+    } catch (e: any) {
+      // revert both row and dropdown
+      setRows(prevRows);
+      setRolePick((p) => ({ ...p, [u.id]: prevPick }));
+      const msg = e?.message || "Failed to update role";
+      setErr(msg);
+      showToast(msg, "error");
+    } finally {
+      setRoleSaving((p) => ({ ...p, [u.id]: false }));
+    }
+  }
+
+  const displayRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((u) => {
+      const fullName = `${u.firstName} ${u.lastName}`.toLowerCase();
+      return fullName.includes(q) || u.email.toLowerCase().includes(q);
+    });
+  }, [rows, query]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <section className="rounded-2xl bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Manage Users</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Search, filter, suspend/activate users (static demo).
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
+              Manage Users
+            </h1>
+          </div>
+        </div>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-12">
-          {/* Search */}
-          <div className="lg:col-span-6">
+          <div className="lg:col-span-8">
             <label className="text-xs font-semibold text-gray-700">Search</label>
             <div className="mt-2 relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <Icon.Search className="h-4 w-4" />
+                <FiSearch className="h-4 w-4" />
               </span>
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name, username, email..."
+                placeholder="Search name or email..."
                 className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               />
             </div>
           </div>
 
-          {/* Role */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-4">
             <label className="text-xs font-semibold text-gray-700">Role</label>
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as any)}
+              onChange={(e) => setRole(e.target.value as AdminRoleFilter)}
               className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             >
               <option value="All">All</option>
               <option value="student">Student</option>
-              <option value="instructor">Instructor</option>
+              <option value="verified_instructor">Verified Instructor</option>
+              <option value="unverified_instructor">Unverified Instructor</option>
               <option value="admin">Admin</option>
-            </select>
-          </div>
-
-          {/* Status */}
-          <div className="lg:col-span-3">
-            <label className="text-xs font-semibold text-gray-700">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-            >
-              <option value="All">All</option>
-              <option value="Active">Active</option>
-              <option value="Suspended">Suspended</option>
             </select>
           </div>
         </div>
 
-        <p className="mt-4 text-sm text-gray-600">
-          Showing <span className="font-semibold text-gray-900">{filtered.length}</span> user(s)
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-gray-600">
+            {loading ? (
+              "Loading..."
+            ) : (
+              <>
+                Showing{" "}
+                <span className="font-semibold text-gray-900">
+                  {showingFrom}-{showingTo}
+                </span>{" "}
+                of <span className="font-semibold text-gray-900">{total}</span>
+              </>
+            )}
+          </p>
+
+          {err ? <p className="text-sm font-semibold text-red-700">{err}</p> : null}
+        </div>
       </section>
 
-      {/* Table */}
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -295,129 +307,147 @@ const ManageUsersPage = () => {
               <tr className="border-b border-gray-200">
                 <th className="py-3 pr-4">User</th>
                 <th className="py-3 pr-4">Role</th>
-                <th className="py-3 pr-4">Status</th>
                 <th className="py-3 pr-4">Joined</th>
-                <th className="py-3 pr-4">Last Active</th>
                 <th className="py-3 text-right">Action</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((u) => (
-                <tr key={u.id} className="align-top">
-                  <td className="py-4 pr-4">
-                    <div className="flex items-start gap-3">
-                      <span className="grid h-10 w-10 place-items-center rounded-xl bg-gray-900 text-white">
-                        <Icon.User className="h-5 w-5" />
-                      </span>
-
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-gray-900">{u.name}</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          @{u.username} • {u.email}
-                        </p>
-
-                        {/* extra meta */}
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {u.role === "instructor" ? (
-                            u.verifiedInstructor ? (
-                              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                                <Icon.Shield className="h-4 w-4" />
-                                Verified Instructor
-                              </span>
-                            ) : (
-                              <Badge text="Instructor (Not verified)" tone="gray" />
-                            )
-                          ) : null}
-
-                          {u.role === "student" && typeof u.rank === "number" ? (
-                            <Badge text={`Rank #${u.rank}`} tone="gray" />
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="py-4 pr-4">
-                    <Badge text={u.role.toUpperCase()} tone={roleTone(u.role) as any} />
-                  </td>
-
-                  <td className="py-4 pr-4">
-                    <Badge text={u.status} tone={statusTone(u.status) as any} />
-                  </td>
-
-                  <td className="py-4 pr-4 text-gray-700">{u.joinedAt}</td>
-
-                  <td className="py-4 pr-4 text-gray-700">{u.lastActive}</td>
-
-                  <td className="py-4 text-right">
-                    <div className="inline-flex flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        className={[
-                          "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold",
-                          u.status === "Active"
-                            ? "border border-gray-300 text-gray-800 hover:bg-gray-50"
-                            : "bg-green-600 text-white hover:bg-green-700",
-                        ].join(" ")}
-                        onClick={() => toggleSuspend(u.id)}
-                        title="Static demo"
-                      >
-                        {u.status === "Active" ? (
-                          <>
-                            <Icon.Pause className="h-4 w-4" />
-                            Suspend
-                          </>
-                        ) : (
-                          <>
-                            <Icon.Play className="h-4 w-4" />
-                            Activate
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
-                        onClick={() => deleteUser(u.id)}
-                        title="Static demo"
-                        disabled={u.role === "admin"} // prevent deleting admin in demo
-                      >
-                        <Icon.Trash className="h-4 w-4" />
-                        Delete
-                      </button>
-                    </div>
-
-                    {u.role === "admin" ? (
-                      <p className="mt-2 text-xs text-gray-500">Admin protected</p>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-
-              {!filtered.length ? (
+              {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-gray-600">
+                  <td colSpan={4} className="py-10 text-center text-sm text-gray-600">
                     No users found.
                   </td>
                 </tr>
               ) : null}
+
+              {displayRows.map((u) => {
+                const fullName = `${u.firstName} ${u.lastName}`.trim();
+                const currentKey = getRoleKey(u);
+                const pickedKey = rolePick[u.id] ?? currentKey;
+                const isAdmin = currentKey === "admin";
+                const saving = Boolean(roleSaving[u.id]);
+
+                return (
+                  <tr key={u.id} className="align-top">
+                    <td className="py-4 pr-4">
+                      <div className="flex items-start gap-3">
+                        <span className="grid h-10 w-10 place-items-center rounded-xl bg-gray-900 text-white">
+                          <FiUser className="h-5 w-5" />
+                        </span>
+
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-gray-900">
+                            {fullName || "(No name)"}
+                          </p>
+                          <p className="mt-1 text-xs text-gray-500">{u.email}</p>
+
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="py-4 pr-4">
+                      <Badge text={roleLabel(currentKey)} tone={roleToneByKey(currentKey)} />
+                    </td>
+
+                    <td className="py-4 pr-4 text-gray-700">{formatDate(u.joinedAt)}</td>
+
+                    <td className="py-4 text-right">
+                      <div className="inline-flex flex-wrap justify-end gap-2">
+                        {/* ✅ dropdown in Action column */}
+                        <select
+                          value={pickedKey}
+                          onChange={(e) => {
+                            const next = e.target.value as AdminRoleKey;
+                            setRolePick((p) => ({ ...p, [u.id]: next }));
+                            void handleRoleChange(u, next);
+                          }}
+                          disabled={isAdmin || saving}
+                          className="h-10 rounded-lg border border-gray-300 bg-white px-2 text-sm disabled:opacity-60"
+                          title={isAdmin ? "Admin protected" : saving ? "Updating..." : "Change role"}
+                        >
+                          <option value="student">Student</option>
+                          <option value="verified_instructor">Verified Instructor</option>
+                          <option value="unverified_instructor">Unverified Instructor</option>
+                          <option value="admin">Admin</option>
+                        </select>
+
+                        <button
+                          type="button"
+                          className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                          onClick={() => openDeleteConfirm(u)}
+                          disabled={isAdmin || confirmLoading}
+                          title={isAdmin ? "Admin protected" : "Delete user"}
+                        >
+                          <FiTrash2 className="h-4 w-4" />
+                          Delete
+                        </button>
+                      </div>
+
+                      {isAdmin ? <p className="mt-2 text-xs text-gray-500">Admin protected</p> : null}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        {/* Note */}
-        <div className="mt-6 rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
-          <p className="text-xs font-semibold text-gray-700">Backend later</p>
-          <p className="mt-1 text-xs text-gray-600">
-            Future endpoints idea: <span className="font-semibold">GET /admin/users</span>,{" "}
-            <span className="font-semibold">PATCH /admin/users/:id/status</span>,{" "}
-            <span className="font-semibold">DELETE /admin/users/:id</span>.
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-gray-600">
+            Page <span className="font-semibold text-gray-900">{page}</span> of{" "}
+            <span className="font-semibold text-gray-900">{totalPages}</span>
           </p>
+
+          <div className="inline-flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Prev
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </section>
+
+      {/* ✅ ConfirmDialog only for delete */}
+      <ConfirmDialog
+        open={confirmOpen}
+        title={confirmTitle}
+        description={confirmDesc}
+        tone="danger"
+        confirmText="Delete"
+        loading={confirmLoading}
+        onClose={() => {
+          if (confirmLoading) return;
+          setConfirmOpen(false);
+        }}
+        onConfirm={() => {
+          if (!confirmAction) return;
+
+          setConfirmLoading(true);
+          Promise.resolve()
+            .then(confirmAction)
+            .then(() => setConfirmOpen(false))
+            .catch((e: any) => {
+              const msg = e?.message || "Delete failed";
+              setErr(msg);
+              showToast(msg, "error");
+            })
+            .finally(() => setConfirmLoading(false));
+        }}
+      />
     </div>
   );
-};
-
-export default ManageUsersPage;
+}
