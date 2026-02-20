@@ -1,7 +1,8 @@
-// models/User.model.ts (updated)
+// models/User.model.ts
 import { Schema, model } from "mongoose";
 
-export type UserRole = "student" | "instructor";
+export type UserRole = "student" | "instructor" | "admin";
+export type VerificationStatus = "NotSubmitted" | "Pending" | "Rejected" | "Verified";
 
 const UserSchema = new Schema(
   {
@@ -10,15 +11,24 @@ const UserSchema = new Schema(
 
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ["student", "instructor"], required: true },
+    role: { type: String, enum: ["student", "instructor", "admin"], required: true },
 
     // Instructor-only
     expertise: { type: String, trim: true },
     institution: { type: String, trim: true },
 
+    // ✅ verification flow
+    verificationStatus: {
+      type: String,
+      enum: ["NotSubmitted", "Pending", "Rejected", "Verified"],
+      default: "NotSubmitted",
+    },
+    verificationReason: { type: String, trim: true, default: null },
+
     isVerified: { type: Boolean, default: false },
-    points: { type: Number, default: 0 },         // ✅ NEW
-    acceptedAnswers: { type: Number, default: 0 }, // ✅ NEW (optional but useful)
+
+    points: { type: Number, default: 0 },
+    acceptedAnswers: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

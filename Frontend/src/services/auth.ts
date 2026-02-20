@@ -9,6 +9,7 @@ export type LoginResponse = {
     email: string;
     firstName?: string;
     lastName?: string;
+    isVerified?: boolean;
   };
 };
 

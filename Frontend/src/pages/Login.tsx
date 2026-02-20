@@ -5,6 +5,9 @@ import Logo from "../assets/icon.svg";
 import { useToast } from "../components/toast";
 import { loginApi } from "../services/auth";
 
+// ✅ add this
+import { setUser } from "../services/session";
+
 const LoginPage = () => {
   const nav = useNavigate();
   const { showToast } = useToast();
@@ -39,14 +42,22 @@ const LoginPage = () => {
         rememberMe
       );
 
-      const storage = rememberMe ? localStorage : sessionStorage;
-      storage.setItem("gyanlearnia_user", JSON.stringify(data.user));
+      // ✅ store user in local/session storage (single helper)
+      setUser(data.user, rememberMe);
 
       showToast("Login successful", "success");
 
       setTimeout(() => {
-        if (data.user.role === "admin") nav("/admin", { replace: true });
-        else nav("/courses", { replace: true });
+        // ✅ admin goes admin
+        if (data.user.role === "admin") return nav("/admin", { replace: true });
+
+        // ✅ instructor gating (needs backend to send isVerified)
+        if (data.user.role === "instructor" && !data.user.isVerified) {
+          return nav("/instructor/verify", { replace: true });
+        }
+
+        // ✅ normal
+        nav("/courses", { replace: true });
       }, 700);
     } catch (err: any) {
       setError(err?.message || "Login failed. Please try again.");

@@ -27,6 +27,7 @@ import ManageUsersPage from "../../pages/admin/ManageUserPage";
 import ReportsPage from "../../pages/admin/ReportsPage";
 import SettingsPage from "../../pages/admin/SettingsPage";
 import AskQuestionPage from "../../pages/AskQuestionPage";
+import InstructorVerificationPage from "../../pages/instructor/InstructorVerificationPage";
 
 // ✅ helpers (loaders)
 const redirectIfLoggedIn = () => {
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "login", element: <LoginPage />, loader: redirectIfLoggedIn },
       { path: "register", element: <RegisterPage />, loader: redirectIfLoggedIn },
+        { path: "instructor/verify", element: <InstructorVerificationPage />, loader: requireAuth },
     ],
   },
 
