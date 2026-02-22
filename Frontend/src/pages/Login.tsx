@@ -42,21 +42,24 @@ const LoginPage = () => {
         rememberMe
       );
 
-      // ✅ store user in local/session storage (single helper)
+      // ✅ stores role + isVerified + verificationStatus (after you add it in backend/types)
       setUser(data.user, rememberMe);
 
       showToast("Login successful", "success");
 
       setTimeout(() => {
-        // ✅ admin goes admin
+        const isInstructor = data.user.role === "instructor";
+        const isVerifiedInstructor =
+          Boolean(data.user.isVerified) || data.user.verificationStatus === "Verified";
+
         if (data.user.role === "admin") return nav("/admin", { replace: true });
 
-        // ✅ instructor gating (needs backend to send isVerified)
-        if (data.user.role === "instructor" && !data.user.isVerified) {
-          return nav("/instructor/verify", { replace: true });
+        if (isInstructor) {
+          return nav(isVerifiedInstructor ? "/instructor/dashboard" : "/instructor/verify", {
+            replace: true,
+          });
         }
 
-        // ✅ normal
         nav("/courses", { replace: true });
       }, 700);
     } catch (err: any) {

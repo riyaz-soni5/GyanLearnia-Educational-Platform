@@ -10,6 +10,7 @@ export type LoginResponse = {
     firstName?: string;
     lastName?: string;
     isVerified?: boolean;
+    verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
   };
 };
 

@@ -8,6 +8,7 @@ export type SessionUser = {
   firstName?: string;
   lastName?: string;
   isVerified?: boolean; // ✅ needed for instructor gating
+  verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
 };
 
 // ✅ get logged user
