@@ -3,6 +3,7 @@ import type { MyInstructorCourse } from "../../services/instructorCourse";
 
 type Props = {
   course: MyInstructorCourse;
+  onEdit?: (courseId: string) => void;
 };
 
 const badgeByStatus = (status: MyInstructorCourse["status"]) => {
@@ -32,7 +33,7 @@ const badgeByStatus = (status: MyInstructorCourse["status"]) => {
   };
 };
 
-export default function CourseSubmissionStatusCard({ course }: Props) {
+export default function CourseSubmissionStatusCard({ course, onEdit }: Props) {
   const meta = badgeByStatus(course.status);
 
   if (course.status === "Published") {
@@ -69,6 +70,16 @@ export default function CourseSubmissionStatusCard({ course }: Props) {
           </div>
         ) : null}
       </div>
+
+      {course.status === "Rejected" ? (
+        <button
+          type="button"
+          onClick={() => onEdit?.(course.id)}
+          className="mt-4 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+        >
+          Edit and Resubmit
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,30 @@
-export type LessonType = "Video" | "Note" | "Quiz" | "File";
+export type LessonType = "Video" | "Quiz" | "File";
+
+export const COURSE_CATEGORIES = ["Academic", "Technical", "Vocational", "Skill"] as const;
+export const COURSE_LEVELS = [
+  "Class 8",
+  "Class 9",
+  "Class 10 (SEE)",
+  "+2",
+  "Bachelor's",
+  "Masters",
+  "PhD",
+  "Other",
+] as const;
+export const COURSE_SUBJECTS = [
+  "Mathematics",
+  "Science",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "English",
+  "Nepali",
+  "Accountancy",
+  "Economics",
+  "Computer Science",
+  "Business Studies",
+  "Other",
+] as const;
 
 export type LessonResource = {
   name: string;
@@ -15,7 +41,6 @@ export type LessonDraft = {
 
   // content
   videoUrl?: string;
-  noteText?: string;
   fileUrl?: string;
 
   resources: LessonResource[];
@@ -33,25 +58,20 @@ export type LessonDraft = {
   };
 };
 
+export type SectionDraft = {
+  id: string;
+  title: string;
+  lessons: LessonDraft[];
+};
+
 export type CourseDraft = {
   title: string;
   subtitle: string;
 
-  level: "Class 8" | "Class 9" | "Class 10 (SEE)" | "+2" |"Bachelor's"| "Masters" | "PhD" | "Skill" | "Other";
-  category: "Academic" | "Technical" | "Vocational";
-  subject:
-    | "Mathematics"
-    | "Science"
-    | "Physics"
-    | "Chemistry"
-    | "Biology"
-    | "English"
-    | "Nepali"
-    | "Accountancy"
-    | "Economics"
-    | "Computer Science"
-    | "Business Studies"
-    | "Other";
+  level: (typeof COURSE_LEVELS)[number];
+  category: (typeof COURSE_CATEGORIES)[number];
+  subject: (typeof COURSE_SUBJECTS)[number];
+  tags: string[];
 
   priceType: "Free" | "Paid";
   priceNpr: number;
@@ -63,7 +83,8 @@ export type CourseDraft = {
   outcomes: string[];
   requirements: string[];
 
-  lessons: LessonDraft[];
+  sections: SectionDraft[];
+  lessons?: LessonDraft[]; // backward compatibility for older drafts
 };
 
 export type CourseStatus = "Draft" | "Pending" | "Published" | "Rejected";
@@ -78,6 +99,13 @@ export type CourseListItem = {
   language: string;
   price: number;
   currency: string;
+  tags?: string[];
+  instructor?: {
+    name?: string;
+    email?: string;
+  };
+  totalLectures?: number;
+  totalVideoSec?: number;
 };
 
 export type AdminCourseRow = {

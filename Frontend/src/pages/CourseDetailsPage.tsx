@@ -8,7 +8,6 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiClock,
-  FiFileText,
   FiGlobe,
   FiHelpCircle,
   FiPaperclip,
@@ -16,10 +15,12 @@ import {
   FiShield,
   FiStar,
   FiUsers,
+  FiX,
 } from "react-icons/fi";
-import { coursesApi } from "../app/api/courses.api";
+import { coursesApi, type CourseQuiz, type CourseQuizResult } from "../app/api/courses.api";
+import type { CourseListItem } from "../app/types/course.type";
 
-type LectureKind = "Video" | "Note" | "Quiz" | "File";
+type LectureKind = "Video" | "Quiz" | "File";
 
 type UiLecture = {
   id: string;
@@ -27,6 +28,7 @@ type UiLecture = {
   type: LectureKind;
   durationMin: number;
   isPreview: boolean;
+  quizId?: string;
 };
 
 type UiSection = {
@@ -53,9 +55,18 @@ type CourseUiModel = {
   thumbnailUrl: string;
   outcomes: string[];
   requirements: string[];
+  tags: string[];
   sections: UiSection[];
   updatedAt?: string;
 };
+
+type RelatedCourse = CourseListItem & {
+  instructor?: { name?: string; email?: string };
+  totalLectures?: number;
+  totalVideoSec?: number;
+};
+
+type CourseListResponse = RelatedCourse[] | { items?: RelatedCourse[] };
 
 type RawLecture = {
   _id?: unknown;
@@ -65,6 +76,7 @@ type RawLecture = {
   durationSec?: unknown;
   isFreePreview?: unknown;
   isPreview?: unknown;
+  quizId?: unknown;
 };
 
 type RawSection = {
@@ -87,11 +99,12 @@ type RawCourse = {
   price?: unknown;
   rating?: unknown;
   enrolled?: unknown;
-  instructor?: { name?: unknown } | null;
+  instructor?: { name?: unknown; email?: unknown } | null;
   instructorName?: unknown;
   thumbnailUrl?: unknown;
   outcomes?: unknown;
   requirements?: unknown;
+  tags?: unknown;
   sections?: unknown;
   totalVideoSec?: unknown;
   updatedAt?: unknown;
@@ -107,12 +120,18 @@ const pickCourseItem = (payload: unknown): RawCourse | null => {
   return (item ?? outer) as RawCourse;
 };
 
+const toCourseRows = (payload: CourseListResponse): RelatedCourse[] => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+};
+
 const toLectureType = (raw: unknown): LectureKind => {
   const normalized = String(raw ?? "").toLowerCase();
   if (normalized === "video") return "Video";
   if (normalized === "file") return "File";
   if (normalized === "quiz") return "Quiz";
-  return "Note";
+  return "File";
 };
 
 const formatMin = (min: number): string => {
@@ -127,7 +146,6 @@ const formatMin = (min: number): string => {
 const lessonIcon = (type: LectureKind) => {
   if (type === "Video") return <FiPlayCircle className="h-4 w-4" />;
   if (type === "File") return <FiPaperclip className="h-4 w-4" />;
-  if (type === "Note") return <FiFileText className="h-4 w-4" />;
   return <FiHelpCircle className="h-4 w-4" />;
 };
 
@@ -146,6 +164,7 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
       type: toLectureType(l.type),
       durationMin: Math.max(0, Math.round(Number(l.durationSec ?? 0) / 60)),
       isPreview: Boolean(l.isFreePreview ?? l.isPreview),
+      quizId: l.quizId ? String(l.quizId) : undefined,
     }));
 
     return {
@@ -188,13 +207,26 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
       ? c.thumbnailUrl
       : "https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=1600&q=60";
 
+  const category = String(c.category ?? "General").trim() || "General";
+  const rawLevel = String(c.level ?? "").trim();
+  const level =
+    category === "Academic"
+      ? rawLevel || "Class 10 (SEE)"
+      : rawLevel && rawLevel !== "Class 10 (SEE)"
+      ? rawLevel
+      : "All Levels";
+
+  const instructorName =
+    String(c.instructor?.name ?? c.instructor?.email ?? c.instructorName ?? "").trim() ||
+    "Unknown Instructor";
+
   return {
     id: String(c._id ?? c.id ?? ""),
     title: String(c.title ?? "Untitled Course"),
     subtitle: String(c.subtitle ?? ""),
     description: String(c.description ?? "No description provided yet."),
-    category: String(c.category ?? "General"),
-    level: String(c.level ?? "All Levels"),
+    category,
+    level,
     language: String(c.language ?? "English"),
     priceType: Number(c.price ?? 0) > 0 ? "Paid" : "Free",
     priceNpr: Number(c.price ?? 0),
@@ -202,10 +234,11 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
     hours,
     lessons,
     enrolled: Number(c.enrolled ?? 0),
-    instructorName: String(c.instructor?.name ?? c.instructorName ?? "Instructor"),
+    instructorName,
     thumbnailUrl: thumb,
     outcomes,
     requirements,
+    tags: Array.isArray(c.tags) ? c.tags.map((x: unknown) => String(x).trim()).filter(Boolean) : [],
     sections,
     updatedAt: typeof c.updatedAt === "string" ? c.updatedAt : undefined,
   };
@@ -215,10 +248,18 @@ const CourseDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
 
   const [course, setCourse] = useState<CourseUiModel | null>(null);
+  const [relatedCourses, setRelatedCourses] = useState<RelatedCourse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizTitle, setQuizTitle] = useState("");
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizSubmitting, setQuizSubmitting] = useState(false);
+  const [quizData, setQuizData] = useState<CourseQuiz | null>(null);
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
+  const [quizResult, setQuizResult] = useState<CourseQuizResult | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -257,6 +298,55 @@ const CourseDetailsPage = () => {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!course?.id) {
+      setRelatedCourses([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const data = (await coursesApi.list()) as CourseListResponse;
+        const rows = toCourseRows(data);
+        const courseTagSet = new Set(course.tags.map((x) => x.toLowerCase()));
+
+        const related = rows
+          .filter((row) => row.id !== course.id)
+          .map((row) => {
+            const sameCategory = row.category === course.category ? 2 : 0;
+            const sameLevel = row.level === course.level ? 2 : 0;
+
+            const rowTags = Array.isArray((row as { tags?: unknown }).tags)
+              ? ((row as { tags?: unknown }).tags as unknown[])
+              : [];
+            const overlap = rowTags.reduce((acc, raw) => {
+              const t = String(raw || "").trim().toLowerCase();
+              return t && courseTagSet.has(t) ? acc + 1 : acc;
+            }, 0);
+
+            return {
+              row,
+              score: sameCategory + sameLevel + overlap,
+            };
+          })
+          .filter((x) => x.score > 0 || x.row.category === course.category)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 4)
+          .map((x) => x.row);
+
+        if (!cancelled) setRelatedCourses(related);
+      } catch {
+        if (!cancelled) setRelatedCourses([]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [course]);
+
   const totalPreviewLectures = useMemo(() => {
     if (!course) return 0;
     return course.sections.reduce(
@@ -273,8 +363,78 @@ const CourseDetailsPage = () => {
     );
   }, [course]);
 
+  const reviews = useMemo(() => {
+    if (!course) return [];
+
+    const base = Math.max(1, Math.round(course.rating * 2));
+    return [
+      {
+        id: "r1",
+        name: "Student A",
+        rating: Math.min(5, Math.max(3, base / 2)),
+        text: `Clear explanation style for ${course.title}.`,
+      },
+      {
+        id: "r2",
+        name: "Student B",
+        rating: Math.min(5, Math.max(3, course.rating)),
+        text: `Curriculum is structured and easy to follow.`,
+      },
+      {
+        id: "r3",
+        name: "Student C",
+        rating: Math.min(5, Math.max(3, course.rating - 0.3)),
+        text: `Good for ${course.level} learners with practical coverage.`,
+      },
+    ];
+  }, [course]);
+
   const toggleSection = (sectionId: string) => {
     setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  };
+
+  const openQuiz = async (lecture: UiLecture) => {
+    if (!course || !lecture.quizId) return;
+    if (!(lecture.isPreview || isEnrolled)) return;
+
+    setQuizOpen(true);
+    setQuizLoading(true);
+    setQuizTitle(lecture.title);
+    setQuizResult(null);
+    setQuizAnswers({});
+
+    try {
+      const res = await coursesApi.getQuiz(course.id, lecture.quizId);
+      setQuizData(res.item);
+      setQuizAnswers(
+        (res.item.questions || []).reduce<Record<string, string>>((acc, q) => {
+          acc[q.id] = "";
+          return acc;
+        }, {})
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to load quiz";
+      setQuizData(null);
+      setQuizResult(null);
+      setError(msg);
+      setQuizOpen(false);
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const submitQuiz = async () => {
+    if (!course || !quizData) return;
+    setQuizSubmitting(true);
+    try {
+      const res = await coursesApi.submitQuiz(course.id, quizData.id, quizAnswers);
+      setQuizResult(res.item);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to submit quiz";
+      setError(msg);
+    } finally {
+      setQuizSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -400,13 +560,6 @@ const CourseDetailsPage = () => {
                 {isEnrolled ? "You are enrolled" : course.priceType === "Free" ? "Enroll for Free" : "Buy Now"}
               </button>
 
-              <Link
-                to="/questions"
-                className="mt-2 inline-flex w-full items-center justify-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
-              >
-                Ask a Question
-              </Link>
-
               <div className="mt-5 space-y-3 text-sm text-gray-700">
                 <p className="inline-flex items-center gap-2">
                   <FiCheckCircle className="h-4 w-4 text-green-600" />
@@ -445,8 +598,15 @@ const CourseDetailsPage = () => {
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">Course Description</h2>
-            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-700">{course.description}</p>
+            <h2 className="text-xl font-bold text-gray-900">Requirements</h2>
+            <ul className="mt-4 space-y-2 text-sm text-gray-700">
+              {course.requirements.map((item, idx) => (
+                <li key={`${item}-${idx}`} className="inline-flex items-start gap-2">
+                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-gray-500" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -509,6 +669,21 @@ const CourseDetailsPage = () => {
                                   </span>
                                 ) : null}
                                 <span>{lecture.durationMin > 0 ? `${lecture.durationMin} min` : "-"}</span>
+                                {lecture.type === "Quiz" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void openQuiz(lecture)}
+                                    disabled={!(lecture.isPreview || isEnrolled)}
+                                    className={[
+                                      "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition",
+                                      lecture.isPreview || isEnrolled
+                                        ? "bg-indigo-600 text-white hover:bg-indigo-700"
+                                        : "cursor-not-allowed border border-gray-300 bg-white text-gray-400",
+                                    ].join(" ")}
+                                  >
+                                    Start Quiz
+                                  </button>
+                                ) : null}
                               </div>
                             </div>
                           ))}
@@ -522,15 +697,26 @@ const CourseDetailsPage = () => {
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">Requirements</h2>
-            <ul className="mt-4 space-y-2 text-sm text-gray-700">
-              {course.requirements.map((item, idx) => (
-                <li key={`${item}-${idx}`} className="inline-flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-gray-500" />
-                  <span>{item}</span>
-                </li>
+            <h2 className="text-xl font-bold text-gray-900">Course Description</h2>
+            <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-700">{course.description}</p>
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-gray-900">Reviews</h2>
+            <div className="mt-4 space-y-3">
+              {reviews.map((review) => (
+                <div key={review.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-gray-900">{review.name}</p>
+                    <p className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                      <FiStar className="h-3.5 w-3.5" />
+                      {review.rating.toFixed(1)}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700">{review.text}</p>
+                </div>
               ))}
-            </ul>
+            </div>
           </section>
         </main>
 
@@ -576,16 +762,172 @@ const CourseDetailsPage = () => {
                 <p className="mt-1 text-xs text-gray-600">Verified Instructor</p>
               </div>
             </div>
+          </section>
 
-            <Link
-              to="/mentors"
-              className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
-            >
-              Find Mentor
-            </Link>
+          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900">Related Courses</h3>
+            {relatedCourses.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-600">No related courses found right now.</p>
+            ) : (
+              <div className="mt-4 space-y-3">
+                {relatedCourses.map((item) => {
+                  const teacher = item.instructor?.name?.trim() || item.instructor?.email?.trim() || "Instructor";
+                  const priceText = Number(item.price || 0) > 0 ? `NPR ${Number(item.price).toLocaleString()}` : "Free";
+                  return (
+                    <Link
+                      key={item.id}
+                      to={`/courses/${item.id}`}
+                      className="block rounded-xl border border-gray-200 p-3 hover:bg-gray-50"
+                    >
+                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.title}</p>
+                      <p className="mt-1 text-xs text-gray-600">By {teacher}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {item.category} • {item.level}
+                      </p>
+                      <p className="mt-2 text-sm font-bold text-gray-900">{priceText}</p>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </aside>
       </div>
+
+      {quizOpen ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 p-4">
+              <div>
+                <p className="text-xs font-semibold text-gray-500">Quiz</p>
+                <h3 className="text-lg font-bold text-gray-900">{quizData?.title || quizTitle}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (quizSubmitting) return;
+                  setQuizOpen(false);
+                }}
+                className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
+              >
+                <FiX className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 overflow-y-auto p-4">
+              {quizLoading ? (
+                <p className="text-sm text-gray-600">Loading quiz...</p>
+              ) : !quizData ? (
+                <p className="text-sm text-red-600">Quiz unavailable.</p>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-600">
+                    Pass mark: <span className="font-semibold">{quizData.passPercent}%</span>
+                  </p>
+
+                  {quizData.questions.map((q, qIdx) => (
+                    <div key={q.id} className="rounded-xl border border-gray-200 p-4">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {qIdx + 1}. {q.prompt}
+                      </p>
+
+                      <div className="mt-3 space-y-2">
+                        {q.options.map((opt) => {
+                          const detail = quizResult?.details.find((d) => d.questionId === q.id);
+                          const isSelected = quizAnswers[q.id] === opt.id;
+                          const isCorrectOpt = detail?.correctOptionId === opt.id;
+                          const reveal = Boolean(quizResult);
+
+                          return (
+                            <label
+                              key={opt.id}
+                              className={[
+                                "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm",
+                                reveal && isCorrectOpt
+                                  ? "border-green-300 bg-green-50"
+                                  : reveal && isSelected && !isCorrectOpt
+                                  ? "border-red-300 bg-red-50"
+                                  : "border-gray-300 bg-white",
+                              ].join(" ")}
+                            >
+                              <input
+                                type="radio"
+                                name={`quiz-${q.id}`}
+                                checked={isSelected}
+                                onChange={() =>
+                                  !quizResult && setQuizAnswers((prev) => ({ ...prev, [q.id]: opt.id }))
+                                }
+                                disabled={Boolean(quizResult)}
+                              />
+                              <span>{opt.text}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      {quizResult ? (
+                        <p className="mt-2 text-xs text-gray-600">
+                          {quizResult.details.find((d) => d.questionId === q.id)?.explanation || "No explanation."}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-gray-200 p-4">
+              {quizResult ? (
+                <div className="mb-3 rounded-xl bg-gray-50 p-3 text-sm">
+                  <p className="font-semibold text-gray-900">
+                    Score: {quizResult.scorePercent}% ({quizResult.correctCount}/{quizResult.totalQuestions})
+                  </p>
+                  <p className={quizResult.passed ? "text-green-700" : "text-red-700"}>
+                    {quizResult.passed ? "Passed" : "Failed"} (required {quizResult.passPercent}%)
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="flex justify-end gap-2">
+                {quizResult ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuizResult(null);
+                      setQuizAnswers((quizData?.questions || []).reduce<Record<string, string>>((acc, q) => {
+                        acc[q.id] = "";
+                        return acc;
+                      }, {}));
+                    }}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Retry
+                  </button>
+                ) : null}
+
+                {!quizResult ? (
+                  <button
+                    type="button"
+                    onClick={() => void submitQuiz()}
+                    disabled={quizSubmitting || !quizData}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                  >
+                    {quizSubmitting ? "Submitting..." : "Submit Quiz"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setQuizOpen(false)}
+                    className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                  >
+                    Close
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

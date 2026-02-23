@@ -62,7 +62,7 @@ export default function LessonCard({
         { name: out.name, url: out.publicUrl, sizeBytes: out.sizeBytes },
       ];
 
-      onChange({ resources: next });
+      onChange({ resources: next, fileUrl: next[0]?.url });
       showToast("File added", "success");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "File upload failed";
@@ -74,6 +74,52 @@ export default function LessonCard({
   }
 
   const type = lesson.type as LessonType;
+  const quizQuestions = lesson.quiz?.questions ?? [];
+
+  const ensureQuiz = () => ({
+    title: lesson.quiz?.title ?? (lesson.title || "Quiz"),
+    passPercent: lesson.quiz?.passPercent ?? 60,
+    questions:
+      quizQuestions.length > 0
+        ? quizQuestions
+        : [{ q: "", options: ["", "", "", ""], answerIndex: 0, explanation: "" }],
+  });
+
+  const addQuizQuestion = () => {
+    const quiz = ensureQuiz();
+    onChange({
+      quiz: {
+        ...quiz,
+        questions: [...quiz.questions, { q: "", options: ["", "", "", ""], answerIndex: 0, explanation: "" }],
+      },
+    });
+  };
+
+  const removeQuizQuestion = (idx: number) => {
+    const quiz = ensureQuiz();
+    const next = quiz.questions.filter((_, i) => i !== idx);
+    onChange({
+      quiz: {
+        ...quiz,
+        questions: next.length > 0 ? next : [{ q: "", options: ["", "", "", ""], answerIndex: 0, explanation: "" }],
+      },
+    });
+  };
+
+  const updateQuizQuestion = (idx: number, patch: Partial<(typeof quizQuestions)[number]>) => {
+    const quiz = ensureQuiz();
+    const questions = quiz.questions.map((q, i) => {
+      if (i !== idx) return q;
+      return {
+        ...q,
+        ...patch,
+        options: Array.isArray((patch as { options?: string[] }).options)
+          ? ((patch as { options?: string[] }).options as string[])
+          : q.options,
+      };
+    });
+    onChange({ quiz: { ...quiz, questions } });
+  };
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5">
@@ -102,7 +148,6 @@ export default function LessonCard({
                 disabled={disabled}
               >
                 <option>Video</option>
-                <option>Note</option>
                 <option>Quiz</option>
                 <option>File</option>
               </select>
@@ -178,124 +223,186 @@ export default function LessonCard({
                 {lesson.videoUrl ? (
                   <video src={lesson.videoUrl} controls className="w-full rounded-xl border border-gray-200 bg-white" />
                 ) : (
-                  <p className="text-xs text-gray-600">No video uploaded yet.</p>
+                  <p className="text-xs text-gray-600"></p>
                 )}
               </div>
             ) : null}
 
-            {type === "Note" ? (
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-900">Note Content</p>
-                <textarea
-                  value={lesson.noteText ?? ""}
-                  onChange={(e) => onChange({ noteText: e.target.value })}
-                  rows={4}
-                  placeholder="Write note content for this lesson..."
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                  disabled={disabled}
-                />
-              </div>
-            ) : null}
-
             {type === "Quiz" ? (
-              <div className="space-y-2">
-                <p className="text-sm font-semibold text-gray-900">Quiz (simple)</p>
-                <p className="text-xs text-gray-600">
-                  For now, keep quiz authoring minimal. We’ll upgrade to full quiz builder next step.
-                </p>
+              <div className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-8">
+                    <label className="text-xs font-medium text-gray-700">Quiz Title</label>
+                    <input
+                      value={lesson.quiz?.title ?? lesson.title}
+                      onChange={(e) => {
+                        const quiz = ensureQuiz();
+                        onChange({ quiz: { ...quiz, title: e.target.value } });
+                      }}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      disabled={disabled}
+                    />
+                  </div>
 
-                <input
-                  value={lesson.quiz?.questions?.[0]?.q ?? ""}
-                  onChange={(e) =>
-                    onChange({
-                      quiz: {
-                        questions: [
-                          {
-                            q: e.target.value,
-                            options: ["A", "B", "C", "D"],
-                            answerIndex: 0,
-                          },
-                        ],
-                      },
-                    })
-                  }
-                  placeholder="Question 1 (example)"
-                  className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  <div className="sm:col-span-4">
+                    <label className="text-xs font-medium text-gray-700">Pass %</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={lesson.quiz?.passPercent ?? 60}
+                      onChange={(e) => {
+                        const quiz = ensureQuiz();
+                        onChange({ quiz: { ...quiz, passPercent: Number(e.target.value || 60) } });
+                      }}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      disabled={disabled}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {quizQuestions.map((q, idx) => (
+                    <div key={idx} className="rounded-xl border border-gray-200 bg-white p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-gray-600">Question {idx + 1}</p>
+                        <button
+                          type="button"
+                          onClick={() => removeQuizQuestion(idx)}
+                          disabled={disabled}
+                          className="rounded-md border border-gray-300 px-2 py-1 text-[11px] font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      <input
+                        value={q.q}
+                        onChange={(e) => updateQuizQuestion(idx, { q: e.target.value })}
+                        placeholder="Write the question"
+                        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        disabled={disabled}
+                      />
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {q.options.map((opt, optIdx) => (
+                          <div key={optIdx} className="flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name={`q-${lesson.id}-${idx}`}
+                              checked={q.answerIndex === optIdx}
+                              onChange={() => updateQuizQuestion(idx, { answerIndex: optIdx })}
+                              disabled={disabled}
+                            />
+                            <input
+                              value={opt}
+                              onChange={(e) => {
+                                const nextOptions = [...q.options];
+                                nextOptions[optIdx] = e.target.value;
+                                updateQuizQuestion(idx, { options: nextOptions });
+                              }}
+                              placeholder={`Option ${optIdx + 1}`}
+                              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                              disabled={disabled}
+                            />
+                          </div>
+                        ))}
+                      </div>
+
+                      <textarea
+                        value={q.explanation ?? ""}
+                        onChange={(e) => updateQuizQuestion(idx, { explanation: e.target.value })}
+                        rows={2}
+                        placeholder="Optional explanation"
+                        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        disabled={disabled}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addQuizQuestion}
                   disabled={disabled}
-                />
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  Add Question
+                </button>
               </div>
             ) : null}
 
             {type === "File" ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <p className="text-sm font-semibold text-gray-900">File Lesson</p>
-                <p className="text-xs text-gray-600">
-                  Upload a file in Resources below. Duration is not required for file lessons.
-                </p>
+                <p className="text-xs text-gray-600">Attach files only for this lesson type.</p>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-gray-900">Files (PDF/ZIP/etc)</p>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void uploadResource(f);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={disabled || uploadingFile}
+                      onClick={() => fileRef.current?.click()}
+                      className={[
+                        "inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50",
+                        disabled || uploadingFile ? "opacity-60 cursor-not-allowed" : "",
+                      ].join(" ")}
+                    >
+                      <FiPaperclip className="h-4 w-4" />
+                      {uploadingFile ? "Uploading..." : "Add file"}
+                    </button>
+                  </div>
+                </div>
+
+                {resources.length ? (
+                  <div className="mt-2 space-y-2">
+                    {resources.map((r, i) => (
+                      <div
+                        key={r.url + i}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-gray-900">{r.name}</p>
+                          <p className="text-xs text-gray-600">{Math.ceil(r.sizeBytes / 1024)} KB</p>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => {
+                            const next = resources.filter((_, idx) => idx !== i);
+                            onChange({ resources: next, fileUrl: next[0]?.url });
+                          }}
+                          className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-600">No files attached yet.</p>
+                )}
               </div>
             ) : null}
           </div>
 
-          {/* Resources upload */}
-          <div className="mt-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-gray-900">Resources (PDF/ZIP/etc)</p>
-
-              <div className="flex items-center gap-2">
-                <input
-                  ref={fileRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void uploadResource(f);
-                  }}
-                />
-                <button
-                  type="button"
-                  disabled={disabled || uploadingFile}
-                  onClick={() => fileRef.current?.click()}
-                  className={[
-                    "inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50",
-                    disabled || uploadingFile ? "opacity-60 cursor-not-allowed" : "",
-                  ].join(" ")}
-                >
-                  <FiPaperclip className="h-4 w-4" />
-                  {uploadingFile ? "Uploading..." : "Add file"}
-                </button>
-              </div>
+          {type === "File" && resources.length ? (
+            <div className="mt-2 text-xs text-gray-500">
+              Primary file: <span className="font-semibold text-gray-700">{resources[0]?.name}</span>
             </div>
-
-            {resources.length ? (
-              <div className="mt-3 space-y-2">
-                {resources.map((r, i) => (
-                  <div
-                    key={r.url + i}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-gray-900">{r.name}</p>
-                      <p className="text-xs text-gray-600">{Math.ceil(r.sizeBytes / 1024)} KB</p>
-                    </div>
-
-                    <button
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => {
-                        const next = resources.filter((_, idx) => idx !== i);
-                        onChange({ resources: next });
-                      }}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-gray-600">No resources attached.</p>
-            )}
-          </div>
+          ) : null}
         </div>
 
         {/* right actions */}

@@ -18,7 +18,7 @@ type CourseApproval = {
   id: string;
   title: string;
   subtitle: string;
-  type: "Academic" | "Technical" | "Vocational";
+  type: "Academic" | "Technical" | "Vocational" | "Skill";
   level: string;
   priceType: "Free" | "Paid";
   priceNpr?: number;
@@ -146,6 +146,9 @@ const CheckRow = ({ label, ok }: { label: string; ok: boolean }) => (
     <Badge text={ok ? "OK" : "Missing"} tone={ok ? "green" : "red"} />
   </div>
 );
+
+const actionBtnClass =
+  "inline-flex w-24 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold";
 
 const CourseApprovalsPage = () => {
   const { showToast } = useToast();
@@ -335,6 +338,7 @@ const CourseApprovalsPage = () => {
               <option value="Academic">Academic</option>
               <option value="Technical">Technical</option>
               <option value="Vocational">Vocational</option>
+              <option value="Skill">Skill</option>
             </select>
           </div>
 
@@ -399,7 +403,7 @@ const CourseApprovalsPage = () => {
                         {x.type}
                       </span>
                       <span className="rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
-                        {x.level}
+                        {x.type === "Academic" ? x.level : "N/A"}
                       </span>
                     </div>
                   </td>
@@ -420,7 +424,7 @@ const CourseApprovalsPage = () => {
                     <div className="flex flex-col items-end gap-2">
                       <button
                         type="button"
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                        className={`${actionBtnClass} border border-gray-300 text-gray-800 hover:bg-gray-50`}
                         onClick={() => setOpenId(x.id)}
                       >
                         <Icon.Eye className="h-4 w-4" />
@@ -431,7 +435,7 @@ const CourseApprovalsPage = () => {
                         <>
                           <button
                             type="button"
-                            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                            className={`${actionBtnClass} bg-indigo-600 text-white hover:bg-indigo-700`}
                             onClick={() => setApproveId(x.id)}
                           >
                             <Icon.Check className="h-4 w-4" />
@@ -440,7 +444,7 @@ const CourseApprovalsPage = () => {
 
                           <button
                             type="button"
-                            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                            className={`${actionBtnClass} border border-gray-300 text-red-700 hover:bg-red-50`}
                             onClick={() => reject(x.id)}
                           >
                             <Icon.X className="h-4 w-4" />
@@ -479,18 +483,19 @@ const CourseApprovalsPage = () => {
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge text={openItem.type} tone="gray" />
-                  <Badge text={openItem.level} tone="gray" />
+                  <Badge text={openItem.type === "Academic" ? openItem.level : "N/A"} tone="gray" />
                   <Badge text={openItem.status} tone={toneForStatus(openItem.status)} />
                   <Badge text={priceText(openItem)} tone="indigo" />
                 </div>
               </div>
-
               <button
                 type="button"
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                 onClick={() => setOpenId(null)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                aria-label="Close modal"
+                title="Close"
               >
-                Close
+                <FiX className="h-5 w-5" />
               </button>
             </div>
 
@@ -574,16 +579,8 @@ const CourseApprovalsPage = () => {
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-gray-900">{openItem.instructorName}</p>
                       <span className="text-sm text-gray-600">{openItem.instructorEmail}</span>
-                      {openItem.instructorVerified ? (
-                        <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                          <Icon.Badge className="h-4 w-4" />
-                          Verified
-                        </span>
-                      ) : (
-                        <Badge text="Not verified" tone="gray" />
-                      )}
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">Submitted: {new Date(openItem.submittedAt).toLocaleString()}</p>
+                    <p className="mt-2 text-xs text-gray-500">Submitted: {new Date(openItem.submittedAt).toLocaleDateString()}</p>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
@@ -608,19 +605,7 @@ const CourseApprovalsPage = () => {
                       <CheckRow label="Course Outline" ok={openItem.checklist.hasOutline} />
                       <CheckRow label="At least 3 lessons" ok={openItem.checklist.hasAtLeast3Lessons} />
                       <CheckRow label="Description" ok={openItem.checklist.hasDescription} />
-                      <CheckRow label="Pricing (if paid)" ok={openItem.checklist.hasPricingIfPaid} />
                     </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-200">
-                    <p className="text-sm font-bold text-indigo-900">Quick Preview</p>
-                    <Link
-                      to={`/courses/${openItem.id}`}
-                      className="mt-3 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-                    >
-                      <Icon.Book className="h-4 w-4" />
-                      Open Public Course Page
-                    </Link>
                   </div>
                 </div>
               </div>
