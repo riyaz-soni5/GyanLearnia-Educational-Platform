@@ -25,22 +25,30 @@
 /* Apply tokens globally (THIS is the missing part) */
 html,
 body {
-  height: 100%;
+  min-height: 100%;
   background: rgb(var(--bg));
   color: rgb(var(--text));
+  overflow-x: hidden;
+}
+
+html {
+  overflow-y: auto;
 }
 
 #root {
   min-height: 100vh;
   background: rgb(var(--bg));
   color: rgb(var(--text));
+  overflow-x: hidden;
 }
 
 /* Remove Vite demo centering */
 body {
   margin: 0;
+  min-height: 100dvh;
   min-width: 320px;
   display: block;
+  overflow-y: visible;
 }
 
 /* Optional utility helpers (use these in components) */

@@ -3,7 +3,7 @@ import Logo from "@/assets/icon.svg";
 
 const Footer = () => {
   return (
-    <footer className="w-screen border-t border-base bg-surface">
+    <footer className="w-full border-t border-base bg-surface">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <div className="grid gap-10 md:grid-cols-4">
           {/* Brand */}
@@ -98,4 +98,3 @@ const Footer = () => {
 };
 
 export default Footer;
-

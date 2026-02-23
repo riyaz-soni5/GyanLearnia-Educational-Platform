@@ -35,7 +35,7 @@ function TestimonialCard({ t }: { t: Testimonial }) {
           </div>
 
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-basec">{t.name}</p>
+            <p className="truncate text-base font-semibold text-basec">{t.name}</p>
             <p className="truncate text-xs text-muted">{t.role}</p>
           </div>
         </div>
@@ -44,7 +44,7 @@ function TestimonialCard({ t }: { t: Testimonial }) {
       </div>
 
       {/* text (clamped) */}
-      <p className="mt-4 line-clamp-4 text-sm leading-relaxed text-muted">
+      <p className="mt-4 line-clamp-4 text-sm leading-7 text-muted">
         {t.text}
       </p>
     </article>
@@ -121,7 +121,7 @@ export default function TestimonialsSection() {
   return (
     <section className="mt-20 w-full max-w-full overflow-x-hidden">
       <div className="flex w-full justify-center">
-        <h2 className="text-center text-4xl font-bold text-basec">
+        <h2 className="text-center text-4xl font-bold leading-tight text-basec sm:text-5xl">
           Students and Instructors Testimonials
         </h2>
       </div>

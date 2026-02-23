@@ -28,12 +28,12 @@ const FeatureCard = ({ icon, title, desc }: Props) => {
       </div>
 
       {/* Title */}
-      <h3 className="text-lg font-semibold text-basec">
+      <h3 className="text-base font-semibold text-basec sm:text-lg">
         {title}
       </h3>
 
       {/* Description */}
-      <p className="mt-2 text-sm leading-relaxed text-muted">
+      <p className="mt-2 text-sm leading-7 text-muted">
         {desc}
       </p>
     </div>

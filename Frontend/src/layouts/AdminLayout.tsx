@@ -1,6 +1,6 @@
 // src/layouts/AdminLayout.tsx
 import React from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   MdDashboard,
   MdVerifiedUser,
@@ -12,6 +12,7 @@ import {
   MdMenu,
   MdClose,
 } from "react-icons/md";
+import { logout } from "@/services/session";
 
 const Icon = {
   Dashboard: (p: React.ComponentProps<"svg">) => <MdDashboard {...p} />,
@@ -69,10 +70,19 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
 const AdminLayout = () => {
   const adminName = "Admin";
+  const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = React.useState(false);
 
-  const onLogout = () => {
-    localStorage.removeItem("gyanlearnia_session");
-    window.location.href = "/login";
+  const onLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+      localStorage.removeItem("gyanlearnia_session");
+      navigate("/login", { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -134,10 +144,11 @@ const AdminLayout = () => {
             <button
               type="button"
               onClick={onLogout}
+              disabled={loggingOut}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
               title="Logout"
             >
-              Logout
+              {loggingOut ? "Logging out..." : "Logout"}
               <Icon.Logout className="h-4 w-4" color="red" />
             </button>
           </div>
