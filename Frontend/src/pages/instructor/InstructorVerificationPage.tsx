@@ -18,9 +18,9 @@ import {
 } from "react-icons/fi";
 
 
-import { http } from "../../services/http";
-import { getUser } from "../../services/session";
-import { useToast } from "../../components/toast";
+import { http } from "@/services/http";
+import { getUser } from "@/services/session";
+import { useToast } from "@/components/toast";
 
 type UploadRes = { id: string; url?: string };
 

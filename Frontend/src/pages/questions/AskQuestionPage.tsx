@@ -1,11 +1,11 @@
 // src/pages/AskQuestionPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { createQuestion } from "../services/questions";
-import { fetchCategories } from "../services/category";
-import type { CategoryDTO } from "../services/category";
-import RichTextEditor from "../components/RichTextEditor";
-import { useToast } from "../components/toast";
+import { createQuestion } from "@/services/questions";
+import { fetchCategories } from "@/services/category";
+import type { CategoryDTO } from "@/services/category";
+import RichTextEditor from "@/components/RichTextEditor";
+import { useToast } from "@/components/toast";
 
 
 const LEVELS = ["School", "+2/High School", "Bachelor", "Master", "PhD", "Others"] as const;

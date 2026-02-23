@@ -1,6 +1,6 @@
 // src/components/questions/QuestionCard.tsx
 import { Link, useNavigate } from "react-router-dom";
-import type { Question } from "../../app/types/question.types";
+import type { Question } from "@/app/types/question.types";
 import { BiUpvote } from "react-icons/bi";
 import { FaRegCommentDots } from "react-icons/fa";
 import { FiEye, FiBookmark, FiShare2 } from "react-icons/fi";

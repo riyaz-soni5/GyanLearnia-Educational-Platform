@@ -2,14 +2,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { FiSearch, FiEye, FiCheckCircle, FiXCircle } from "react-icons/fi";
 
-import VerificationInstructorModal from "../../components/admin/VerificationInstructorModal";
+import VerificationInstructorModal from "@/components/admin/VerificationInstructorModal";
 import {
   type AdminVerificationItem,
   type VerificationStatus,
   listInstructorVerifications,
   approveInstructor,
   rejectInstructor,
-} from "../../services/adminVerification";
+} from "@/services/adminVerification";
 
 
 

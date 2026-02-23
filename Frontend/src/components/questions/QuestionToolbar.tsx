@@ -1,6 +1,6 @@
 // src/components/questions/QuestionToolbar.tsx
 import { Link } from "react-router-dom";
-import type { CategoryDTO } from "../../services/category";
+import type { CategoryDTO } from "@/services/category";
 
 type Props = {
   query: string;

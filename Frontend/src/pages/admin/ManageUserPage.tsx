@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { FiSearch, FiUser, FiTrash2, FiRefreshCcw } from "react-icons/fi";
 
-import ConfirmDialog from "../../components/ConfirmDialog";
-import { useToast } from "../../components/toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/toast";
 import {
   type AdminUser,
   type AdminRoleFilter,
@@ -11,7 +11,7 @@ import {
   deleteUserById,
   fetchAdminUsers,
   updateUserRoleById,
-} from "../../services/adminUsers";
+} from "@/services/adminUsers";
 
 type Tone = "gray" | "indigo" | "green" | "yellow" | "red";
 

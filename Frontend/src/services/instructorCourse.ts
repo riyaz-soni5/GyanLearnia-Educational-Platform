@@ -1,6 +1,6 @@
 // src/services/instructorCourse.ts
 import { http } from "./http";
-import type { CourseDraft } from "../app/types/course.type";
+import type { CourseDraft } from "@/app/types/course.type";
 
 export type MyInstructorCourse = {
   id: string;

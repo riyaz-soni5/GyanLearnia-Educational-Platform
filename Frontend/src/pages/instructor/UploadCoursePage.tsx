@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FiPlus, FiSave, FiTrash2, FiUploadCloud } from "react-icons/fi";
 
-import { useToast } from "../../components/toast";
+import { useToast } from "@/components/toast";
 import {
   COURSE_CATEGORIES,
   COURSE_LEVELS,
@@ -11,12 +11,12 @@ import {
   type CourseDraft,
   type LessonDraft,
   type SectionDraft,
-} from "../../app/types/course.type";
-import ThumbnailUploadCard from "../../components/instructor/ThumbnailUploadCard";
-import LessonCard from "../../components/instructor/LessonCard";
-import CourseSubmissionStatusCard from "../../components/instructor/CourseSubmissionStatusCard";
-import CourseCard from "../../components/courses/CourseCard";
-import CertificateEditorCard from "../../components/instructor/CertificateEditorCard";
+} from "@/app/types/course.type";
+import ThumbnailUploadCard from "@/components/instructor/ThumbnailUploadCard";
+import LessonCard from "@/components/instructor/LessonCard";
+import CourseSubmissionStatusCard from "@/components/instructor/CourseSubmissionStatusCard";
+import CourseCard from "@/components/courses/CourseCard";
+import CertificateEditorCard from "@/components/instructor/CertificateEditorCard";
 
 import {
   createCourse,
@@ -24,7 +24,7 @@ import {
   listMyCourses,
   resubmitCourse,
   type MyInstructorCourse,
-} from "../../services/instructorCourse";
+} from "@/services/instructorCourse";
 
 const DRAFT_KEY = "gyanlearnia_course_draft_v1";
 

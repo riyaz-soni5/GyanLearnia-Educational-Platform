@@ -1,5 +1,5 @@
 // src/services/questions.ts
-import type { Question } from "../app/types/question.types";
+import type { Question } from "@/app/types/question.types";
 import { http } from "./http";
 
 // ---------- Types ----------

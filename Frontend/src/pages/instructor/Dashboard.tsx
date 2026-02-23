@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiBookOpen, FiCheckCircle, FiClock, FiEdit2, FiShield, FiTrendingUp, FiTrash2 } from "react-icons/fi";
 
-import CourseSubmissionStatusCard from "../../components/instructor/CourseSubmissionStatusCard";
-import InstructorHoursChart from "../../components/instructor/InstructorHoursChart";
-import InstructorStatCard from "../../components/instructor/InstructorStatCard";
-import InstructorStatusChart from "../../components/instructor/InstructorStatusChart";
-import { deleteCourse, listMyCourses, type MyInstructorCourse } from "../../services/instructorCourse";
-import { getUser } from "../../services/session";
-import { getMyVerification, type VerificationStatus } from "../../services/instructorVerification";
+import CourseSubmissionStatusCard from "@/components/instructor/CourseSubmissionStatusCard";
+import InstructorHoursChart from "@/components/instructor/InstructorHoursChart";
+import InstructorStatCard from "@/components/instructor/InstructorStatCard";
+import InstructorStatusChart from "@/components/instructor/InstructorStatusChart";
+import { deleteCourse, listMyCourses, type MyInstructorCourse } from "@/services/instructorCourse";
+import { getUser } from "@/services/session";
+import { getMyVerification, type VerificationStatus } from "@/services/instructorVerification";
 
 const statusTone = (status: MyInstructorCourse["status"]) => {
   if (status === "Published") return "bg-green-50 text-green-700 ring-green-200";

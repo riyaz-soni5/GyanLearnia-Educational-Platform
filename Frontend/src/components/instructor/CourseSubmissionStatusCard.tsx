@@ -1,5 +1,5 @@
 import { FiAlertCircle, FiClock, FiXCircle } from "react-icons/fi";
-import type { MyInstructorCourse } from "../../services/instructorCourse";
+import type { MyInstructorCourse } from "@/services/instructorCourse";
 
 type Props = {
   course: MyInstructorCourse;

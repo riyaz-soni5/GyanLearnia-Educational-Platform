@@ -1,12 +1,12 @@
 // src/pages/Login.tsx
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Logo from "../assets/icon.svg";
-import { useToast } from "../components/toast";
-import { loginApi } from "../services/auth";
+import Logo from "@/assets/icon.svg";
+import { useToast } from "@/components/toast";
+import { loginApi } from "@/services/auth";
 
 // ✅ add this
-import { setUser } from "../services/session";
+import { setUser } from "@/services/session";
 
 const LoginPage = () => {
   const nav = useNavigate();

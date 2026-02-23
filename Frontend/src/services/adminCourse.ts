@@ -1,5 +1,5 @@
 import { http } from "./http";
-import type { AdminCourseRow } from "../app/types/course.type";
+import type { AdminCourseRow } from "@/app/types/course.type";
 
 export async function listPendingCourses() {
   return http<{ items: AdminCourseRow[] }>(`/api/admin/courses/pending`);

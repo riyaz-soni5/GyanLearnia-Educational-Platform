@@ -4,10 +4,10 @@ import { BiDownvote, BiUpvote } from "react-icons/bi";
 import { FaRegCommentDots } from "react-icons/fa";
 import { HiCheckCircle } from "react-icons/hi2";
 import { FiEdit2, FiEye, FiSave, FiTrash2, FiX } from "react-icons/fi";
-import { acceptAnswer } from "../services/questions";
+import { acceptAnswer } from "@/services/questions";
 
-import type { Question } from "../app/types/question.types";
-import type { AnswerDTO } from "../services/questions";
+import type { Question } from "@/app/types/question.types";
+import type { AnswerDTO } from "@/services/questions";
 import {
   deleteQuestion,
   downvoteAnswer,
@@ -22,14 +22,14 @@ import {
   deleteAnswer as apiDeleteAnswer,
   upvoteAnswer,
   upvoteQuestion,
-} from "../services/questions";
+} from "@/services/questions";
 
-import ConfirmDialog from "../components/ConfirmDialog";
-import RichTextEditor from "../components/RichTextEditor";
-import { useToast } from "../components/toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import RichTextEditor from "@/components/RichTextEditor";
+import { useToast } from "@/components/toast";
 
 // ✅ ADDED (only)
-import ReplyThread from "../components/questions/ReplyThread";
+import ReplyThread from "@/components/questions/ReplyThread";
 
 const Badge = ({
   text,

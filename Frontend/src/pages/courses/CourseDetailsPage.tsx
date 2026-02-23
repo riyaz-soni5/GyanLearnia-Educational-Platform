@@ -24,8 +24,8 @@ import {
   type CourseProgress,
   type CourseQuiz,
   type CourseQuizResult,
-} from "../app/api/courses.api";
-import type { CourseListItem } from "../app/types/course.type";
+} from "@/app/api/courses.api";
+import type { CourseListItem } from "@/app/types/course.type";
 
 type LectureKind = "Video" | "Quiz" | "File";
 

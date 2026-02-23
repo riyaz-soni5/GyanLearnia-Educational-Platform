@@ -1,6 +1,6 @@
 // src/components/admin/VerificationInstructorModal.tsx
 import { FiX, FiExternalLink, FiFileText } from "react-icons/fi";
-import type { AdminVerificationItem, VerificationStatus } from "../../services/adminVerification";
+import type { AdminVerificationItem, VerificationStatus } from "@/services/adminVerification";
 import { useMemo, useState } from "react";
 import ConfirmDialog from "../ConfirmDialog"; // adjust path if needed
 import RejectReasonDialog from "../admin/RejectReasonDialog"; // ✅ new

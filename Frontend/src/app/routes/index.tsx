@@ -1,33 +1,33 @@
 // src/routes/index.tsx
 import { createBrowserRouter, redirect } from "react-router-dom";
-import MainLayout from "../../layouts/MainLayout";
-import AuthLayout from "../../layouts/AuthLayout";
-import AdminLayout from "../../layouts/AdminLayout";
+import MainLayout from "@/layouts/MainLayout";
+import AuthLayout from "@/layouts/AuthLayout";
+import AdminLayout from "@/layouts/AdminLayout";
 
 // ✅ add these
-import { getUser, isLoggedIn } from "../../services/session";
+import { getUser, isLoggedIn } from "@/services/session";
 
 // Pages
-import HomePage from "../../pages/HomePage";
-import CoursesPage from "../../pages/CoursePage";
-import QuestionsPage from "../../pages/QuestionPage";
-import MentorsPage from "../../pages/MentorsDiscovryPage";
-import LoginPage from "../../pages/Login";
-import RegisterPage from "../../pages/Register";
-import PricingPage from "../../pages/PricingPage";
-import AboutPage from "../../pages/AboutPage";
-import QuestionDetailsPage from "../../pages/QuestionDetailsPage";
-import CourseDetailsPage from "../../pages/CourseDetailsPage";
-import UploadCoursePage from "../../pages/instructor/UploadCoursePage";
-import InstructorDashboardPage from "../../pages/instructor/Dashboard";
-import AdminDashboardPage from "../../pages/admin/Dashboard";
-import VerifyInstructorsPage from "../../pages/admin/VerifyInstructorPage";
-import CourseApprovalsPage from "../../pages/admin/CourseApprovalsPage";
-import ManageUsersPage from "../../pages/admin/ManageUserPage";
-import ReportsPage from "../../pages/admin/ReportsPage";
-import SettingsPage from "../../pages/admin/SettingsPage";
-import AskQuestionPage from "../../pages/AskQuestionPage";
-import InstructorVerificationPage from "../../pages/instructor/InstructorVerificationPage";
+import HomePage from "@/pages/public/HomePage";
+import CoursesPage from "@/pages/courses/CoursePage";
+import QuestionsPage from "@/pages/questions/QuestionPage";
+import MentorsPage from "@/pages/public/MentorsDiscovryPage";
+import LoginPage from "@/pages/auth/LoginPage";
+import RegisterPage from "@/pages/auth/RegisterPage";
+import PricingPage from "@/pages/public/PricingPage";
+import AboutPage from "@/pages/public/AboutPage";
+import QuestionDetailsPage from "@/pages/questions/QuestionDetailsPage";
+import CourseDetailsPage from "@/pages/courses/CourseDetailsPage";
+import UploadCoursePage from "@/pages/instructor/UploadCoursePage";
+import InstructorDashboardPage from "@/pages/instructor/Dashboard";
+import AdminDashboardPage from "@/pages/admin/Dashboard";
+import VerifyInstructorsPage from "@/pages/admin/VerifyInstructorPage";
+import CourseApprovalsPage from "@/pages/admin/CourseApprovalsPage";
+import ManageUsersPage from "@/pages/admin/ManageUserPage";
+import ReportsPage from "@/pages/admin/ReportsPage";
+import SettingsPage from "@/pages/admin/SettingsPage";
+import AskQuestionPage from "@/pages/questions/AskQuestionPage";
+import InstructorVerificationPage from "@/pages/instructor/InstructorVerificationPage";
 
 // ✅ helpers (loaders)
 const redirectIfLoggedIn = () => {

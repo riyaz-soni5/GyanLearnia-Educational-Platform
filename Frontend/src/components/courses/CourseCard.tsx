@@ -1,6 +1,6 @@
 // src/components/courses/CourseCard.tsx
 import { Link } from "react-router-dom";
-import type { CourseListItem } from "../../app/types/course.type";
+import type { CourseListItem } from "@/app/types/course.type";
 
 type CourseCardModel = CourseListItem & {
   instructor?: { name?: string; email?: string };

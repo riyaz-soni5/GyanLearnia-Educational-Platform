@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { http } from "../services/http";
+import { http } from "@/services/http";
 import {
   FiAward,
   FiStar,

@@ -1,16 +1,16 @@
 // src/pages/admin/CourseApprovalsPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import RejectReasonDialog from "../../components/admin/RejectReasonDialog";
-import ConfirmDialog from "../../components/ConfirmDialog";
-import { useToast } from "../../components/toast";
+import RejectReasonDialog from "@/components/admin/RejectReasonDialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { useToast } from "@/components/toast";
 import { FiSearch, FiEye, FiCheck, FiX, FiAward, FiBookOpen } from "react-icons/fi";
 
 // ✅ Make sure you have these service functions (file example: src/services/adminCourses.ts)
 // - listPendingCourses(): Promise<{ items: CourseApproval[] }>
 // - approveCourse(id: string): Promise<any>
 // - rejectCourse(id: string, reason: string): Promise<any>
-import { listPendingCourses, approveCourse, rejectCourse } from "../../services/adminCourse";
+import { listPendingCourses, approveCourse, rejectCourse } from "@/services/adminCourse";
 
 type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 

@@ -8,7 +8,7 @@ import {
   upvoteReply,
   downvoteReply,
   type ReplyDTO,
-} from "../../services/questions";
+} from "@/services/questions";
 import { BiUpvote, BiDownvote } from "react-icons/bi";
 
 const stripHtml = (html: string) =>

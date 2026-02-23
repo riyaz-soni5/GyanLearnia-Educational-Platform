@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import HeroImg from "../assets/HeroIMG.png";
-import RoleCard from "../components/RoleCard";
-import FeatureCard from "../components/FeatureCard";
-import ImpactCard from "../components/ImpactCard";
-import TestimonialsSection from "../components/TestomonialsSection";
+import HeroImg from "@/assets/HeroIMG.png";
+import RoleCard from "@/components/RoleCard";
+import FeatureCard from "@/components/FeatureCard";
+import ImpactCard from "@/components/ImpactCard";
+import TestimonialsSection from "@/components/TestomonialsSection";
 
 
 import {

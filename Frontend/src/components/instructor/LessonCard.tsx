@@ -3,7 +3,7 @@ import { useRef, useState } from "react";
 import { FiChevronUp, FiChevronDown, FiTrash2, FiUploadCloud, FiPaperclip } from "react-icons/fi";
 import { useToast } from "../toast";
 import { getVideoDurationMin, uploadFileToCloud } from "../../features/instructor/uploadHelpers";
-import type { LessonDraft, LessonResource, LessonType } from "../../app/types/course.type";
+import type { LessonDraft, LessonResource, LessonType } from "@/app/types/course.type";
 
 type Props = {
   lesson: LessonDraft;

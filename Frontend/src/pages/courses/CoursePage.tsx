@@ -1,9 +1,9 @@
 // src/pages/CoursesPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import CourseCard from "../components/courses/CourseCard";
-import CourseFilters from "../components/courses/CourseFilters";
-import type { CourseListItem } from "../app/types/course.type";
-import { coursesApi } from "../app/api/courses.api";
+import CourseCard from "@/components/courses/CourseCard";
+import CourseFilters from "@/components/courses/CourseFilters";
+import type { CourseListItem } from "@/app/types/course.type";
+import { coursesApi } from "@/app/api/courses.api";
 
 type CourseListRow = CourseListItem & {
   // Optional extras if your API returns them (nice for UI)

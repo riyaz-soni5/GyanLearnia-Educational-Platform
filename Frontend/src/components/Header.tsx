@@ -11,7 +11,7 @@ import {
   FiUploadCloud,
   FiSettings,
 } from "react-icons/fi";
-import Logo from "../assets/icon.svg";
+import Logo from "@/assets/icon.svg";
 
 type NavItem = { name: string; path: string };
 

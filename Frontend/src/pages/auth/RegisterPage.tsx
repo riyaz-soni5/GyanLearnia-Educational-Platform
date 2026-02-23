@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Logo from "../assets/icon.svg";
-import { useToast } from "../components/toast";
+import Logo from "@/assets/icon.svg";
+import { useToast } from "@/components/toast";
 
 type Role = "student" | "instructor";
 const roleLabel = (r: Role) => (r === "student" ? "Student" : "Instructor");
