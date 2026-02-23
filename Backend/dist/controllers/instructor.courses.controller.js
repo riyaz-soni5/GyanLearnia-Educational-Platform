@@ -258,6 +258,16 @@ function toPersistedCourseFields(draft) {
         thumbnailUrl: draft.thumbnailUrl || null,
         price: draft.priceType === "Free" ? 0 : Math.max(0, Number(draft.priceNpr || 0)),
         currency: "NPR",
+        certificate: {
+            enabled: Boolean(draft.certificate?.enabled),
+            template: {
+                imageUrl: String(draft.certificate?.templateImageUrl || "").trim(),
+                nameXPercent: Math.min(100, Math.max(0, Number(draft.certificate?.nameXPercent ?? 50))),
+                nameYPercent: Math.min(100, Math.max(0, Number(draft.certificate?.nameYPercent ?? 55))),
+                nameFontSizePx: Math.min(96, Math.max(16, Number(draft.certificate?.nameFontSizePx ?? 42))),
+                nameColor: String(draft.certificate?.nameColor || "#111827").trim() || "#111827",
+            },
+        },
     };
 }
 async function mapCourseToDraft(course) {
@@ -373,6 +383,14 @@ async function mapCourseToDraft(course) {
             : [""],
         tags: Array.isArray(course?.tags) ? course.tags.map(String) : [],
         sections: safeSections,
+        certificate: {
+            enabled: Boolean(course?.certificate?.enabled),
+            templateImageUrl: String(course?.certificate?.template?.imageUrl || "").trim() || undefined,
+            nameXPercent: Number(course?.certificate?.template?.nameXPercent ?? 50),
+            nameYPercent: Number(course?.certificate?.template?.nameYPercent ?? 55),
+            nameFontSizePx: Number(course?.certificate?.template?.nameFontSizePx ?? 42),
+            nameColor: String(course?.certificate?.template?.nameColor || "#111827"),
+        },
     };
 }
 export async function createInstructorCourse(req, res) {
@@ -453,6 +471,7 @@ export async function resubmitInstructorCourse(req, res) {
             course.thumbnailUrl = fields.thumbnailUrl;
             course.price = fields.price;
             course.currency = fields.currency;
+            course.certificate = fields.certificate;
             course.sections = built.sections;
             course.totalLectures = built.totalLectures;
             course.totalVideoSec = built.totalVideoSec;

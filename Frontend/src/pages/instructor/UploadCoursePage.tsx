@@ -16,6 +16,7 @@ import ThumbnailUploadCard from "../../components/instructor/ThumbnailUploadCard
 import LessonCard from "../../components/instructor/LessonCard";
 import CourseSubmissionStatusCard from "../../components/instructor/CourseSubmissionStatusCard";
 import CourseCard from "../../components/courses/CourseCard";
+import CertificateEditorCard from "../../components/instructor/CertificateEditorCard";
 
 import {
   createCourse,
@@ -84,6 +85,14 @@ function normalizeDraft(raw: unknown): CourseDraft | null {
     requirements:
       Array.isArray(draft.requirements) && draft.requirements.length > 0 ? draft.requirements.map(String) : [""],
     sections: normalizedSections,
+    certificate: {
+      enabled: Boolean(draft.certificate?.enabled),
+      templateImageUrl: draft.certificate?.templateImageUrl,
+      nameXPercent: Number(draft.certificate?.nameXPercent ?? 50),
+      nameYPercent: Number(draft.certificate?.nameYPercent ?? 55),
+      nameFontSizePx: Number(draft.certificate?.nameFontSizePx ?? 42),
+      nameColor: String(draft.certificate?.nameColor ?? "#111827"),
+    },
   };
 }
 
@@ -129,6 +138,14 @@ export default function UploadCoursePage() {
         ],
       },
     ],
+    certificate: {
+      enabled: false,
+      templateImageUrl: undefined,
+      nameXPercent: 50,
+      nameYPercent: 55,
+      nameFontSizePx: 42,
+      nameColor: "#111827",
+    },
   });
 
   useEffect(() => {
@@ -251,11 +268,23 @@ export default function UploadCoursePage() {
 
     const paidOk = draft.priceType === "Free" || draft.priceNpr >= 50;
     const hasAcademicMeta = draft.category !== "Academic" || (Boolean(draft.level) && Boolean(draft.subject));
+    const certificateOk = !draft.certificate?.enabled || Boolean(draft.certificate?.templateImageUrl);
 
     const videoOk = allLessons.every((l) => (l.type !== "Video" ? true : Boolean(l.videoUrl)));
     const fileOk = allLessons.every((l) => (l.type !== "File" ? true : (l.resources?.length ?? 0) > 0));
 
-    return hasTitle && hasSubtitle && hasDesc && hasSections && hasLessons && paidOk && hasAcademicMeta && videoOk && fileOk;
+    return (
+      hasTitle &&
+      hasSubtitle &&
+      hasDesc &&
+      hasSections &&
+      hasLessons &&
+      paidOk &&
+      hasAcademicMeta &&
+      certificateOk &&
+      videoOk &&
+      fileOk
+    );
   }, [draft, allLessons]);
 
   const addTag = (value: string) => {
@@ -436,6 +465,14 @@ export default function UploadCoursePage() {
         outcomes: draft.outcomes.map((x) => x.trim()).filter(Boolean),
         requirements: draft.requirements.map((x) => x.trim()).filter(Boolean),
         tags: draft.tags.map((x) => x.trim()).filter(Boolean),
+        certificate: {
+          enabled: Boolean(draft.certificate?.enabled),
+          templateImageUrl: draft.certificate?.templateImageUrl,
+          nameXPercent: Number(draft.certificate?.nameXPercent ?? 50),
+          nameYPercent: Number(draft.certificate?.nameYPercent ?? 55),
+          nameFontSizePx: Number(draft.certificate?.nameFontSizePx ?? 42),
+          nameColor: String(draft.certificate?.nameColor ?? "#111827"),
+        },
         priceNpr: draft.priceType === "Free" ? 0 : Number(draft.priceNpr || 0),
         sections: draft.sections.map((section) => ({
           ...section,
@@ -709,6 +746,20 @@ export default function UploadCoursePage() {
               </div>
             </div>
           </section>
+
+          <CertificateEditorCard
+            value={
+              draft.certificate || {
+                enabled: false,
+                templateImageUrl: undefined,
+                nameXPercent: 50,
+                nameYPercent: 55,
+                nameFontSizePx: 42,
+                nameColor: "#111827",
+              }
+            }
+            onChange={(next) => setDraft((p) => ({ ...p, certificate: next }))}
+          />
 
           <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
             <div>

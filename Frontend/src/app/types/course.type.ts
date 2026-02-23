@@ -85,6 +85,14 @@ export type CourseDraft = {
 
   sections: SectionDraft[];
   lessons?: LessonDraft[]; // backward compatibility for older drafts
+  certificate?: {
+    enabled: boolean;
+    templateImageUrl?: string;
+    nameXPercent: number;
+    nameYPercent: number;
+    nameFontSizePx: number;
+    nameColor: string;
+  };
 };
 
 export type CourseStatus = "Draft" | "Pending" | "Published" | "Rejected";

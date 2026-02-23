@@ -16,8 +16,15 @@ import {
   FiStar,
   FiUsers,
   FiX,
+  FiAward,
 } from "react-icons/fi";
-import { coursesApi, type CourseQuiz, type CourseQuizResult } from "../app/api/courses.api";
+import {
+  coursesApi,
+  type CourseCertificate,
+  type CourseProgress,
+  type CourseQuiz,
+  type CourseQuizResult,
+} from "../app/api/courses.api";
 import type { CourseListItem } from "../app/types/course.type";
 
 type LectureKind = "Video" | "Quiz" | "File";
@@ -56,6 +63,7 @@ type CourseUiModel = {
   outcomes: string[];
   requirements: string[];
   tags: string[];
+  certificateEnabled: boolean;
   sections: UiSection[];
   updatedAt?: string;
 };
@@ -105,6 +113,7 @@ type RawCourse = {
   outcomes?: unknown;
   requirements?: unknown;
   tags?: unknown;
+  certificate?: { enabled?: unknown } | null;
   sections?: unknown;
   totalVideoSec?: unknown;
   updatedAt?: unknown;
@@ -239,6 +248,7 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
     outcomes,
     requirements,
     tags: Array.isArray(c.tags) ? c.tags.map((x: unknown) => String(x).trim()).filter(Boolean) : [],
+    certificateEnabled: Boolean(c.certificate?.enabled),
     sections,
     updatedAt: typeof c.updatedAt === "string" ? c.updatedAt : undefined,
   };
@@ -260,6 +270,11 @@ const CourseDetailsPage = () => {
   const [quizData, setQuizData] = useState<CourseQuiz | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [quizResult, setQuizResult] = useState<CourseQuizResult | null>(null);
+  const [progress, setProgress] = useState<CourseProgress | null>(null);
+  const [progressLoading, setProgressLoading] = useState(false);
+  const [markingLectureId, setMarkingLectureId] = useState<string>("");
+  const [certificateLoading, setCertificateLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -298,6 +313,24 @@ const CourseDetailsPage = () => {
     };
   }, [id]);
 
+  const loadProgress = async (courseId: string) => {
+    try {
+      setProgressLoading(true);
+      const res = await coursesApi.progress(courseId);
+      setProgress(res.item);
+      setIsEnrolled(Boolean(res.item.enrolled));
+    } catch {
+      setProgress(null);
+    } finally {
+      setProgressLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!course?.id) return;
+    void loadProgress(course.id);
+  }, [course?.id]);
+
   useEffect(() => {
     if (!course?.id) {
       setRelatedCourses([]);
@@ -321,7 +354,7 @@ const CourseDetailsPage = () => {
             const rowTags = Array.isArray((row as { tags?: unknown }).tags)
               ? ((row as { tags?: unknown }).tags as unknown[])
               : [];
-            const overlap = rowTags.reduce((acc, raw) => {
+            const overlap = rowTags.reduce<number>((acc, raw) => {
               const t = String(raw || "").trim().toLowerCase();
               return t && courseTagSet.has(t) ? acc + 1 : acc;
             }, 0);
@@ -393,6 +426,80 @@ const CourseDetailsPage = () => {
     setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
 
+  const enrollCourse = async () => {
+    if (!course) return;
+    try {
+      setActionError("");
+      const res = await coursesApi.enroll(course.id);
+      setIsEnrolled(true);
+      setProgress(res.item);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to enroll");
+    }
+  };
+
+  const completeLecture = async (lectureId: string) => {
+    if (!course) return;
+    try {
+      setActionError("");
+      setMarkingLectureId(lectureId);
+      const res = await coursesApi.completeLecture(course.id, lectureId);
+      setProgress((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...res.item,
+              enrolled: true,
+              quizScores: prev.quizScores,
+              certificateEligible: res.item.isCompleted && course.certificateEnabled,
+            }
+          : {
+              enrolled: true,
+              completedCount: res.item.completedCount,
+              totalCount: res.item.totalCount,
+              percent: res.item.percent,
+              isCompleted: res.item.isCompleted,
+              completedLectureIds: res.item.completedLectureIds,
+              quizScores: {},
+              certificateEligible: res.item.isCompleted && course.certificateEnabled,
+            }
+      );
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to mark lesson");
+    } finally {
+      setMarkingLectureId("");
+    }
+  };
+
+  const openCertificate = async () => {
+    if (!course) return;
+    const win = window.open("", "_blank");
+    if (!win) {
+      setActionError("Popup blocked by browser. Please allow popups for this site.");
+      return;
+    }
+
+    win.document.write(
+      "<!doctype html><html><body style='font-family:Arial,sans-serif;padding:24px'>Generating certificate...</body></html>"
+    );
+    win.document.close();
+
+    try {
+      setActionError("");
+      setCertificateLoading(true);
+      const res = await coursesApi.getCertificate(course.id);
+      const cert: CourseCertificate = res.item;
+      win.document.open();
+      win.document.write(cert.html);
+      win.document.close();
+    } catch (e: unknown) {
+      win.close();
+      setActionError(e instanceof Error ? e.message : "Failed to open certificate");
+    } finally {
+      setCertificateLoading(false);
+    }
+  };
+
   const openQuiz = async (lecture: UiLecture) => {
     if (!course || !lecture.quizId) return;
     if (!(lecture.isPreview || isEnrolled)) return;
@@ -416,7 +523,7 @@ const CourseDetailsPage = () => {
       const msg = e instanceof Error ? e.message : "Failed to load quiz";
       setQuizData(null);
       setQuizResult(null);
-      setError(msg);
+      setActionError(msg);
       setQuizOpen(false);
     } finally {
       setQuizLoading(false);
@@ -427,11 +534,13 @@ const CourseDetailsPage = () => {
     if (!course || !quizData) return;
     setQuizSubmitting(true);
     try {
+      setActionError("");
       const res = await coursesApi.submitQuiz(course.id, quizData.id, quizAnswers);
       setQuizResult(res.item);
+      await loadProgress(course.id);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Failed to submit quiz";
-      setError(msg);
+      setActionError(msg);
     } finally {
       setQuizSubmitting(false);
     }
@@ -477,6 +586,7 @@ const CourseDetailsPage = () => {
   }
 
   const priceText = course.priceType === "Free" ? "Free" : `NPR ${course.priceNpr.toLocaleString()}`;
+  const completedLectureSet = new Set(progress?.completedLectureIds ?? []);
 
   return (
     <div className="space-y-8">
@@ -530,6 +640,11 @@ const CourseDetailsPage = () => {
               Created by <span className="font-semibold text-white">{course.instructorName}</span>
               {course.updatedAt ? ` • Last updated ${new Date(course.updatedAt).toLocaleDateString()}` : ""}
             </p>
+            {actionError ? (
+              <p className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {actionError}
+              </p>
+            ) : null}
           </div>
 
           <aside className="lg:col-span-4">
@@ -551,13 +666,24 @@ const CourseDetailsPage = () => {
 
               <button
                 type="button"
-                onClick={() => setIsEnrolled(true)}
+                onClick={() => void enrollCourse()}
+                disabled={progressLoading}
                 className={[
                   "mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
-                  isEnrolled ? "bg-green-600 hover:bg-green-700" : "bg-indigo-600 hover:bg-indigo-700",
+                  isEnrolled
+                    ? "bg-green-600 hover:bg-green-700"
+                    : progressLoading
+                    ? "cursor-not-allowed bg-gray-400"
+                    : "bg-indigo-600 hover:bg-indigo-700",
                 ].join(" ")}
               >
-                {isEnrolled ? "You are enrolled" : course.priceType === "Free" ? "Enroll for Free" : "Buy Now"}
+                {isEnrolled
+                  ? "You are enrolled"
+                  : progressLoading
+                  ? "Please wait..."
+                  : course.priceType === "Free"
+                  ? "Enroll for Free"
+                  : "Buy Now"}
               </button>
 
               <div className="mt-5 space-y-3 text-sm text-gray-700">
@@ -578,6 +704,37 @@ const CourseDetailsPage = () => {
                   Language: {course.language}
                 </p>
               </div>
+
+              {progress ? (
+                <div className="mt-5 rounded-xl border border-gray-200 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-700">Your Progress</p>
+                    <p className="text-xs font-semibold text-gray-700">{progress.percent}%</p>
+                  </div>
+                  <div className="h-2 rounded-full bg-gray-100">
+                    <div className="h-2 rounded-full bg-indigo-600" style={{ width: `${progress.percent}%` }} />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-600">
+                    {progress.completedCount}/{progress.totalCount} completed
+                  </p>
+                  {course.certificateEnabled ? (
+                    <button
+                      type="button"
+                      onClick={() => void openCertificate()}
+                      disabled={!progress.certificateEligible || certificateLoading}
+                      className={[
+                        "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold",
+                        progress.certificateEligible && !certificateLoading
+                          ? "bg-gray-900 text-white hover:bg-gray-800"
+                          : "cursor-not-allowed border border-gray-300 bg-white text-gray-400",
+                      ].join(" ")}
+                    >
+                      <FiAward className="h-4 w-4" />
+                      {certificateLoading ? "Generating..." : "Get Certificate"}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </aside>
         </div>
@@ -663,6 +820,11 @@ const CourseDetailsPage = () => {
                               </div>
 
                               <div className="flex items-center gap-2 text-xs text-gray-500">
+                                {completedLectureSet.has(lecture.id) ? (
+                                  <span className="rounded-full bg-green-50 px-2 py-0.5 font-semibold text-green-700 ring-1 ring-green-200">
+                                    Completed
+                                  </span>
+                                ) : null}
                                 {lecture.isPreview ? (
                                   <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 ring-1 ring-indigo-200">
                                     Preview
@@ -682,6 +844,22 @@ const CourseDetailsPage = () => {
                                     ].join(" ")}
                                   >
                                     Start Quiz
+                                  </button>
+                                ) : isEnrolled ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => void completeLecture(lecture.id)}
+                                    disabled={completedLectureSet.has(lecture.id) || markingLectureId === lecture.id}
+                                    className={[
+                                      "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition",
+                                      completedLectureSet.has(lecture.id)
+                                        ? "cursor-not-allowed border border-green-200 bg-green-50 text-green-700"
+                                        : markingLectureId === lecture.id
+                                        ? "cursor-not-allowed bg-gray-400 text-white"
+                                        : "bg-gray-900 text-white hover:bg-gray-800",
+                                    ].join(" ")}
+                                  >
+                                    {markingLectureId === lecture.id ? "Saving..." : "Mark Complete"}
                                   </button>
                                 ) : null}
                               </div>
@@ -744,6 +922,12 @@ const CourseDetailsPage = () => {
                 <FiBookOpen className="h-4 w-4" />
                 Category: {course.category}
               </p>
+              {course.certificateEnabled ? (
+                <p className="inline-flex items-center gap-2">
+                  <FiAward className="h-4 w-4" />
+                  Completion certificate included
+                </p>
+              ) : null}
             </div>
           </section>
 

@@ -24,6 +24,13 @@ const SectionSchema = new Schema({
     order: { type: Number, default: 0 },
     lectures: { type: [LectureSchema], default: [] },
 }, { _id: true });
+const CertificateTemplateSchema = new Schema({
+    imageUrl: { type: String, default: "" },
+    nameXPercent: { type: Number, default: 50 },
+    nameYPercent: { type: Number, default: 55 },
+    nameFontSizePx: { type: Number, default: 42 },
+    nameColor: { type: String, default: "#111827" },
+}, { _id: false });
 const CourseSchema = new Schema({
     instructorId: { type: Types.ObjectId, ref: "User", required: true },
     title: { type: String, required: true, trim: true },
@@ -41,6 +48,10 @@ const CourseSchema = new Schema({
     status: { type: String, enum: ["Draft", "Pending", "Published", "Rejected"], default: "Draft" },
     rejectionReason: { type: String, default: null },
     sections: { type: [SectionSchema], default: [] },
+    certificate: {
+        enabled: { type: Boolean, default: false },
+        template: { type: CertificateTemplateSchema, default: () => ({}) },
+    },
     totalLectures: { type: Number, default: 0 },
     totalVideoSec: { type: Number, default: 0 },
 }, { timestamps: true });

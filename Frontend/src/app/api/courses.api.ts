@@ -37,6 +37,25 @@ export type CourseQuizResult = {
     explanation: string;
   }>;
 };
+export type CourseProgress = {
+  enrolled: boolean;
+  completedCount: number;
+  totalCount: number;
+  percent: number;
+  isCompleted: boolean;
+  completedLectureIds: string[];
+  quizScores: Record<string, number>;
+  certificateEligible: boolean;
+};
+export type CourseCertificate = {
+  courseId: string;
+  courseTitle: string;
+  studentName: string;
+  completedOn: string;
+  templateImageUrl: string;
+  downloadUrl?: string;
+  html: string;
+};
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
 
@@ -68,8 +87,31 @@ export const coursesApi = {
   submitQuiz: (courseId: string, quizId: string, answers: Record<string, string>) =>
     http<{ item: CourseQuizResult }>(`/api/courses/${courseId}/quizzes/${quizId}/submit`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ answers }),
+    }),
+
+  enroll: (courseId: string) =>
+    http<{ item: CourseProgress }>(`/api/courses/${courseId}/enroll`, {
+      method: "POST",
+      credentials: "include",
+    }),
+
+  progress: (courseId: string) =>
+    http<{ item: CourseProgress }>(`/api/courses/${courseId}/progress`, {
+      credentials: "include",
+    }),
+
+  completeLecture: (courseId: string, lectureId: string) =>
+    http<{ item: CourseProgress }>(`/api/courses/${courseId}/lectures/${lectureId}/complete`, {
+      method: "POST",
+      credentials: "include",
+    }),
+
+  getCertificate: (courseId: string) =>
+    http<{ item: CourseCertificate }>(`/api/courses/${courseId}/certificate`, {
+      credentials: "include",
     }),
 
   lessons: (id: string) => http<Lesson[]>(`/api/courses/${id}/lessons`),
