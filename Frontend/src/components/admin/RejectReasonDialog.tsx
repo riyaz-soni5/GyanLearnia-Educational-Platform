@@ -1,5 +1,5 @@
 // src/components/RejectReasonDialog.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FiX } from "react-icons/fi";
 import { HiOutlineExclamationTriangle } from "react-icons/hi2";
@@ -18,6 +18,9 @@ type Props = {
   // You can prefill (optional)
   initialReason?: string;
 
+  // ✅ NEW: allow reuse for course reject too
+  minLength?: number;
+
   onConfirm: (reason: string) => void;
   onClose: () => void;
 };
@@ -35,6 +38,7 @@ export default function RejectReasonDialog({
   loading = false,
   disabled = false,
   initialReason = "",
+  minLength = 1, // ✅ default keeps old behavior
   onConfirm,
   onClose,
 }: Props) {
@@ -81,8 +85,16 @@ export default function RejectReasonDialog({
   if (!open) return null;
 
   const trimmed = reason.trim();
-  const reasonError = touched && !trimmed ? "Reject reason is required." : "";
-  const confirmDisabled = disabled || loading || !trimmed;
+  const tooShort = trimmed.length < minLength;
+
+  const reasonError =
+    touched && !trimmed
+      ? "Reject reason is required."
+      : touched && tooShort
+      ? `Reason must be at least ${minLength} characters.`
+      : "";
+
+  const confirmDisabled = disabled || loading || !trimmed || tooShort;
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] grid place-items-center p-4">
@@ -160,7 +172,7 @@ export default function RejectReasonDialog({
             <button
               onClick={() => {
                 setTouched(true);
-                if (!trimmed) return;
+                if (!trimmed || tooShort) return;
                 onConfirm(trimmed);
               }}
               disabled={confirmDisabled}

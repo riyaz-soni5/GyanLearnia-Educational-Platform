@@ -1,12 +1,13 @@
 // src/components/courses/CourseCard.tsx
 import { Link } from "react-router-dom";
-import type { Course } from "../../app/types/course.type";
+import type { CourseListItem } from "../../app/types/course.type";
 
-const StarIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
-    <path d="M12 17.3l-5.2 3.1 1.4-5.9-4.6-4 6-.5L12 4.5l2.4 5.5 6 .5-4.6 4 1.4 5.9z" />
-  </svg>
-);
+type CourseCardModel = CourseListItem & {
+  instructor?: { name?: string; email?: string };
+  totalLectures?: number;
+  totalVideoSec?: number;
+  badge?: "Popular" | "Certified" | "New" | string;
+};
 
 const BadgePill = ({ text }: { text: string }) => {
   const tone =
@@ -25,20 +26,28 @@ const BadgePill = ({ text }: { text: string }) => {
   );
 };
 
-const CourseCard = ({ course }: { course: Course }) => {
-  const priceText =
-    course.priceType === "Free" ? "Free" : `NPR ${course.priceNpr?.toLocaleString()}`;
+const CourseCard = ({ course }: { course: CourseCardModel }) => {
+  const priceText = course.price === 0 ? "Free" : `NPR ${Number(course.price || 0).toLocaleString()}`;
 
-  // If you don’t have thumbnails yet, this keeps it looking good.
   const thumb =
     course.thumbnailUrl ??
     "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=1200&q=60";
 
+  const lectures = typeof course.totalLectures === "number" ? course.totalLectures : undefined;
+  const hours =
+    typeof course.totalVideoSec === "number"
+      ? Math.round((course.totalVideoSec / 3600) * 10) / 10
+      : undefined;
+
+  // prefer email if available (you said your site doesn't use username)
+  const instructorLine =
+    course.instructor?.email?.trim() ||
+    course.instructor?.name?.trim() ||
+    "";
+
   return (
     <article className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
-      {/* Whole top area clickable like Udemy */}
       <Link to={`/courses/${course.id}`} className="block">
-        {/* Thumbnail */}
         <div className="relative">
           <div className="aspect-video w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
             <img
@@ -49,74 +58,45 @@ const CourseCard = ({ course }: { course: Course }) => {
             />
           </div>
 
-          {/* Badge overlay */}
           <div className="absolute left-3 top-3 flex gap-2">
             {course.badge ? <BadgePill text={course.badge} /> : null}
           </div>
 
-          {/* Type/Level overlay (subtle) */}
           <div className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
-            {course.type} • {course.level}
+            {course.category} • {course.level}
           </div>
         </div>
 
-        {/* Body */}
         <div className="p-5">
-          {/* Title */}
           <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-gray-900 group-hover:underline dark:text-white">
             {course.title}
           </h3>
 
-          {/* Instructor (Udemy style) */}
-          <p className="mt-2 truncate text-xs text-gray-600 dark:text-gray-300">
-            {course.instructorName}
-          </p>
+          {instructorLine ? (
+            <p className="mt-2 truncate text-xs text-gray-600 dark:text-gray-300">{instructorLine}</p>
+          ) : null}
 
-          {/* Rating row */}
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-sm font-bold text-gray-900 dark:text-white">
-              {course.rating.toFixed(1)}
-            </span>
+          {typeof lectures === "number" || typeof hours === "number" ? (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {typeof lectures === "number" ? `${lectures} lessons` : null}
+              {typeof lectures === "number" && typeof hours === "number" ? " • " : null}
+              {typeof hours === "number" ? `${hours} hrs` : null}
+            </p>
+          ) : null}
 
-            <div className="flex items-center">
-              {Array.from({ length: 5 }).map((_, i) => {
-                const filled = course.rating >= i + 1;
-                return (
-                  <StarIcon
-                    key={i}
-                    className={`h-4 w-4 ${filled ? "text-yellow-400" : "text-gray-200 dark:text-gray-700"}`}
-                  />
-                );
-              })}
-            </div>
-
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              ({course.enrolled.toLocaleString()})
-            </span>
-          </div>
-
-          {/* Meta line like Udemy */}
-          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {course.lessons} lessons
-          </p>
-
-          {/* Small subtitle (optional — keep subtle) */}
           <p className="mt-2 line-clamp-2 text-xs text-gray-600 dark:text-gray-300">
             {course.subtitle}
           </p>
 
-          {/* Price row (bottom) */}
           <div className="mt-4 flex items-end justify-between">
             <p className="text-base font-extrabold text-gray-900 dark:text-white">{priceText}</p>
-
             <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">
-              {course.enrolled.toLocaleString()} students
+              {course.language}
             </span>
           </div>
         </div>
       </Link>
 
-      {/* Bottom actions (your style, but cleaner) */}
       <div className="flex gap-3 border-t border-gray-100 p-4 dark:border-gray-800">
         <Link
           to={`/courses/${course.id}`}

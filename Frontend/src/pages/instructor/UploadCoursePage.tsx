@@ -1,158 +1,35 @@
-
-import { useMemo, useState } from "react";
+// src/pages/instructor/UploadCoursePage.tsx
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { FiPlus, FiSave, FiUploadCloud } from "react-icons/fi";
 
-type LessonType = "Video" | "Note" | "Quiz";
+import { useToast } from "../../components/toast";
+import type { CourseDraft, LessonDraft } from "../../app/types/course.type";
+import ThumbnailUploadCard from "../../components/instructor/ThumbnailUploadCard";
+import LessonCard from "../../components/instructor/LessonCard";
+import CourseSubmissionStatusCard from "../../components/instructor/CourseSubmissionStatusCard";
 
-type LessonDraft = {
-  id: string;
-  title: string;
-  type: LessonType;
-  durationMin: number; 
-  isPreview: boolean;
-};
+import { createCourse, listMyCourses, type MyInstructorCourse } from "../../services/instructorCourse";
 
-type CourseDraft = {
-  title: string;
-  subtitle: string;
-  level: "Class 8" | "Class 9" | "Class 10 (SEE)" | "+2" | "Skill";
-  category: "Academic" | "Technical" | "Vocational";
-  subject:
-    | "Mathematics"
-    | "Science"
-    | "Physics"
-    | "Chemistry"
-    | "Biology"
-    | "English"
-    | "Nepali"
-    | "Accountancy"
-    | "Economics"
-    | "Computer Science"
-    | "Business Studies"
-    | "Other";
-  priceType: "Free" | "Paid";
-  priceNpr?: number;
-  language: "English" | "Nepali";
-  thumbnailUrl: string;
-  description: string;
-  outcomes: string[];
-  requirements: string[];
-  lessons: LessonDraft[];
-};
+const DRAFT_KEY = "gyanlearnia_course_draft_v1";
 
-const Icon = {
-  Upload: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M12 16V4"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M7 9l5-5 5 5"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M4 20h16"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Plus: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M12 5v14M5 12h14"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Trash: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M4 7h16"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M10 11v7M14 11v7"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9 7l1-3h4l1 3"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 7l1 15h10l1-15"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  Move: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M12 2v20M2 12h20"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M12 2l-3 3M12 2l3 3M2 12l3-3M2 12l3 3M12 22l-3-3M12 22l3-3M22 12l-3-3M22 12l-3 3"
-        className="stroke-current"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Check: (props: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M20 6L9 17l-5-5"
-        className="stroke-current"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-};
+function newLesson(): LessonDraft {
+  return {
+    id: `l_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+    title: "",
+    type: "Video",
+    durationMin: 0,
+    isPreview: false,
+    resources: [],
+  };
+}
 
-const SectionTitle = ({
-  title,
-  desc,
-}: {
-  title: string;
-  desc?: string;
-}) => (
-  <div className="flex items-end justify-between gap-4">
-    <div>
-      <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-      {desc ? <p className="mt-1 text-sm text-gray-600">{desc}</p> : null}
-    </div>
-  </div>
-);
+export default function UploadCoursePage() {
+  const { showToast } = useToast();
 
-const Chip = ({ text }: { text: string }) => (
-  <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
-    {text}
-  </span>
-);
+  const [publishing, setPublishing] = useState(false);
+  const [reviewCourse, setReviewCourse] = useState<MyInstructorCourse | null>(null);
 
-const UploadCoursePage = () => {
   const [draft, setDraft] = useState<CourseDraft>({
     title: "",
     subtitle: "",
@@ -160,32 +37,70 @@ const UploadCoursePage = () => {
     category: "Academic",
     subject: "Mathematics",
     priceType: "Free",
-    priceNpr: 999,
+    priceNpr: 0,
     language: "English",
-    thumbnailUrl: "",
+    thumbnailUrl: undefined,
     description: "",
     outcomes: ["", "", ""],
     requirements: ["", ""],
     lessons: [
       {
-        id: "l1",
+        id: "l_intro",
         title: "Introduction / Course Overview",
         type: "Video",
-        durationMin: 10,
+        durationMin: 0,
         isPreview: true,
+        resources: [],
       },
     ],
   });
 
-  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    try {
+      setDraft(JSON.parse(raw));
+    } catch {
+      // ignore invalid local draft payload
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadLatestReviewCourse();
+  }, []);
+
+  async function loadLatestReviewCourse() {
+    try {
+      const res = await listMyCourses();
+      const latest = (res.items ?? []).find((c) => c.status !== "Published") ?? null;
+      setReviewCourse(latest);
+    } catch {
+      setReviewCourse(null);
+    }
+  }
 
   const isValid = useMemo(() => {
     const hasTitle = draft.title.trim().length >= 6;
     const hasSubtitle = draft.subtitle.trim().length >= 10;
     const hasDesc = draft.description.trim().length >= 30;
-    const hasLessons = draft.lessons.length >= 1 && draft.lessons.every((l) => l.title.trim().length >= 4);
+
+    const hasLessons =
+      Array.isArray(draft.lessons) &&
+      draft.lessons.length >= 1 &&
+      draft.lessons.every((l) => l.title.trim().length >= 4);
+
     const paidOk = draft.priceType === "Free" || (draft.priceNpr !== undefined && draft.priceNpr >= 50);
-    return hasTitle && hasSubtitle && hasDesc && hasLessons && paidOk;
+
+    // strict: every Video lesson must have videoUrl
+    const videoOk =
+      Array.isArray(draft.lessons) &&
+      draft.lessons.every((l) => (l.type !== "Video" ? true : Boolean(l.videoUrl)));
+
+    const fileOk =
+      Array.isArray(draft.lessons) &&
+      draft.lessons.every((l) => (l.type !== "File" ? true : (l.resources?.length ?? 0) > 0 || Boolean(l.fileUrl)));
+
+    return hasTitle && hasSubtitle && hasDesc && hasLessons && paidOk && videoOk && fileOk;
   }, [draft]);
 
   const updateOutcome = (i: number, v: string) => {
@@ -204,32 +119,33 @@ const UploadCoursePage = () => {
     });
   };
 
-  const addLesson = () => {
-    setDraft((p) => ({
-      ...p,
-      lessons: [
-        ...p.lessons,
-        {
-          id: `l_${Date.now()}`,
-          title: "",
-          type: "Video",
-          durationMin: 10,
-          isPreview: false,
-        },
-      ],
-    }));
-  };
+  const addLesson = () => setDraft((p) => ({ ...p, lessons: [...p.lessons, newLesson()] }));
 
   const updateLesson = (id: string, patch: Partial<LessonDraft>) => {
     setDraft((p) => ({
       ...p,
-      lessons: p.lessons.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+      lessons: p.lessons.map((l) => {
+        if (l.id !== id) return l;
+
+        const next = { ...l, ...patch };
+        if (patch.type && patch.type !== "Video") {
+          next.durationMin = 0;
+          next.videoUrl = undefined;
+        }
+        if (patch.type && patch.type !== "Note") {
+          next.noteText = undefined;
+        }
+        if (patch.type && patch.type !== "File") {
+          next.fileUrl = undefined;
+        }
+
+        return next;
+      }),
     }));
   };
 
-  const removeLesson = (id: string) => {
+  const removeLesson = (id: string) =>
     setDraft((p) => ({ ...p, lessons: p.lessons.filter((l) => l.id !== id) }));
-  };
 
   const moveLesson = (id: string, dir: -1 | 1) => {
     setDraft((p) => {
@@ -245,109 +161,146 @@ const UploadCoursePage = () => {
     });
   };
 
-  const onSaveDraft = () => {
-    localStorage.setItem("gyanlearnia_course_draft", JSON.stringify(draft));
-    setToast("Draft saved (localStorage).");
-    setTimeout(() => setToast(null), 1600);
+  const saveDraft = () => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    showToast("Draft saved", "success");
   };
 
-  const onLoadDraft = () => {
-    const raw = localStorage.getItem("gyanlearnia_course_draft");
-    if (!raw) {
-      setToast("No saved draft found.");
-      setTimeout(() => setToast(null), 1600);
-      return;
-    }
+  const loadDraft = () => {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return showToast("No saved draft found", "info");
     try {
       setDraft(JSON.parse(raw));
-      setToast("Draft loaded.");
-      setTimeout(() => setToast(null), 1600);
+      showToast("Draft loaded", "success");
     } catch {
-      setToast("Draft load failed.");
-      setTimeout(() => setToast(null), 1600);
+      showToast("Draft load failed", "error");
     }
   };
 
-  const onPublish = () => {
+  function getErrorMessage(e: unknown) {
+    if (typeof e === "string") return e;
+    if (e && typeof e === "object" && "message" in e) {
+      const msg = (e as { message?: unknown }).message;
+      if (typeof msg === "string") return msg;
+    }
+    return "Publish failed";
+  }
+
+  async function publish() {
+    if (publishing) return;
+
     if (!isValid) {
-      setToast("Please fill required fields before publishing.");
-      setTimeout(() => setToast(null), 1800);
+      showToast("Fill required fields and upload required lesson files/videos before publishing.", "error", {
+        durationMs: 2600,
+      });
       return;
     }
 
-    // ✅ Later: POST to backend /courses
-    // await api.post("/courses", draft)
+    setPublishing(true);
 
-    setToast("Course published (static).");
-    setTimeout(() => setToast(null), 1800);
-  };
+    try {
+      // ✅ send draft exactly (because backend validates draft.lessons)
+      const cleanDraft: CourseDraft = {
+        ...draft,
+        title: draft.title.trim(),
+        subtitle: draft.subtitle.trim(),
+        description: draft.description.trim(),
+        thumbnailUrl: draft.thumbnailUrl ?? undefined,
+        priceNpr: draft.priceType === "Free" ? 0 : Number(draft.priceNpr || 0),
+        lessons: draft.lessons.map((l) => ({
+          ...l,
+          title: l.title.trim(),
+          durationMin: l.type === "Video" ? Number(l.durationMin || 0) : 0,
+          videoUrl: l.videoUrl ?? undefined,
+          fileUrl: l.fileUrl ?? l.resources?.[0]?.url ?? undefined,
+        })),
+      };
+
+      const res = await createCourse(cleanDraft);
+
+      localStorage.removeItem(DRAFT_KEY);
+      const createdId = (res as { item?: { id?: string; status?: string } })?.item?.id;
+      const createdStatus = (res as { item?: { id?: string; status?: string } })?.item?.status;
+      if (createdId && createdStatus && createdStatus !== "Published") {
+        setReviewCourse({
+          id: createdId,
+          title: cleanDraft.title,
+          subtitle: cleanDraft.subtitle,
+          status: createdStatus as MyInstructorCourse["status"],
+          rejectionReason: null,
+          createdAt: new Date().toISOString(),
+          totalLectures: cleanDraft.lessons.length,
+          totalVideoSec: cleanDraft.lessons
+            .filter((x) => x.type === "Video")
+            .reduce((sum, x) => sum + Math.round((x.durationMin || 0) * 60), 0),
+        });
+      } else {
+        await loadLatestReviewCourse();
+      }
+
+      showToast("Submitted to admin for approval ✅", "success");
+    } catch (e) {
+      showToast(getErrorMessage(e), "error");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  const publishDisabled = !isValid || publishing;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <section className="rounded-2xl bg-white p-8 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold text-gray-500">Instructor</p>
-            <h1 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">
-              Upload Course
-            </h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Build a course with clean structure (title, outcomes, lessons). Keep it simple for FYP UI.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Chip text="Academic-friendly" />
-              <Chip text="SEE / +2 / Skill" />
-              <Chip text="Static for now" />
-            </div>
+            <h1 className="mt-2 text-2xl font-bold text-gray-900 sm:text-3xl">Upload Course</h1>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={onLoadDraft}
-              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              onClick={loadDraft}
+              disabled={publishing}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
             >
+              <FiUploadCloud className="h-4 w-4" />
               Load Draft
             </button>
+
             <button
               type="button"
-              onClick={onSaveDraft}
-              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+              onClick={saveDraft}
+              disabled={publishing}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
             >
+              <FiSave className="h-4 w-4" />
               Save Draft
             </button>
+
             <button
               type="button"
-              onClick={onPublish}
+              onClick={publish}
+              disabled={publishDisabled}
               className={[
-                "rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
-                isValid ? "bg-indigo-600 hover:bg-indigo-700" : "bg-gray-400 cursor-not-allowed",
+                "inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
+                publishDisabled ? "bg-gray-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700",
               ].join(" ")}
-              disabled={!isValid}
             >
-              Publish
+              {publishing ? "Publishing..." : "Publish"}
             </button>
           </div>
         </div>
-
-        {toast ? (
-          <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800">
-            {toast}
-          </div>
-        ) : null}
       </section>
 
       <div className="grid gap-6 lg:grid-cols-12">
-        {/* Main form */}
-        <div className="lg:col-span-8 space-y-6">
-          {/* Basic info */}
+        {/* Main */}
+        <div className="space-y-6 lg:col-span-8">
+          {/* Basic */}
           <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <SectionTitle
-              title="Basic Information"
-              desc="Write a clear title + short subtitle. Keep it exam-friendly."
-            />
-
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Basic Information</h2>
+            </div>
             <div className="mt-6 grid gap-4">
               <div>
                 <label className="text-xs font-medium text-gray-700">Course Title *</label>
@@ -361,11 +314,11 @@ const UploadCoursePage = () => {
               </div>
 
               <div>
-                <label className="text-xs font-medium text-gray-700">Subtitle / Short Description *</label>
+                <label className="text-xs font-medium text-gray-700">Subtitle *</label>
                 <input
                   value={draft.subtitle}
                   onChange={(e) => setDraft((p) => ({ ...p, subtitle: e.target.value }))}
-                  placeholder="e.g., Algebra, Geometry, Trigonometry — exam-focused practice"
+                  placeholder="e.g., Algebra + Geometry + Trigonometry — exam-focused practice"
                   className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                 />
                 <p className="mt-1 text-xs text-gray-500">Min 10 characters</p>
@@ -377,7 +330,7 @@ const UploadCoursePage = () => {
                   <select
                     value={draft.level}
                     onChange={(e) => setDraft((p) => ({ ...p, level: e.target.value as CourseDraft["level"] }))}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   >
                     <option>Class 8</option>
                     <option>Class 9</option>
@@ -392,7 +345,7 @@ const UploadCoursePage = () => {
                   <select
                     value={draft.category}
                     onChange={(e) => setDraft((p) => ({ ...p, category: e.target.value as CourseDraft["category"] }))}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   >
                     <option>Academic</option>
                     <option>Technical</option>
@@ -405,7 +358,7 @@ const UploadCoursePage = () => {
                   <select
                     value={draft.subject}
                     onChange={(e) => setDraft((p) => ({ ...p, subject: e.target.value as CourseDraft["subject"] }))}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   >
                     <option>Mathematics</option>
                     <option>Science</option>
@@ -427,7 +380,7 @@ const UploadCoursePage = () => {
                   <select
                     value={draft.language}
                     onChange={(e) => setDraft((p) => ({ ...p, language: e.target.value as CourseDraft["language"] }))}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   >
                     <option>English</option>
                     <option>Nepali</option>
@@ -440,8 +393,15 @@ const UploadCoursePage = () => {
                   <label className="text-xs font-medium text-gray-700">Price Type</label>
                   <select
                     value={draft.priceType}
-                    onChange={(e) => setDraft((p) => ({ ...p, priceType: e.target.value as CourseDraft["priceType"] }))}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                    onChange={(e) => {
+                      const next = e.target.value as CourseDraft["priceType"];
+                      setDraft((p) => ({
+                        ...p,
+                        priceType: next,
+                        priceNpr: next === "Free" ? 0 : p.priceNpr > 0 ? p.priceNpr : 500,
+                      }));
+                    }}
+                    className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                   >
                     <option>Free</option>
                     <option>Paid</option>
@@ -452,58 +412,42 @@ const UploadCoursePage = () => {
                   <label className="text-xs font-medium text-gray-700">Price (NPR)</label>
                   <input
                     type="number"
-                    value={draft.priceType === "Free" ? 0 : draft.priceNpr ?? 0}
-                    onChange={(e) =>
-                      setDraft((p) => ({
-                        ...p,
-                        priceNpr: Number(e.target.value || 0),
-                      }))
-                    }
+                    value={draft.priceType === "Free" ? 0 : draft.priceNpr > 0 ? draft.priceNpr : ""}
+                    onChange={(e) => setDraft((p) => ({ ...p, priceNpr: Number(e.target.value || 0) }))}
                     disabled={draft.priceType === "Free"}
+                    min={0}
+                    placeholder={draft.priceType === "Free" ? "0" : "e.g. 500"}
                     className={[
                       "mt-2 w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2",
                       draft.priceType === "Free"
                         ? "border-gray-200 bg-gray-50 text-gray-400"
                         : "border-gray-300 focus:border-indigo-600 focus:ring-indigo-100",
                     ].join(" ")}
-                    placeholder="e.g., 1499"
                   />
-                  <p className="mt-1 text-xs text-gray-500">
-                    If paid: keep NPR 50+ (static validation)
-                  </p>
+                  <p className="mt-1 text-xs text-gray-500">If paid: NPR 50+.</p>
                 </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-gray-700">Thumbnail URL (optional)</label>
-                <input
-                  value={draft.thumbnailUrl}
-                  onChange={(e) => setDraft((p) => ({ ...p, thumbnailUrl: e.target.value }))}
-                  placeholder="https://..."
-                  className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                />
               </div>
             </div>
           </section>
 
           {/* Description */}
           <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-            <SectionTitle
-              title="Course Description"
-              desc="Explain what this course covers and how it helps students."
-            />
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Course Description</h2>
+              <p className="mt-1 text-sm text-gray-600">Explain what students get and how it helps.</p>
+            </div>
 
             <textarea
               value={draft.description}
               onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))}
               rows={6}
-              placeholder="Write a detailed description (min 30 chars). Example: This course covers..."
+              placeholder="Write a detailed description (min 30 chars)."
               className="mt-6 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             />
 
             <div className="mt-6 grid gap-6 lg:grid-cols-2">
               <div className="rounded-2xl bg-gray-50 p-6">
-                <p className="text-sm font-semibold text-gray-900">Outcomes (What students will learn)</p>
+                <p className="text-sm font-semibold text-gray-900">Outcomes</p>
                 <div className="mt-4 space-y-3">
                   {draft.outcomes.map((v, i) => (
                     <input
@@ -511,7 +455,7 @@ const UploadCoursePage = () => {
                       value={v}
                       onChange={(e) => updateOutcome(i, e.target.value)}
                       placeholder={`Outcome ${i + 1}`}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                     />
                   ))}
                 </div>
@@ -526,7 +470,7 @@ const UploadCoursePage = () => {
                       value={v}
                       onChange={(e) => updateRequirement(i, e.target.value)}
                       placeholder={`Requirement ${i + 1}`}
-                      className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
                     />
                   ))}
                 </div>
@@ -534,124 +478,59 @@ const UploadCoursePage = () => {
             </div>
           </section>
 
-          {/* Lessons builder */}
+          {/* Curriculum */}
           <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <SectionTitle
-                title="Lessons Builder"
-                desc="Add lessons in order. Mark 1–2 lessons as preview."
-              />
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Curriculum</h2>
+                <p className="mt-1 text-sm text-gray-600">Add lessons in order. Upload videos and resources.</p>
+              </div>
+
               <button
                 type="button"
                 onClick={addLesson}
                 className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
               >
-                <Icon.Plus className="h-4 w-4" />
+                <FiPlus className="h-4 w-4" />
                 Add Lesson
               </button>
             </div>
 
             <div className="mt-6 space-y-4">
               {draft.lessons.map((l, idx) => (
-                <div key={l.id} className="rounded-2xl border border-gray-200 bg-white p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold text-gray-500">Lesson {idx + 1}</p>
-                      <div className="mt-3 grid gap-3 sm:grid-cols-12">
-                        <div className="sm:col-span-6">
-                          <label className="text-xs font-medium text-gray-700">Lesson Title *</label>
-                          <input
-                            value={l.title}
-                            onChange={(e) => updateLesson(l.id, { title: e.target.value })}
-                            placeholder="e.g., Quadratic Equations (SEE)"
-                            className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-3">
-                          <label className="text-xs font-medium text-gray-700">Type</label>
-                          <select
-                            value={l.type}
-                            onChange={(e) => updateLesson(l.id, { type: e.target.value as LessonType })}
-                            className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                          >
-                            <option>Video</option>
-                            <option>Note</option>
-                            <option>Quiz</option>
-                          </select>
-                        </div>
-
-                        <div className="sm:col-span-3">
-                          <label className="text-xs font-medium text-gray-700">Duration (min)</label>
-                          <input
-                            type="number"
-                            value={l.durationMin}
-                            onChange={(e) =>
-                              updateLesson(l.id, { durationMin: Math.max(0, Number(e.target.value || 0)) })
-                            }
-                            className="mt-2 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
-                          />
-                        </div>
-                      </div>
-
-                      <label className="mt-4 inline-flex items-center gap-2 text-sm text-gray-600">
-                        <input
-                          type="checkbox"
-                          checked={l.isPreview}
-                          onChange={(e) => updateLesson(l.id, { isPreview: e.target.checked })}
-                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-200"
-                        />
-                        Mark as Preview (free access)
-                      </label>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        title="Move up"
-                        onClick={() => moveLesson(l.id, -1)}
-                        className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
-                      >
-                        <Icon.Move className="h-4 w-4" />
-                      </button>
-
-                      <button
-                        type="button"
-                        title="Delete"
-                        onClick={() => removeLesson(l.id)}
-                        className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
-                      >
-                        <Icon.Trash className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <LessonCard
+                  key={l.id}
+                  lesson={l}
+                  index={idx}
+                  isFirst={idx === 0}
+                  isLast={idx === draft.lessons.length - 1}
+                  onChange={(patch) => updateLesson(l.id, patch)}
+                  onRemove={() => removeLesson(l.id)}
+                  onMove={(dir) => moveLesson(l.id, dir)}
+                />
               ))}
-
-              {!draft.lessons.length ? (
-                <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center text-gray-600">
-                  No lessons yet. Click <span className="font-semibold">Add Lesson</span>.
-                </div>
-              ) : null}
             </div>
           </section>
         </div>
 
-        {/* Sidebar preview */}
-        <aside className="lg:col-span-4 space-y-6">
+        {/* Sidebar */}
+        <aside className="space-y-6 lg:col-span-4">
+          {reviewCourse ? <CourseSubmissionStatusCard course={reviewCourse} /> : null}
+
+          <ThumbnailUploadCard
+            thumbnailUrl={draft.thumbnailUrl}
+            onChange={(url) => setDraft((p) => ({ ...p, thumbnailUrl: url }))}
+          />
+
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900">Preview</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              This is how it may look in course listing (static).
-            </p>
+            <p className="mt-2 text-sm text-gray-600">How it may appear in listing.</p>
 
             <div className="mt-5 rounded-2xl bg-gray-50 p-5">
               <p className="text-xs font-semibold text-gray-500">
                 {draft.category} • {draft.level} • {draft.subject}
               </p>
-              <p className="mt-2 text-lg font-bold text-gray-900">
-                {draft.title.trim() ? draft.title : "Course Title"}
-              </p>
+              <p className="mt-2 text-lg font-bold text-gray-900">{draft.title.trim() ? draft.title : "Course Title"}</p>
               <p className="mt-2 text-sm text-gray-600">
                 {draft.subtitle.trim() ? draft.subtitle : "Short subtitle/description"}
               </p>
@@ -676,46 +555,16 @@ const UploadCoursePage = () => {
             </div>
 
             <div className="mt-5 space-y-3">
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-4">
-                <p className="text-xs font-semibold text-gray-700">Validation</p>
-                <p className="mt-1 text-xs text-gray-600">
-                  {isValid ? (
-                    <span className="inline-flex items-center gap-2 text-green-700">
-                      <Icon.Check className="h-4 w-4" /> Ready to publish
-                    </span>
-                  ) : (
-                    "Fill required fields (title, subtitle, description, lessons)."
-                  )}
-                </p>
-              </div>
-
               <Link
                 to="/courses"
                 className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50"
               >
                 View Courses
               </Link>
-
-              <button
-                type="button"
-                onClick={() => alert("Static UI: preview page later")}
-                className="inline-flex w-full items-center justify-center rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
-              >
-                Preview Course Page
-              </button>
             </div>
-          </div>
-
-          <div className="rounded-2xl bg-gray-900 p-6 text-white">
-            <p className="text-lg font-bold">Instructor Tip</p>
-            <p className="mt-2 text-sm text-gray-300">
-              Keep lesson titles short and exam-focused. Add 1 preview lesson for trust.
-            </p>
           </div>
         </aside>
       </div>
     </div>
   );
-};
-
-export default UploadCoursePage;
+}

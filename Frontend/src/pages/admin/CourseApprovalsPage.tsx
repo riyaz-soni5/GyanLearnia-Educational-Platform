@@ -1,6 +1,16 @@
 // src/pages/admin/CourseApprovalsPage.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import RejectReasonDialog from "../../components/admin/RejectReasonDialog";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import { useToast } from "../../components/toast";
+import { FiSearch, FiEye, FiCheck, FiX, FiAward, FiBookOpen } from "react-icons/fi";
+
+// ✅ Make sure you have these service functions (file example: src/services/adminCourses.ts)
+// - listPendingCourses(): Promise<{ items: CourseApproval[] }>
+// - approveCourse(id: string): Promise<any>
+// - rejectCourse(id: string, reason: string): Promise<any>
+import { listPendingCourses, approveCourse, rejectCourse } from "../../services/adminCourse";
 
 type ApprovalStatus = "Pending" | "Approved" | "Rejected";
 
@@ -14,14 +24,13 @@ type CourseApproval = {
   priceNpr?: number;
 
   instructorName: string;
-  instructorUsername: string;
+  instructorEmail: string;
   instructorVerified: boolean;
 
   submittedAt: string;
   status: ApprovalStatus;
   notes?: string;
 
-  // simple checklist for admin view
   checklist: {
     hasThumbnail: boolean;
     hasOutline: boolean;
@@ -32,90 +41,75 @@ type CourseApproval = {
 
   lessonsCount: number;
   hours: number;
+  totalVideoSec: number;
+
+  description?: string;
+  thumbnailUrl?: string;
+  outcomes: string[];
+  requirements: string[];
+  sections: Array<{
+    id: string;
+    title: string;
+    lectures: Array<{
+      id: string;
+      title: string;
+      type: string;
+      durationSec: number;
+      isFreePreview: boolean;
+    }>;
+  }>;
 };
 
+type RawPendingLecture = {
+  _id?: unknown;
+  id?: unknown;
+  title?: unknown;
+  type?: unknown;
+  durationSec?: unknown;
+  isFreePreview?: unknown;
+};
+
+type RawPendingSection = {
+  _id?: unknown;
+  id?: unknown;
+  title?: unknown;
+  lectures?: unknown;
+};
+
+type RawPendingCourse = {
+  id?: unknown;
+  title?: unknown;
+  subtitle?: unknown;
+  category?: unknown;
+  level?: unknown;
+  price?: unknown;
+  instructor?: {
+    name?: unknown;
+    email?: unknown;
+    isVerified?: unknown;
+  } | null;
+  createdAt?: unknown;
+  status?: unknown;
+  rejectionReason?: unknown;
+  description?: unknown;
+  thumbnailUrl?: unknown;
+  outcomes?: unknown;
+  requirements?: unknown;
+  totalLectures?: unknown;
+  totalVideoSec?: unknown;
+  sections?: unknown;
+};
+
+const toErrorMessage = (e: unknown, fallback: string) =>
+  e instanceof Error ? e.message : fallback;
+
 const Icon = {
-  Search: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16z"
-        className="stroke-current"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M21 21l-4.3-4.3"
-        className="stroke-current"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Eye: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"
-        className="stroke-current"
-        strokeWidth="1.8"
-      />
-      <path
-        d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
-        className="stroke-current"
-        strokeWidth="1.8"
-      />
-    </svg>
-  ),
-  Check: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M20 6L9 17l-5-5"
-        className="stroke-current"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  X: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M6 6l12 12M18 6L6 18"
-        className="stroke-current"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Badge: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z"
-        className="stroke-current"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M9 12l2 2 4-5"
-        className="stroke-current"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  Book: (p: React.SVGProps<SVGSVGElement>) => (
-    <svg viewBox="0 0 24 24" fill="none" {...p}>
-      <path
-        d="M5 4h12a2 2 0 0 1 2 2v14H7a2 2 0 0 0-2 2V4z"
-        className="stroke-current"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M7 20V6a2 2 0 0 1 2-2h12"
-        className="stroke-current"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
+  Search: FiSearch,
+  Eye: FiEye,
+  Check: FiCheck,
+  X: FiX,
+  Badge: FiAward,
+  Book: FiBookOpen,
 };
 
 const Badge = ({
@@ -154,77 +148,12 @@ const CheckRow = ({ label, ok }: { label: string; ok: boolean }) => (
 );
 
 const CourseApprovalsPage = () => {
-  const [items, setItems] = useState<CourseApproval[]>([
-    {
-      id: "cA1",
-      title: "Physics (+2) — Mechanics",
-      subtitle: "Concept + numericals with structured notes",
-      type: "Academic",
-      level: "+2",
-      priceType: "Paid",
-      priceNpr: 1499,
-      instructorName: "Astha Sharma",
-      instructorUsername: "astha_sharma",
-      instructorVerified: true,
-      submittedAt: "1 day ago",
-      status: "Pending",
-      lessonsCount: 30,
-      hours: 22,
-      checklist: {
-        hasThumbnail: true,
-        hasOutline: true,
-        hasAtLeast3Lessons: true,
-        hasDescription: true,
-        hasPricingIfPaid: true,
-      },
-    },
-    {
-      id: "cA2",
-      title: "Basic Graphic Design",
-      subtitle: "Design principles + Canva workflow (beginner friendly)",
-      type: "Vocational",
-      level: "Skill",
-      priceType: "Paid",
-      priceNpr: 999,
-      instructorName: "Verified Instructor",
-      instructorUsername: "verified_instructor",
-      instructorVerified: false,
-      submittedAt: "2 days ago",
-      status: "Pending",
-      lessonsCount: 12,
-      hours: 10,
-      checklist: {
-        hasThumbnail: false,
-        hasOutline: true,
-        hasAtLeast3Lessons: true,
-        hasDescription: true,
-        hasPricingIfPaid: true,
-      },
-    },
-    {
-      id: "cA3",
-      title: "English (Class 9) — Writing Formats",
-      subtitle: "Essay, letter, report writing — exam-ready structure",
-      type: "Academic",
-      level: "Class 9",
-      priceType: "Free",
-      instructorName: "Verified Teacher",
-      instructorUsername: "verified_teacher",
-      instructorVerified: true,
-      submittedAt: "5 days ago",
-      status: "Approved",
-      notes: "Approved (demo).",
-      lessonsCount: 14,
-      hours: 9,
-      checklist: {
-        hasThumbnail: true,
-        hasOutline: true,
-        hasAtLeast3Lessons: true,
-        hasDescription: true,
-        hasPricingIfPaid: true,
-      },
-    },
-  ]);
+  const { showToast } = useToast();
+
+  // ✅ REAL DATA (no static demo list)
+  const [items, setItems] = useState<CourseApproval[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ApprovalStatus | "All">("All");
@@ -232,6 +161,106 @@ const CourseApprovalsPage = () => {
 
   const [openId, setOpenId] = useState<string | null>(null);
   const openItem = useMemo(() => items.find((x) => x.id === openId) ?? null, [items, openId]);
+  const [approveId, setApproveId] = useState<string | null>(null);
+  const [approveLoading, setApproveLoading] = useState(false);
+
+  // ✅ Reject dialog state
+  const [rejectId, setRejectId] = useState<string | null>(null);
+  const [rejectLoading, setRejectLoading] = useState(false);
+
+  // ✅ Load pending courses
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        const res = await listPendingCourses();
+        if (!alive) return;
+        setItems(
+        res.items.map((c: RawPendingCourse) => {
+          const sections = Array.isArray(c.sections)
+            ? (c.sections as RawPendingSection[]).map((s, idx: number) => ({
+                id: String(s._id ?? s.id ?? idx + 1),
+                title: String(s.title ?? `Section ${idx + 1}`),
+                lectures: Array.isArray(s.lectures)
+                  ? (s.lectures as RawPendingLecture[]).map((l, lectureIdx: number) => ({
+                      id: String(l._id ?? l.id ?? `${idx + 1}-${lectureIdx + 1}`),
+                      title: String(l.title ?? "Untitled lecture"),
+                      type: String(l.type ?? "note"),
+                      durationSec: Number(l.durationSec ?? 0),
+                      isFreePreview: Boolean(l.isFreePreview),
+                    }))
+                  : [],
+              }))
+            : [];
+
+          const lessonsCount =
+            Number(c.totalLectures ?? 0) ||
+            sections.reduce((acc: number, s) => acc + s.lectures.length, 0);
+
+          const totalVideoSec =
+            Number(c.totalVideoSec ?? 0) ||
+            sections.reduce(
+              (acc: number, s) =>
+                acc +
+                s.lectures.reduce((sum: number, l) => sum + Number(l.durationSec || 0), 0),
+              0
+            );
+
+          return {
+          id: String(c.id ?? ""),
+          title: String(c.title ?? ""),
+          subtitle: String(c.subtitle ?? ""),
+          type: String(c.category ?? "Academic") as CourseApproval["type"], // backend -> category
+          level: String(c.level ?? "Unknown"),
+
+          priceType: Number(c.price ?? 0) > 0 ? "Paid" : "Free",
+          priceNpr: Number(c.price ?? 0),
+
+          instructorName: String(c.instructor?.name ?? "Instructor"),
+          instructorEmail: String(c.instructor?.email ?? "no-email"),
+          instructorVerified: Boolean(c.instructor?.isVerified),
+
+          submittedAt: String(c.createdAt ?? new Date().toISOString()),
+          status: String(c.status ?? "Pending") as ApprovalStatus,
+
+          notes: c.rejectionReason ? String(c.rejectionReason) : undefined,
+
+          lessonsCount,
+
+          totalVideoSec,
+          hours: Math.round((totalVideoSec / 3600) * 10) / 10,
+
+          description: c.description ? String(c.description) : "",
+          thumbnailUrl: c.thumbnailUrl ? String(c.thumbnailUrl) : undefined,
+          outcomes: Array.isArray(c.outcomes) ? c.outcomes.map((x) => String(x)) : [],
+          requirements: Array.isArray(c.requirements) ? c.requirements.map((x) => String(x)) : [],
+          sections,
+
+          checklist: {
+            hasThumbnail: Boolean(c.thumbnailUrl),
+            hasOutline: sections.length > 0 && sections.some((s) => s.lectures.length > 0),
+            hasAtLeast3Lessons: lessonsCount >= 3,
+            hasDescription: Boolean(c.description),
+            hasPricingIfPaid: Number(c.price ?? 0) === 0 || Number(c.price ?? 0) >= 50,
+          },
+        };
+      })
+      );
+      } catch (e: unknown) {
+        if (!alive) return;
+        setErr(toErrorMessage(e, "Failed to load course submissions"));
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -241,7 +270,7 @@ const CourseApprovalsPage = () => {
         x.title.toLowerCase().includes(q) ||
         x.subtitle.toLowerCase().includes(q) ||
         x.instructorName.toLowerCase().includes(q) ||
-        x.instructorUsername.toLowerCase().includes(q) ||
+        x.instructorEmail.toLowerCase().includes(q) ||
         x.level.toLowerCase().includes(q);
 
       const matchStatus = status === "All" || x.status === status;
@@ -251,18 +280,23 @@ const CourseApprovalsPage = () => {
     });
   }, [items, query, status, type]);
 
-  const approve = (id: string) => {
-    setItems((prev) =>
-      prev.map((x) =>
-        x.id === id ? { ...x, status: "Approved", notes: "Approved by admin (static)" } : x
-      )
-    );
+  const approve = async (id: string) => {
+    setApproveLoading(true);
+    try {
+      await approveCourse(id);
+      setItems((prev) => prev.filter((x) => x.id !== id));
+      showToast("Course approved ✅", "success");
+      if (openId === id) setOpenId(null);
+    } catch (e: unknown) {
+      showToast(toErrorMessage(e, "Approve failed"), "error");
+    } finally {
+      setApproveLoading(false);
+      setApproveId(null);
+    }
   };
 
-  const reject = (id: string) => {
-    const reason = prompt("Reject reason (demo):") || "Rejected by admin (static)";
-    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, status: "Rejected", notes: reason } : x)));
-  };
+  // open dialog
+  const reject = (id: string) => setRejectId(id);
 
   const priceText = (x: CourseApproval) =>
     x.priceType === "Free" ? "Free" : `NPR ${x.priceNpr?.toLocaleString()}`;
@@ -272,9 +306,7 @@ const CourseApprovalsPage = () => {
       {/* Header */}
       <section className="rounded-2xl bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Course Approvals</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Review course submissions and approve/reject them (static demo).
-        </p>
+        <p className="mt-2 text-sm text-gray-600">Review course submissions and approve/reject them.</p>
 
         <div className="mt-6 grid gap-4 lg:grid-cols-12">
           <div className="lg:col-span-6">
@@ -296,7 +328,7 @@ const CourseApprovalsPage = () => {
             <label className="text-xs font-semibold text-gray-700">Type</label>
             <select
               value={type}
-              onChange={(e) => setType(e.target.value as any)}
+              onChange={(e) => setType(e.target.value as CourseApproval["type"] | "All")}
               className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             >
               <option value="All">All</option>
@@ -310,7 +342,7 @@ const CourseApprovalsPage = () => {
             <label className="text-xs font-semibold text-gray-700">Status</label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as ApprovalStatus | "All")}
               className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
             >
               <option value="All">All</option>
@@ -324,6 +356,9 @@ const CourseApprovalsPage = () => {
         <p className="mt-4 text-sm text-gray-600">
           Showing <span className="font-semibold text-gray-900">{filtered.length}</span> course(s)
         </p>
+
+        {loading ? <p className="mt-3 text-sm text-gray-500">Loading...</p> : null}
+        {err ? <p className="mt-3 text-sm text-red-600">{err}</p> : null}
       </section>
 
       {/* Table */}
@@ -348,18 +383,13 @@ const CourseApprovalsPage = () => {
                   <td className="py-4 pr-4">
                     <p className="font-semibold text-gray-900">{x.title}</p>
                     <p className="mt-1 text-xs text-gray-600 line-clamp-2">{x.subtitle}</p>
-                    <p className="mt-2 text-xs text-gray-500">Submitted {x.submittedAt}</p>
+                    <p className="mt-2 text-xs text-gray-500">Submitted {new Date(x.submittedAt).toLocaleDateString()}</p>
                   </td>
 
                   <td className="py-4 pr-4">
                     <div className="space-y-1">
                       <p className="font-semibold text-gray-900">{x.instructorName}</p>
-                      <p className="text-xs text-gray-500">@{x.instructorUsername}</p>
-                      {x.instructorVerified ? (
-                        <Badge text="Verified" tone="indigo" />
-                      ) : (
-                        <Badge text="Not verified" tone="gray" />
-                      )}
+                      <p className="text-xs text-gray-500">{x.instructorEmail}</p>
                     </div>
                   </td>
 
@@ -387,7 +417,7 @@ const CourseApprovalsPage = () => {
                   </td>
 
                   <td className="py-4 text-right">
-                    <div className="inline-flex flex-wrap justify-end gap-2">
+                    <div className="flex flex-col items-end gap-2">
                       <button
                         type="button"
                         className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
@@ -402,7 +432,7 @@ const CourseApprovalsPage = () => {
                           <button
                             type="button"
                             className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                            onClick={() => approve(x.id)}
+                            onClick={() => setApproveId(x.id)}
                           >
                             <Icon.Check className="h-4 w-4" />
                             Approve
@@ -440,8 +470,8 @@ const CourseApprovalsPage = () => {
       {/* Modal */}
       {openItem ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <div className="w-full max-w-3xl rounded-2xl bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-4 sm:p-6">
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-gray-500">Course Review</p>
                 <h3 className="mt-1 truncate text-xl font-bold text-gray-900">{openItem.title}</h3>
@@ -464,71 +494,139 @@ const CourseApprovalsPage = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
-                <p className="text-sm font-bold text-gray-900">Instructor</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-semibold text-gray-900">{openItem.instructorName}</p>
-                  <span className="text-sm text-gray-600">@{openItem.instructorUsername}</span>
-                  {openItem.instructorVerified ? (
-                    <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                      <Icon.Badge className="h-4 w-4" />
-                      Verified
-                    </span>
-                  ) : (
-                    <Badge text="Not verified" tone="gray" />
-                  )}
+            <div className="min-h-0 overflow-y-auto p-4 sm:p-6">
+              <div className="grid gap-6 lg:grid-cols-12">
+                <div className="space-y-6 lg:col-span-8">
+                  {openItem.thumbnailUrl ? (
+                    <div className="overflow-hidden rounded-2xl border border-gray-200">
+                      <img src={openItem.thumbnailUrl} alt={openItem.title} className="h-56 w-full object-cover sm:h-72" />
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-bold text-gray-900">Description</p>
+                    <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
+                      {openItem.description?.trim() || "No description provided."}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                    <p className="text-sm font-bold text-gray-900">Curriculum</p>
+                    {openItem.sections.length ? (
+                      <div className="mt-3 space-y-3">
+                        {openItem.sections.map((s, i) => (
+                          <div key={s.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+                            <p className="text-sm font-semibold text-gray-900">
+                              Section {i + 1}: {s.title}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-600">{s.lectures.length} lectures</p>
+                            <div className="mt-2 space-y-2">
+                              {s.lectures.map((l) => (
+                                <div key={l.id} className="flex items-center justify-between gap-2 text-xs text-gray-700">
+                                  <span className="truncate">
+                                    {l.title} ({l.type})
+                                    {l.isFreePreview ? " • Preview" : ""}
+                                  </span>
+                                  <span>{Math.max(0, Math.round(Number(l.durationSec || 0) / 60))} min</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-sm text-gray-600">No curriculum found.</p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <p className="text-sm font-bold text-gray-900">Outcomes</p>
+                      {openItem.outcomes.length ? (
+                        <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                          {openItem.outcomes.map((o, idx) => (
+                            <li key={`${o}-${idx}`}>• {o}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-sm text-gray-600">No outcomes listed.</p>
+                      )}
+                    </div>
+
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <p className="text-sm font-bold text-gray-900">Requirements</p>
+                      {openItem.requirements.length ? (
+                        <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                          {openItem.requirements.map((r, idx) => (
+                            <li key={`${r}-${idx}`}>• {r}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-sm text-gray-600">No requirements listed.</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                <p className="mt-2 text-xs text-gray-500">Submitted: {openItem.submittedAt}</p>
-              </div>
+                <div className="space-y-4 lg:col-span-4">
+                  <div className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
+                    <p className="text-sm font-bold text-gray-900">Instructor</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900">{openItem.instructorName}</p>
+                      <span className="text-sm text-gray-600">{openItem.instructorEmail}</span>
+                      {openItem.instructorVerified ? (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                          <Icon.Badge className="h-4 w-4" />
+                          Verified
+                        </span>
+                      ) : (
+                        <Badge text="Not verified" tone="gray" />
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">Submitted: {new Date(openItem.submittedAt).toLocaleString()}</p>
+                  </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold text-gray-500">Lessons</p>
-                  <p className="mt-2 text-xl font-bold text-gray-900">{openItem.lessonsCount}</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold text-gray-500">Hours</p>
-                  <p className="mt-2 text-xl font-bold text-gray-900">{openItem.hours}</p>
-                </div>
-                <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                  <p className="text-xs font-semibold text-gray-500">Price</p>
-                  <p className="mt-2 text-xl font-bold text-gray-900">{priceText(openItem)}</p>
-                </div>
-              </div>
+                  <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-500">Lessons</p>
+                      <p className="mt-2 text-xl font-bold text-gray-900">{openItem.lessonsCount}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-500">Hours</p>
+                      <p className="mt-2 text-xl font-bold text-gray-900">{openItem.hours}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                      <p className="text-xs font-semibold text-gray-500">Price</p>
+                      <p className="mt-2 text-xl font-bold text-gray-900">{priceText(openItem)}</p>
+                    </div>
+                  </div>
 
-              <div>
-                <p className="text-sm font-bold text-gray-900">Checklist</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <CheckRow label="Thumbnail" ok={openItem.checklist.hasThumbnail} />
-                  <CheckRow label="Course Outline" ok={openItem.checklist.hasOutline} />
-                  <CheckRow label="At least 3 lessons" ok={openItem.checklist.hasAtLeast3Lessons} />
-                  <CheckRow label="Description" ok={openItem.checklist.hasDescription} />
-                  <CheckRow label="Pricing (if paid)" ok={openItem.checklist.hasPricingIfPaid} />
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Checklist</p>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                      <CheckRow label="Thumbnail" ok={openItem.checklist.hasThumbnail} />
+                      <CheckRow label="Course Outline" ok={openItem.checklist.hasOutline} />
+                      <CheckRow label="At least 3 lessons" ok={openItem.checklist.hasAtLeast3Lessons} />
+                      <CheckRow label="Description" ok={openItem.checklist.hasDescription} />
+                      <CheckRow label="Pricing (if paid)" ok={openItem.checklist.hasPricingIfPaid} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-200">
+                    <p className="text-sm font-bold text-indigo-900">Quick Preview</p>
+                    <Link
+                      to={`/courses/${openItem.id}`}
+                      className="mt-3 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+                    >
+                      <Icon.Book className="h-4 w-4" />
+                      Open Public Course Page
+                    </Link>
+                  </div>
                 </div>
-                <p className="mt-3 text-xs text-gray-500">
-                  Demo: later you can validate these from backend or from uploaded content.
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-200">
-                <p className="text-sm font-bold text-indigo-900">Quick Preview</p>
-                <p className="mt-1 text-sm text-indigo-800">
-                  In future, link this to the course details page to preview as admin.
-                </p>
-
-                <Link
-                  to={`/courses/${openItem.id}`}
-                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-                >
-                  <Icon.Book className="h-4 w-4" />
-                  Open Public Course Page
-                </Link>
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 p-6">
+            <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 p-4 sm:p-6">
               {openItem.status === "Pending" ? (
                 <>
                   <button
@@ -541,7 +639,7 @@ const CourseApprovalsPage = () => {
                   <button
                     type="button"
                     className="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-                    onClick={() => approve(openItem.id)}
+                    onClick={() => setApproveId(openItem.id)}
                   >
                     Approve
                   </button>
@@ -559,6 +657,55 @@ const CourseApprovalsPage = () => {
           </div>
         </div>
       ) : null}
+
+      {/* Reject Reason Dialog */}
+      <RejectReasonDialog
+        open={Boolean(rejectId)}
+        title="Reject course?"
+        description="Please provide a clear reason. The instructor will see this message."
+        confirmText="Reject"
+        cancelText="Cancel"
+        minLength={4}
+        loading={rejectLoading}
+        onClose={() => {
+          if (rejectLoading) return;
+          setRejectId(null);
+        }}
+        onConfirm={async (reason: string) => {
+          if (!rejectId) return;
+
+          setRejectLoading(true);
+          try {
+            await rejectCourse(rejectId, reason);
+            setItems((prev) => prev.filter((x) => x.id !== rejectId));
+            showToast("Course rejected ✅", "success");
+            if (openId === rejectId) setOpenId(null);
+            setRejectId(null);
+          } catch (e: unknown) {
+            showToast(toErrorMessage(e, "Reject failed"), "error");
+          } finally {
+            setRejectLoading(false);
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(approveId)}
+        title="Approve this course?"
+        description="This will publish the course and make it visible to students."
+        confirmText="Approve"
+        cancelText="Cancel"
+        tone="primary"
+        loading={approveLoading}
+        onClose={() => {
+          if (approveLoading) return;
+          setApproveId(null);
+        }}
+        onConfirm={() => {
+          if (!approveId) return;
+          void approve(approveId);
+        }}
+      />
     </div>
   );
 };

@@ -1,13 +1,16 @@
 // src/app/api/courses.api.ts
-import type { Course } from "../types/course.type";
+import type { CourseListItem } from "../types/course.type";
 
 export type Lesson = {
   id: string;
   title: string;
   durationMin: number;
-  type: "Video" | "Note" | "Quiz";
+  type: "Video" | "Note" | "Quiz" | "File";
   isPreview?: boolean;
 };
+
+export type CourseListResponse = { items: CourseListItem[] } | CourseListItem[];
+export type CourseDetailsResponse = { item: Record<string, unknown> } | Record<string, unknown>;
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
 
@@ -28,10 +31,10 @@ export const coursesApi = {
     if (params?.type && params.type !== "All") sp.set("type", params.type);
     if (params?.price && params.price !== "All") sp.set("priceType", params.price);
     const qs = sp.toString();
-    return http<Course[]>(`/api/courses${qs ? `?${qs}` : ""}`);
+    return http<CourseListResponse>(`/api/courses${qs ? `?${qs}` : ""}`);
   },
 
-  getById: (id: string) => http<Course>(`/api/courses/${id}`),
+  getById: (id: string) => http<CourseDetailsResponse>(`/api/courses/${id}`),
 
   lessons: (id: string) => http<Lesson[]>(`/api/courses/${id}/lessons`),
 };

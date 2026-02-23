@@ -1,22 +1,105 @@
-export type CourseLevel = "Class 8" | "Class 9" | "Class 10 (SEE)" | "+2" | "Skill";
-export type CourseType = "Academic" | "Technical" | "Vocational";
-export type PriceType = "Free" | "Paid";
+export type LessonType = "Video" | "Note" | "Quiz" | "File";
 
-// src/app/types/course.type.ts
-export type Course = {
+export type LessonResource = {
+  name: string;
+  url: string;
+  sizeBytes: number;
+};
+
+export type LessonDraft = {
+  id: string;
+  title: string;
+  type: LessonType;
+  durationMin: number;
+  isPreview: boolean;
+
+  // content
+  videoUrl?: string;
+  noteText?: string;
+  fileUrl?: string;
+
+  resources: LessonResource[];
+
+  // minimal quiz draft (upgrade later)
+  quiz?: {
+    title?: string;
+    passPercent?: number;
+    questions: Array<{
+      q: string;
+      options: string[];
+      answerIndex: number;
+      explanation?: string;
+    }>;
+  };
+};
+
+export type CourseDraft = {
+  title: string;
+  subtitle: string;
+
+  level: "Class 8" | "Class 9" | "Class 10 (SEE)" | "+2" |"Bachelor's"| "Masters" | "PhD" | "Skill" | "Other";
+  category: "Academic" | "Technical" | "Vocational";
+  subject:
+    | "Mathematics"
+    | "Science"
+    | "Physics"
+    | "Chemistry"
+    | "Biology"
+    | "English"
+    | "Nepali"
+    | "Accountancy"
+    | "Economics"
+    | "Computer Science"
+    | "Business Studies"
+    | "Other";
+
+  priceType: "Free" | "Paid";
+  priceNpr: number;
+
+  language: "English" | "Nepali";
+  thumbnailUrl?: string;
+
+  description: string;
+  outcomes: string[];
+  requirements: string[];
+
+  lessons: LessonDraft[];
+};
+
+export type CourseStatus = "Draft" | "Pending" | "Published" | "Rejected";
+
+export type CourseListItem = {
   id: string;
   title: string;
   subtitle: string;
+  thumbnailUrl?: string;
+  category: string;
   level: string;
-  type: string;
-  priceType: "Free" | "Paid";
-  priceNpr?: number;
-  rating: number;
-  lessons: number;
-  hours: number;
-  instructorName: string;
-  enrolled: number;
-  badge?: "Popular" | "Certified" | "New" | string;
+  language: string;
+  price: number;
+  currency: string;
+};
 
-  thumbnailUrl?: string; // ✅ add this
+export type AdminCourseRow = {
+  id: string;
+  title: string;
+  subtitle: string;
+  category: string;
+  level: string;
+  language: string;
+  price: number;
+  currency: string;
+
+  status: CourseStatus;
+  rejectionReason?: string | null;
+
+  instructor: {
+    id: string;
+    name: string;
+    email: string;
+  };
+
+  totalLectures: number;
+  totalVideoSec: number;
+  createdAt: string;
 };

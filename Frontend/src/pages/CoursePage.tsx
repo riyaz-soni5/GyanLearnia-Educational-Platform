@@ -2,20 +2,34 @@
 import { useEffect, useMemo, useState } from "react";
 import CourseCard from "../components/courses/CourseCard";
 import CourseFilters from "../components/courses/CourseFilters";
-import type { Course } from "../app/types/course.type";
+import type { CourseListItem } from "../app/types/course.type";
 import { coursesApi } from "../app/api/courses.api";
 
+type CourseListRow = CourseListItem & {
+  // Optional extras if your API returns them (nice for UI)
+  instructor?: { name?: string; email?: string };
+  totalLectures?: number;
+  totalVideoSec?: number;
+};
+
+type CourseListResponse = CourseListRow[] | { items?: CourseListRow[] };
+
+const toCourseRows = (payload: CourseListResponse): CourseListRow[] => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.items)) return payload.items;
+  return [];
+};
+
 const CoursesPage = () => {
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<CourseListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState<string>("All");
-  const [type, setType] = useState<string>("All");
+  const [type, setType] = useState<string>("All");   // maps to category on backend usually
   const [price, setPrice] = useState<string>("All");
 
-  // Option A (recommended): fetch filtered results from backend
   useEffect(() => {
     let cancelled = false;
 
@@ -23,19 +37,24 @@ const CoursesPage = () => {
       try {
         setLoading(true);
         setError("");
-        const data = await coursesApi.list({
+
+        // NOTE: keep your existing API contract
+        // If your backend expects "category" instead of "type",
+        // update coursesApi.list() implementation — not this page.
+        const data = (await coursesApi.list({
           q: query.trim(),
           level,
           type,
           price,
-        });
-        if (!cancelled) setCourses(data);
+        })) as CourseListResponse;
+
+        if (!cancelled) setCourses(toCourseRows(data));
       } catch (e: any) {
         if (!cancelled) setError(e?.message || "Failed to load courses");
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }, 250); // small debounce so typing doesn't spam API
+    }, 250);
 
     return () => {
       cancelled = true;
@@ -50,7 +69,6 @@ const CoursesPage = () => {
     setPrice("All");
   };
 
-  // If you want local filtering instead, you can keep your old useMemo.
   const resultCount = useMemo(() => courses.length, [courses]);
 
   return (
@@ -68,7 +86,6 @@ const CoursesPage = () => {
         resultCount={resultCount}
       />
 
-      {/* States */}
       {loading ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
           Loading courses...

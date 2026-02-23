@@ -9,6 +9,10 @@ import instructorDocRoutes from "./routes/instructorDoc.routes.js";
 import adminVerificationRoutes from "./routes/adminVerification.route.js";
 import instructorVerificationRoutes from "./routes/instructorVerification.route.js";
 import adminUsersRoute from "./routes/admin.users.route.js";
+import courseRoutes from "./routes/course.route.js";
+import instructorCoursesRoutes from "./routes/instructor.courses.route.js";
+import adminCoursesRoutes from "./routes/admin.courses.route.js";
+
 
 
 
@@ -31,5 +35,9 @@ app.use("/api", instructorDocRoutes);
 app.use("/api", adminVerificationRoutes);
 app.use("/api", instructorVerificationRoutes);
 app.use("/api/admin", adminUsersRoute);
+app.use("/api/courses", courseRoutes);
+app.use("/api/instructor/courses", instructorCoursesRoutes);
+app.use("/api/admin/courses", adminCoursesRoutes);
+
 
 export default app;
