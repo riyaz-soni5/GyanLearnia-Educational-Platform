@@ -59,6 +59,7 @@ type CourseUiModel = {
   lessons: number;
   enrolled: number;
   instructorName: string;
+  instructorAvatarUrl?: string | null;
   thumbnailUrl: string;
   outcomes: string[];
   requirements: string[];
@@ -107,7 +108,7 @@ type RawCourse = {
   price?: unknown;
   rating?: unknown;
   enrolled?: unknown;
-  instructor?: { name?: unknown; email?: unknown } | null;
+  instructor?: { name?: unknown; email?: unknown; avatarUrl?: unknown } | null;
   instructorName?: unknown;
   thumbnailUrl?: unknown;
   outcomes?: unknown;
@@ -121,6 +122,15 @@ type RawCourse = {
 
 const asObject = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
+const resolveAssetUrl = (url?: string | null) => {
+  if (!url) return null;
+  const clean = String(url).trim();
+  if (!clean) return null;
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return `${API_BASE}${clean.startsWith("/") ? clean : `/${clean}`}`;
+};
 
 const pickCourseItem = (payload: unknown): RawCourse | null => {
   const outer = asObject(payload);
@@ -228,6 +238,8 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
   const instructorName =
     String(c.instructor?.name ?? c.instructor?.email ?? c.instructorName ?? "").trim() ||
     "Unknown Instructor";
+  const instructorAvatarUrl =
+    typeof c.instructor?.avatarUrl === "string" ? resolveAssetUrl(c.instructor.avatarUrl) : null;
 
   return {
     id: String(c._id ?? c.id ?? ""),
@@ -244,6 +256,7 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
     lessons,
     enrolled: Number(c.enrolled ?? 0),
     instructorName,
+    instructorAvatarUrl,
     thumbnailUrl: thumb,
     outcomes,
     requirements,
@@ -934,13 +947,21 @@ const CourseDetailsPage = () => {
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900">Instructor</h3>
             <div className="mt-4 flex items-start gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-xl bg-gray-900 text-sm font-bold text-white">
-                {course.instructorName
-                  .split(" ")
-                  .slice(0, 2)
-                  .map((w) => w[0]?.toUpperCase())
-                  .join("")}
-              </div>
+              {course.instructorAvatarUrl ? (
+                <img
+                  src={course.instructorAvatarUrl}
+                  alt={course.instructorName}
+                  className="h-11 w-11 rounded-xl object-cover ring-1 ring-gray-200"
+                />
+              ) : (
+                <div className="grid h-11 w-11 place-items-center rounded-xl bg-gray-900 text-sm font-bold text-white">
+                  {course.instructorName
+                    .split(" ")
+                    .slice(0, 2)
+                    .map((w) => w[0]?.toUpperCase())
+                    .join("")}
+                </div>
+              )}
               <div>
                 <p className="text-sm font-semibold text-gray-900">{course.instructorName}</p>
                 <p className="mt-1 text-xs text-gray-600">Verified Instructor</p>

@@ -9,6 +9,7 @@ export type LoginResponse = {
     email: string;
     firstName?: string;
     lastName?: string;
+    avatarUrl?: string | null;
     isVerified?: boolean;
     verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
   };

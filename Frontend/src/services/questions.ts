@@ -12,6 +12,7 @@ export type AnswerDTO = {
   isVerified?: boolean;
   createdAt: string;
   author: string;
+  authorAvatarUrl?: string | null;
   authorType?: "Student" | "Instructor" | "Tutor";
 };
 
@@ -165,6 +166,7 @@ export type ReplyDTO = {
   createdAt: string;
   updatedAt?: string;
   author?: string;
+  authorAvatarUrl?: string | null;
   authorType?: string;
   authorId?: string;
 };

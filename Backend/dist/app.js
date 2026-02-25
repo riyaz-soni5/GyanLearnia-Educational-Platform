@@ -12,6 +12,7 @@ import adminUsersRoute from "./routes/admin.users.route.js";
 import courseRoutes from "./routes/course.route.js";
 import instructorCoursesRoutes from "./routes/instructor.courses.route.js";
 import adminCoursesRoutes from "./routes/admin.courses.route.js";
+import userProfileRoutes from "./routes/user.profile.route.js";
 const app = express();
 app.use(cors({
     origin: "http://localhost:5173",
@@ -30,4 +31,5 @@ app.use("/api/admin", adminUsersRoute);
 app.use("/api/courses", courseRoutes);
 app.use("/api/instructor/courses", instructorCoursesRoutes);
 app.use("/api/admin/courses", adminCoursesRoutes);
+app.use("/api/user", userProfileRoutes);
 export default app;

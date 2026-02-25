@@ -112,8 +112,8 @@ const Reveal = ({
 
 const AboutPage = () => {
   return (
-    <div className="space-y-20">
-      <section className="relative -mx-4 overflow-hidden border-y border-base sm:-mx-6 lg:-mx-8">
+    <div className="space-y-10">
+      <section className="relative -mx-4 overflow-hidden sm:-mx-6 lg:-mx-8">
         <div className="relative flex min-h-[76vh] items-center justify-center px-6 py-24 text-center">
           <Reveal className="relative z-10 mx-auto max-w-5xl" delay={80}>
             <p className="text-xs font-semibold uppercase tracking-[0.32em] text-muted">Our Mission</p>
@@ -127,8 +127,6 @@ const AboutPage = () => {
               create long-term career impact.
             </p>
           </Reveal>
-
-          <div className="pointer-events-none absolute -bottom-[420px] left-1/2 h-[820px] w-[1320px] -translate-x-1/2 rounded-full border border-indigo-300/70 bg-[radial-gradient(ellipse_at_top,rgba(67,56,202,0.36),rgba(79,70,229,0.28)_42%,rgba(99,102,241,0.16)_62%,rgba(255,255,255,0)_76%)] dark:border-indigo-500/30 dark:bg-[radial-gradient(ellipse_at_top,rgba(67,56,202,0.42),rgba(79,70,229,0.30)_42%,rgba(99,102,241,0.18)_62%,rgba(3,7,18,0)_76%)]" />
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 // src/components/ReplyThread.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import RichTextEditor from "../RichTextEditor";
 import { useToast } from "../toast";
 import {
@@ -10,6 +10,8 @@ import {
   type ReplyDTO,
 } from "@/services/questions";
 import { BiUpvote, BiDownvote } from "react-icons/bi";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const stripHtml = (html: string) =>
   String(html || "")
@@ -39,6 +41,23 @@ const timeAgo = (iso?: string) => {
   if (mo < 12) return `${mo}mo ago`;
   const yr = Math.floor(day / 365);
   return `${yr}y ago`;
+};
+
+const resolveAssetUrl = (url?: string | null) => {
+  if (!url) return null;
+  const clean = String(url).trim();
+  if (!clean) return null;
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return `${API_BASE}${clean.startsWith("/") ? clean : `/${clean}`}`;
+};
+
+const getInitials = (name?: string) => {
+  const s = String(name || "").trim();
+  if (!s) return "?";
+  const parts = s.split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts[1]?.[0] ?? "";
+  return (a + b).toUpperCase() || a.toUpperCase() || "?";
 };
 
 const VoteInline = ({
@@ -270,6 +289,7 @@ export default function ReplyThread({
     const children = childrenMap[r.id] || [];
     const hasMore = childHasMoreMap[r.id];
     const isLoading = loadingChild[r.id];
+    const avatarSrc = resolveAssetUrl(r.authorAvatarUrl);
 
     return (
       <div
@@ -280,6 +300,17 @@ export default function ReplyThread({
         ].join(" ")}
       >
         <div className="flex items-start gap-3">
+          {avatarSrc ? (
+            <img
+              src={avatarSrc}
+              alt={r.author || "Reply author"}
+              className="h-8 w-8 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"
+            />
+          ) : (
+            <div className="h-8 w-8 rounded-full bg-gray-100 ring-1 ring-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-700 dark:bg-white/5 dark:ring-white/10 dark:text-gray-200">
+              {getInitials(r.author)}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
               <span className="font-semibold text-gray-800 dark:text-gray-200">

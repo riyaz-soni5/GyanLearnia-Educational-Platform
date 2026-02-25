@@ -3,6 +3,7 @@ import { Response } from "express";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import Reply from "../models/Reply.model.js";
 import Answer from "../models/Answer.model.js";
+import User from "../models/User.model.js";
 
 // helper: apply vote switch / toggle (same as your Answer logic)
 const applyVote = (existing: number | null, next: 1 | -1) => {
@@ -38,7 +39,7 @@ export const listReplies = async (req: AuthedRequest, res: Response) => {
     const rows = await Reply.find(filter)
       .sort({ createdAt: -1 })
       .limit(limit + 1)
-      .populate("authorId", "firstName lastName role email")
+      .populate("authorId", "firstName lastName role email avatarUrl")
       .lean();
 
     const hasMore = rows.length > limit;
@@ -77,6 +78,7 @@ export const listReplies = async (req: AuthedRequest, res: Response) => {
         authorId: authorObj?._id ? String(authorObj._id) : undefined,
         author,
         authorType: authorObj?.role ?? "student",
+        authorAvatarUrl: authorObj?.avatarUrl ?? null,
       };
     });
 
@@ -115,6 +117,9 @@ export const postReply = async (req: AuthedRequest, res: Response) => {
       authorId: req.user.id,
       content: html,
     });
+    const authorDoc = await User.findById(req.user.id)
+      .select("firstName lastName role email avatarUrl")
+      .lean();
 
     return res.status(201).json({
       message: "Reply posted",
@@ -128,8 +133,12 @@ export const postReply = async (req: AuthedRequest, res: Response) => {
         myVote: null,
         createdAt: created.createdAt,
         authorId: String(req.user.id),
-        author: "You",
-        authorType: req.user.role ?? "student",
+        author:
+          [authorDoc?.firstName, authorDoc?.lastName].filter(Boolean).join(" ").trim() ||
+          authorDoc?.email ||
+          "You",
+        authorType: (authorDoc as any)?.role ?? req.user.role ?? "student",
+        authorAvatarUrl: authorDoc?.avatarUrl ?? null,
       },
     });
   } catch {

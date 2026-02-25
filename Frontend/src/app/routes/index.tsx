@@ -14,6 +14,7 @@ import QuestionsPage from "@/pages/questions/QuestionPage";
 import MentorsPage from "@/pages/public/MentorsDiscovryPage";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
+import ProfilePage from "@/pages/auth/ProfilePage";
 import PricingPage from "@/pages/public/PricingPage";
 import AboutPage from "@/pages/public/AboutPage";
 import QuestionDetailsPage from "@/pages/questions/QuestionDetailsPage";
@@ -55,7 +56,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "login", element: <LoginPage />, loader: redirectIfLoggedIn },
       { path: "register", element: <RegisterPage />, loader: redirectIfLoggedIn },
-        { path: "instructor/verify", element: <InstructorVerificationPage />, loader: requireAuth },
+      { path: "instructor/verify", element: <InstructorVerificationPage />, loader: requireAuth },
     ],
   },
 
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
       { path: "mentors", element: <MentorsPage /> },
       { path: "pricing", element: <PricingPage /> },
       { path: "about", element: <AboutPage /> },
+      { path: "profile", element: <ProfilePage />, loader: requireAuth },
 
       // ✅ instructor protected
       {

@@ -111,6 +111,7 @@ export type CourseListItem = {
   instructor?: {
     name?: string;
     email?: string;
+    avatarUrl?: string | null;
   };
   totalLectures?: number;
   totalVideoSec?: number;

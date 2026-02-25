@@ -14,7 +14,7 @@ export const listAnswers = async (req: AuthedRequest, res: Response) => {
 
     const answers = await Answer.find({ questionId })
       .sort({ isVerified: -1, votes: -1, createdAt: -1 }) // verified first, then top votes
-      .populate("authorId", "firstName lastName role email")
+      .populate("authorId", "firstName lastName role email avatarUrl")
       .lean();
 
     // return in a frontend-friendly shape
@@ -39,6 +39,7 @@ export const listAnswers = async (req: AuthedRequest, res: Response) => {
           ? `${a.authorId.firstName ?? ""} ${a.authorId.lastName ?? ""}`.trim() || a.authorId.email
           : "Unknown",
         authorType: a.authorId?.role ?? "student",
+        authorAvatarUrl: a.authorId?.avatarUrl ?? null,
       };
     });
 
@@ -79,6 +80,9 @@ export const postAnswer = async (req: AuthedRequest, res: Response) => {
       authorId: req.user.id,
       content: String(content).trim(),
     });
+    const authorDoc = await User.findById(req.user.id)
+      .select("firstName lastName role email avatarUrl")
+      .lean();
 
     // ✅ update cached count only (DO NOT mark as answered here)
     await Question.findByIdAndUpdate(questionId, { $inc: { answersCount: 1 } });
@@ -92,13 +96,14 @@ export const postAnswer = async (req: AuthedRequest, res: Response) => {
         votes: answer.votes,
         isVerified: answer.isVerified,
         createdAt: answer.createdAt,
+        authorAvatarUrl: authorDoc?.avatarUrl ?? null,
       },
-      authorId: answer.authorId?._id ? String(answer.authorId._id) : String(req.user.id),
-      author: answer.authorId
-        ? `${(answer.authorId as any).firstName ?? ""} ${(answer.authorId as any).lastName ?? ""}`.trim() ||
-          (answer.authorId as any).email
-        : "You",
-      authorType: (answer.authorId as any)?.role ?? req.user.role ?? "student",
+      authorId: String(req.user.id),
+      author:
+        [authorDoc?.firstName, authorDoc?.lastName].filter(Boolean).join(" ").trim() ||
+        authorDoc?.email ||
+        "You",
+      authorType: (authorDoc as any)?.role ?? req.user.role ?? "student",
     });
   } catch (err: any) {
     // ✅ handle unique index conflict gracefully if you add the index

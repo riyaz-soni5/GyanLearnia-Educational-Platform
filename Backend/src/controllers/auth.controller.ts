@@ -41,6 +41,7 @@ export const login = async (req: Request, res: Response) => {
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
+        avatarUrl: user.avatarUrl ?? null,
         isVerified: Boolean(user.isVerified),
         verificationStatus: user.verificationStatus, // ✅ add this
       },
@@ -84,6 +85,7 @@ export const register = async (req: Request, res: Response) => {
         lastName: user.lastName,
         role: user.role,
         email: user.email,
+        avatarUrl: user.avatarUrl ?? null,
       },
     });
   } catch (err) {

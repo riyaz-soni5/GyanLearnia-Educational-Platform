@@ -63,7 +63,7 @@ export async function listPublishedCourses(_req, res) {
     try {
         const items = await Course.find({ status: "Published" })
             .select("title subtitle thumbnailUrl category level language price currency tags totalLectures totalVideoSec createdAt")
-            .populate("instructorId", "firstName lastName email")
+            .populate("instructorId", "firstName lastName email avatarUrl")
             .sort({ createdAt: -1 })
             .lean();
         return res.json({
@@ -84,6 +84,7 @@ export async function listPublishedCourses(_req, res) {
                     ? {
                         name: [c.instructorId.firstName, c.instructorId.lastName].filter(Boolean).join(" ").trim(),
                         email: c.instructorId.email,
+                        avatarUrl: c.instructorId.avatarUrl ?? null,
                     }
                     : undefined,
             })),
@@ -97,7 +98,7 @@ export async function getPublishedCourse(req, res) {
     try {
         const id = req.params.id;
         const c = await Course.findOne({ _id: id, status: "Published" })
-            .populate("instructorId", "firstName lastName email")
+            .populate("instructorId", "firstName lastName email avatarUrl")
             .lean();
         if (!c)
             return res.status(404).json({ message: "Course not found" });
@@ -106,6 +107,7 @@ export async function getPublishedCourse(req, res) {
             ? {
                 name: [instructorDoc.firstName, instructorDoc.lastName].filter(Boolean).join(" ").trim(),
                 email: instructorDoc.email,
+                avatarUrl: instructorDoc.avatarUrl ?? null,
             }
             : null;
         return res.json({

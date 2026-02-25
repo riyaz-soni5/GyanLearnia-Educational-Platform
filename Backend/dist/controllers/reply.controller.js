@@ -1,5 +1,6 @@
 import Reply from "../models/Reply.model.js";
 import Answer from "../models/Answer.model.js";
+import User from "../models/User.model.js";
 // helper: apply vote switch / toggle (same as your Answer logic)
 const applyVote = (existing, next) => {
     if (existing === next)
@@ -30,7 +31,7 @@ export const listReplies = async (req, res) => {
         const rows = await Reply.find(filter)
             .sort({ createdAt: -1 })
             .limit(limit + 1)
-            .populate("authorId", "firstName lastName role email")
+            .populate("authorId", "firstName lastName role email avatarUrl")
             .lean();
         const hasMore = rows.length > limit;
         const slice = hasMore ? rows.slice(0, limit) : rows;
@@ -60,6 +61,7 @@ export const listReplies = async (req, res) => {
                 authorId: authorObj?._id ? String(authorObj._id) : undefined,
                 author,
                 authorType: authorObj?.role ?? "student",
+                authorAvatarUrl: authorObj?.avatarUrl ?? null,
             };
         });
         return res.json({ items, hasMore, nextCursor });
@@ -95,6 +97,9 @@ export const postReply = async (req, res) => {
             authorId: req.user.id,
             content: html,
         });
+        const authorDoc = await User.findById(req.user.id)
+            .select("firstName lastName role email avatarUrl")
+            .lean();
         return res.status(201).json({
             message: "Reply posted",
             item: {
@@ -107,8 +112,11 @@ export const postReply = async (req, res) => {
                 myVote: null,
                 createdAt: created.createdAt,
                 authorId: String(req.user.id),
-                author: "You",
-                authorType: req.user.role ?? "student",
+                author: [authorDoc?.firstName, authorDoc?.lastName].filter(Boolean).join(" ").trim() ||
+                    authorDoc?.email ||
+                    "You",
+                authorType: authorDoc?.role ?? req.user.role ?? "student",
+                authorAvatarUrl: authorDoc?.avatarUrl ?? null,
             },
         });
     }

@@ -7,6 +7,7 @@ export type SessionUser = {
   email: string;
   firstName?: string;
   lastName?: string;
+  avatarUrl?: string | null;
   isVerified?: boolean; // ✅ needed for instructor gating
   verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
 };
@@ -36,12 +37,18 @@ export function isLoggedIn() {
 export function setUser(user: SessionUser, rememberMe: boolean) {
   const storage = rememberMe ? localStorage : sessionStorage;
   storage.setItem("gyanlearnia_user", JSON.stringify(user));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("gyanlearnia_user_updated"));
+  }
 }
 
 // ✅ logout
 export async function logout() {
   localStorage.removeItem("gyanlearnia_user");
   sessionStorage.removeItem("gyanlearnia_user");
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("gyanlearnia_user_updated"));
+  }
 
   // clear cookie on backend
   try {

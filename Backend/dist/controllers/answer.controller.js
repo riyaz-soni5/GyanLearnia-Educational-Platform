@@ -8,7 +8,7 @@ export const listAnswers = async (req, res) => {
         const { id: questionId } = req.params;
         const answers = await Answer.find({ questionId })
             .sort({ isVerified: -1, votes: -1, createdAt: -1 }) // verified first, then top votes
-            .populate("authorId", "firstName lastName role email")
+            .populate("authorId", "firstName lastName role email avatarUrl")
             .lean();
         // return in a frontend-friendly shape
         const meId = req.user?.id ? String(req.user.id) : null;
@@ -29,6 +29,7 @@ export const listAnswers = async (req, res) => {
                     ? `${a.authorId.firstName ?? ""} ${a.authorId.lastName ?? ""}`.trim() || a.authorId.email
                     : "Unknown",
                 authorType: a.authorId?.role ?? "student",
+                authorAvatarUrl: a.authorId?.avatarUrl ?? null,
             };
         });
         return res.json({ items });
@@ -65,6 +66,9 @@ export const postAnswer = async (req, res) => {
             authorId: req.user.id,
             content: String(content).trim(),
         });
+        const authorDoc = await User.findById(req.user.id)
+            .select("firstName lastName role email avatarUrl")
+            .lean();
         // ✅ update cached count only (DO NOT mark as answered here)
         await Question.findByIdAndUpdate(questionId, { $inc: { answersCount: 1 } });
         return res.status(201).json({
@@ -76,13 +80,13 @@ export const postAnswer = async (req, res) => {
                 votes: answer.votes,
                 isVerified: answer.isVerified,
                 createdAt: answer.createdAt,
+                authorAvatarUrl: authorDoc?.avatarUrl ?? null,
             },
-            authorId: answer.authorId?._id ? String(answer.authorId._id) : String(req.user.id),
-            author: answer.authorId
-                ? `${answer.authorId.firstName ?? ""} ${answer.authorId.lastName ?? ""}`.trim() ||
-                    answer.authorId.email
-                : "You",
-            authorType: answer.authorId?.role ?? req.user.role ?? "student",
+            authorId: String(req.user.id),
+            author: [authorDoc?.firstName, authorDoc?.lastName].filter(Boolean).join(" ").trim() ||
+                authorDoc?.email ||
+                "You",
+            authorType: authorDoc?.role ?? req.user.role ?? "student",
         });
     }
     catch (err) {

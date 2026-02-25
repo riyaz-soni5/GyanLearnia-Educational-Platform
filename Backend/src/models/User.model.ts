@@ -13,6 +13,34 @@ const UserSchema = new Schema(
     password: { type: String, required: true },
     role: { type: String, enum: ["student", "instructor", "admin"], required: true },
 
+    // Profile extras
+    avatarUrl: { type: String, trim: true, default: null },
+    dateOfBirth: { type: Date, default: null },
+    gender: {
+      type: String,
+      enum: ["", "male", "female", "other", "prefer_not_to_say"],
+      default: "",
+    },
+    bio: { type: String, trim: true, default: "" },
+    academicBackgrounds: {
+      type: [
+        {
+          institution: { type: String, trim: true, required: true },
+          startDate: { type: Date, required: true },
+          endDate: { type: Date, default: null },
+          isCurrent: { type: Boolean, default: false },
+        },
+      ],
+      default: [],
+    },
+    socialLinks: {
+      linkedin: { type: String, trim: true, default: "" },
+      twitter: { type: String, trim: true, default: "" },
+      facebook: { type: String, trim: true, default: "" },
+      instagram: { type: String, trim: true, default: "" },
+      website: { type: String, trim: true, default: "" },
+    },
+
     // Instructor-only
     expertise: { type: String, trim: true },
     institution: { type: String, trim: true },

@@ -29,6 +29,7 @@ type StoredUser = {
   email: string;
   firstName?: string;
   lastName?: string;
+  avatarUrl?: string | null;
   isVerified?: boolean;
   verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
 };
@@ -46,6 +47,7 @@ function readStoredUser(): StoredUser | null {
 }
 
 const Header = () => {
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const nav = useNavigate();
   const location = useLocation();
 
@@ -71,6 +73,12 @@ const Header = () => {
     setUser(readStoredUser());
   }, [location.pathname]);
 
+  useEffect(() => {
+    const syncUser = () => setUser(readStoredUser());
+    window.addEventListener("gyanlearnia_user_updated", syncUser);
+    return () => window.removeEventListener("gyanlearnia_user_updated", syncUser);
+  }, []);
+
   // close menu on outside click
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -93,6 +101,16 @@ const Header = () => {
     user?.firstName || user?.lastName
       ? `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim()
       : "Profile";
+  const initials = (
+    `${user?.firstName?.[0] ?? ""}${user?.lastName?.[0] ?? ""}` ||
+    user?.email?.[0] ||
+    "U"
+  ).toUpperCase();
+  const avatarUrl = user?.avatarUrl
+    ? user.avatarUrl.startsWith("http")
+      ? user.avatarUrl
+      : `${API_BASE}${user.avatarUrl.startsWith("/") ? user.avatarUrl : `/${user.avatarUrl}`}`
+    : null;
 
   const isInstructor = user?.role === "instructor";
   const isAdmin = user?.role === "admin";
@@ -108,7 +126,6 @@ const Header = () => {
 
   const logout = async () => {
     try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
       await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" });
     } catch {
       // ignore
@@ -183,9 +200,17 @@ const Header = () => {
                   className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
                   aria-label="Open profile menu"
                 >
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-gray-900 text-white">
-                    <FiUser className="h-4 w-4" />
-                  </span>
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={displayName}
+                      className="h-8 w-8 rounded-full object-cover ring-1 ring-gray-200 dark:ring-gray-700"
+                    />
+                  ) : (
+                    <span className="grid h-8 w-8 place-items-center rounded-full bg-gray-900 text-xs font-semibold text-white">
+                      {user ? initials : <FiUser className="h-4 w-4" />}
+                    </span>
+                  )}
                   <span className="hidden text-sm font-semibold sm:inline-block">
                     {displayName}
                   </span>

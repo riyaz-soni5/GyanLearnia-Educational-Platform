@@ -31,6 +31,8 @@ import { useToast } from "@/components/toast";
 // ✅ ADDED (only)
 import ReplyThread from "@/components/questions/ReplyThread";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+
 const Badge = ({
   text,
   tone,
@@ -168,11 +170,26 @@ const getInitials = (name?: string) => {
   return (a + b).toUpperCase() || a.toUpperCase() || "?";
 };
 
-const Avatar = ({ name }: { name?: string }) => (
-  <div className="h-9 w-9 rounded-full bg-gray-100 ring-1 ring-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 dark:bg-white/5 dark:ring-white/10 dark:text-gray-200">
-    {getInitials(name)}
-  </div>
-);
+const resolveAssetUrl = (url?: string | null) => {
+  if (!url) return null;
+  const clean = String(url).trim();
+  if (!clean) return null;
+  if (/^https?:\/\//i.test(clean)) return clean;
+  return `${API_BASE}${clean.startsWith("/") ? clean : `/${clean}`}`;
+};
+
+const Avatar = ({ name, src }: { name?: string; src?: string | null }) =>
+  src ? (
+    <img
+      src={src}
+      alt={name || "User avatar"}
+      className="h-9 w-9 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"
+    />
+  ) : (
+    <div className="h-9 w-9 rounded-full bg-gray-100 ring-1 ring-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 dark:bg-white/5 dark:ring-white/10 dark:text-gray-200">
+      {getInitials(name)}
+    </div>
+  );
 
 const RolePill = ({ role }: { role?: string }) => {
   const r = String(role || "student").toLowerCase();
@@ -564,6 +581,7 @@ const QuestionDetailsPage = () => {
         authorId: created?.authorId ?? currentUserId,
         userId: created?.userId ?? currentUserId,
         author: created?.author ?? currentUsername,
+        authorAvatarUrl: created?.authorAvatarUrl ?? null,
         authorType: created?.authorType ?? me?.role ?? "student",
       };
 
@@ -915,6 +933,10 @@ const QuestionDetailsPage = () => {
                   </span>
 
                   <div className="inline-flex items-center gap-2">
+                    <Avatar
+                      name={(question as any).author}
+                      src={resolveAssetUrl((question as any).authorAvatarUrl)}
+                    />
                     <span className="font-semibold text-gray-900 dark:text-white">
                       {(question as any).author}
                     </span>
@@ -1037,7 +1059,7 @@ const QuestionDetailsPage = () => {
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <Avatar name={a.author} />
+                          <Avatar name={a.author} src={resolveAssetUrl(a.authorAvatarUrl)} />
 
                           <span className="font-semibold text-gray-900 dark:text-white">
                             {a.author || "Anonymous"}

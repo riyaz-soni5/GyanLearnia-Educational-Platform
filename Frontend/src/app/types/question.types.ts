@@ -11,6 +11,7 @@ export type Question = {
   tags: string[];
   author: string;
   authorId: string;
+  authorAvatarUrl?: string | null;
   authorType?: "Student" | "Tutor" | "Teacher" | "Instructor";
   answersCount: number;
   views: number;

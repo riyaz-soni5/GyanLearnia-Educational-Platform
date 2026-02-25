@@ -20,7 +20,7 @@ export const listQuestions = async (req, res) => {
             .skip(skip)
             .limit(Number(limit))
             .populate("categoryId", "name")
-            .populate("authorId", "firstName lastName fullName name username role")
+            .populate("authorId", "firstName lastName fullName name username role avatarUrl")
             .lean(),
         Question.countDocuments(filter),
     ]));
@@ -57,6 +57,7 @@ export const listQuestions = async (req, res) => {
                     authorObj?.username ||
                     "Anonymous",
             authorType: authorObj?.role || "student",
+            authorAvatarUrl: authorObj?.avatarUrl || null,
         };
     });
     res.json({ items: mapped, total, page: Number(page), limit: Number(limit) });
@@ -82,7 +83,7 @@ export const getQuestion = async (req, res) => {
             $addToSet: { viewedBy: userId },
         }, { new: true })
             .populate("categoryId", "name")
-            .populate("authorId", "firstName lastName fullName name username role")
+            .populate("authorId", "firstName lastName fullName name username role avatarUrl")
             .lean();
     }
     // ✅ Guest logic
@@ -95,14 +96,14 @@ export const getQuestion = async (req, res) => {
             $addToSet: { viewedKeys: guestKey },
         }, { new: true })
             .populate("categoryId", "name")
-            .populate("authorId", "firstName lastName fullName name username role")
+            .populate("authorId", "firstName lastName fullName name username role avatarUrl")
             .lean();
     }
     // If not incremented, just fetch normally
     if (!q) {
         q = await Question.findById(id)
             .populate("categoryId", "name")
-            .populate("authorId", "firstName lastName fullName name username role")
+            .populate("authorId", "firstName lastName fullName name username role avatarUrl")
             .lean();
     }
     if (!q)
@@ -142,6 +143,7 @@ export const getQuestion = async (req, res) => {
             updatedAt: q.updatedAt ? new Date(q.updatedAt).toISOString() : undefined,
             author: authorName,
             authorType,
+            authorAvatarUrl: authorObj?.avatarUrl || null,
             authorId: authorObj?._id
                 ? String(authorObj._id)
                 : String(q.authorId),

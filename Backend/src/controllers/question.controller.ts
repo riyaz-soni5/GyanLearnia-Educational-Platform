@@ -28,7 +28,7 @@ export const listQuestions = async (req: Request, res: Response) => {
     .skip(skip)
     .limit(Number(limit))
     .populate("categoryId", "name")
-    .populate("authorId", "firstName lastName fullName name username role")
+    .populate("authorId", "firstName lastName fullName name username role avatarUrl")
     .lean(),
   Question.countDocuments(filter),
 ])) as any;
@@ -74,6 +74,7 @@ export const listQuestions = async (req: Request, res: Response) => {
       "Anonymous",
 
 authorType: authorObj?.role || "student",
+    authorAvatarUrl: authorObj?.avatarUrl || null,
   };
 });
 
@@ -110,7 +111,7 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
       { new: true }
     )
       .populate("categoryId", "name")
-      .populate("authorId", "firstName lastName fullName name username role")
+      .populate("authorId", "firstName lastName fullName name username role avatarUrl")
       .lean();
   } 
   // ✅ Guest logic
@@ -127,7 +128,7 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
       { new: true }
     )
       .populate("categoryId", "name")
-      .populate("authorId", "firstName lastName fullName name username role")
+      .populate("authorId", "firstName lastName fullName name username role avatarUrl")
       .lean();
   }
 
@@ -135,7 +136,7 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
   if (!q) {
     q = await Question.findById(id)
       .populate("categoryId", "name")
-      .populate("authorId", "firstName lastName fullName name username role")
+      .populate("authorId", "firstName lastName fullName name username role avatarUrl")
       .lean();
   }
 
@@ -188,6 +189,7 @@ const myVote =
 
       author: authorName,
       authorType,
+      authorAvatarUrl: authorObj?.avatarUrl || null,
 
       authorId: authorObj?._id
         ? String(authorObj._id)
