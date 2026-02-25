@@ -3,8 +3,6 @@ import { http } from "@/services/http";
 import {
   FiAward,
   FiStar,
-  FiMessageSquare,
-  FiUser,
 } from "react-icons/fi";
 
 type LeaderDTO = {
@@ -18,12 +16,6 @@ type LeaderDTO = {
 type LeaderboardResponse = {
   items: LeaderDTO[];
   range?: "This Week" | "This Month" | "All Time";
-};
-
-const getInitials = (name?: string) => {
-  if (!name) return "?";
-  const parts = name.split(" ").filter(Boolean);
-  return (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
 };
 
 const getRankIcon = (idx: number) => {
@@ -47,6 +39,7 @@ const Leaderboard = () => {
   const [range, setRange] = useState<string>("This Week");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const displayItems = items.filter((u) => Number(u.points) > 0);
 
   useEffect(() => {
     let alive = true;
@@ -59,12 +52,11 @@ const Leaderboard = () => {
         if (!alive) return;
         setItems(res.items ?? []);
         setRange(res.range ?? "This Week");
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!alive) return;
-        setErr(e?.message || "Failed to load leaderboard");
+        setErr(e instanceof Error ? e.message : "Failed to load leaderboard");
       } finally {
-        if (!alive) return;
-        setLoading(false);
+        if (alive) setLoading(false);
       }
     })();
 
@@ -98,13 +90,13 @@ const Leaderboard = () => {
         <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
           {err}
         </div>
-      ) : items.length === 0 ? (
+      ) : displayItems.length === 0 ? (
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
           No leaderboard data yet.
         </div>
       ) : (
         <div className="mt-5 space-y-3">
-          {items.map((u, idx) => (
+          {displayItems.map((u, idx) => (
             <div
               key={u.id}
               className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 transition hover:shadow-sm dark:border-white/10 dark:bg-white/5"
