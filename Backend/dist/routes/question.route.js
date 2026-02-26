@@ -10,7 +10,7 @@ import { listReplies, postReply, updateReply, deleteReply, upvoteReply, downvote
 import { optionalAuth } from "../middlewares/auth.middleware.js";
 import { getLeaderboard } from "../controllers/leaderboard.controller.js"; // ✅ NEW
 const router = Router();
-router.get("/", listQuestions);
+router.get("/", optionalAuth, listQuestions);
 router.get("/leaderboard", getLeaderboard); // ✅ NEW (must be before "/:id" routes ideally)
 router.get("/:id", optionalAuth, getQuestion);
 router.post("/", requireAuth, createQuestion);

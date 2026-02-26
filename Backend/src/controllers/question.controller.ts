@@ -1,26 +1,59 @@
 // controllers/question.controller.ts
-import { Request, Response } from "express";
+import { Response } from "express";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import type { SortOrder } from "mongoose";
 import Question from "../models/Question.model.js";
 
-export const listQuestions = async (req: Request, res: Response) => {
-  const { query = "", categoryId = "All", level = "All", sort = "Newest", page = "1", limit = "10" } = req.query;
+export const listQuestions = async (req: AuthedRequest, res: Response) => {
+  const {
+    q = "",
+    query = "",
+    categoryId = "All",
+    level = "All",
+    sort = "Newest",
+    status = "All",
+    page = "1",
+    limit = "10",
+  } = req.query;
 
-  const q = String(query).trim();
+  const searchText = String(q || query).trim();
   const filter: any = {};
 
-  if (q) filter.$or = [{ title: new RegExp(q, "i") }, { excerpt: new RegExp(q, "i") }];
+  if (searchText) {
+    const searchRegex = new RegExp(searchText, "i");
+    // Search by title, description(excerpt), and tags.
+    filter.$or = [
+      { title: searchRegex },
+      { excerpt: searchRegex },
+      { tags: searchRegex },
+    ];
+  }
   if (categoryId !== "All") filter.categoryId = categoryId;
   if (level !== "All") filter.level = level;
+  if (status === "Answered") filter.hasVerifiedAnswer = true;
+  if (status === "Unanswered") filter.hasVerifiedAnswer = false;
+
+  const sortKey = String(sort).trim().toLowerCase();
+  if (sortKey === "answered") filter.hasVerifiedAnswer = true;
+  if (sortKey === "unanswered") filter.hasVerifiedAnswer = false;
+  if (sortKey === "fast response" || sortKey === "fast_response" || sortKey === "fastresponse") {
+    filter.isFastResponse = true;
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
   const sortObj: Record<string, SortOrder> =
-  sort === "Most Viewed" ? { views: -1 } :
-  sort === "Most Voted" ? { votes: -1 } :
-  sort === "Unanswered" ? { answersCount: 1, createdAt: -1 } :
-  { createdAt: -1 };
+    sortKey === "most viewed"
+      ? { views: -1, createdAt: -1 }
+      : sortKey === "most voted"
+      ? { votes: -1, createdAt: -1 }
+      : sortKey === "fast response" || sortKey === "fast_response" || sortKey === "fastresponse"
+      ? { createdAt: -1 }
+      : sortKey === "answered"
+      ? { createdAt: -1 }
+      : sortKey === "unanswered"
+      ? { createdAt: -1 }
+      : { createdAt: -1 };
 
   const [items, total] = (await Promise.all([
   Question.find(filter)
@@ -33,8 +66,14 @@ export const listQuestions = async (req: Request, res: Response) => {
   Question.countDocuments(filter),
 ])) as any;
 
+  const meId = req.user?.id ? String(req.user.id) : null;
+
   const mapped = items.map((q: any) => {
   const authorObj = q.authorId as any;
+  const myVote =
+    meId
+      ? (q.voters?.find((v: any) => String(v.userId) === meId)?.value ?? null)
+      : null;
 
   return {
     id: String(q._id),
@@ -52,6 +91,7 @@ export const listQuestions = async (req: Request, res: Response) => {
     tags: q.tags ?? [],
 
     votes: q.votes ?? 0,
+    myVote,
     views: q.views ?? 0,
     answersCount: q.answersCount ?? 0,
     isFastResponse: q.isFastResponse ?? false,

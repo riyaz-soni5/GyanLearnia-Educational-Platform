@@ -117,7 +117,9 @@ const QuestionsToolbar = ({
             <option>Newest</option>
             <option>Most Viewed</option>
             <option>Most Voted</option>
+            <option>Answered</option>
             <option>Unanswered</option>
+            <option>Fast Response</option>
           </select>
         </div>
       </div>

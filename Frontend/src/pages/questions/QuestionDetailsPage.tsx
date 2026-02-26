@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BiDownvote, BiUpvote } from "react-icons/bi";
 import { FaRegCommentDots } from "react-icons/fa";
@@ -293,6 +293,25 @@ const QuestionDetailsPage = () => {
   const currentUserId = me?.id || "";
   const currentUsername =
     `${me?.firstName ?? ""} ${me?.lastName ?? ""}`.trim() || me?.email || "";
+  const questionVoteCacheKey = `gyanlearnia_question_vote_cache_${currentUserId || "guest"}`;
+
+  // Keep question-list vote UI synced when user votes from details.
+  const syncQuestionVoteCache = useCallback((qid: string, myVote: 1 | -1 | null) => {
+    if (!currentUserId) return;
+    try {
+      const raw = sessionStorage.getItem(questionVoteCacheKey);
+      const existing =
+        raw && typeof raw === "string"
+          ? (JSON.parse(raw) as Record<string, 1 | -1 | null>)
+          : {};
+      const next = { ...existing };
+      if (myVote === null) delete next[qid];
+      else next[qid] = myVote;
+      sessionStorage.setItem(questionVoteCacheKey, JSON.stringify(next));
+    } catch {
+      // ignore cache write failures
+    }
+  }, [currentUserId, questionVoteCacheKey]);
 
   const requireLoginForVote = () => {
     if (!currentUserId) {
@@ -391,6 +410,7 @@ const QuestionDetailsPage = () => {
 
         setQuestion(qRes.item);
         setQVotes(qRes.item.votes ?? 0);
+        syncQuestionVoteCache(questionId, ((qRes.item as any)?.myVote ?? null) as 1 | -1 | null);
         setAnswers(aRes.items ?? []);
 
         setEditTitle(qRes.item?.title ?? "");
@@ -404,7 +424,7 @@ const QuestionDetailsPage = () => {
     })();
 
     return () => controller.abort();
-  }, [questionId]);
+  }, [questionId, syncQuestionVoteCache]);
 
   useEffect(() => {
     if (!question) return;
@@ -823,6 +843,7 @@ const QuestionDetailsPage = () => {
                           ? ({ ...(prev as any), myVote: r.myVote } as any)
                           : prev
                       );
+                      syncQuestionVoteCache(questionId, r.myVote);
                     } catch (e: any) {
                       showToast(e?.message || "Failed to vote", "error");
                     }
@@ -841,6 +862,7 @@ const QuestionDetailsPage = () => {
                           ? ({ ...(prev as any), myVote: r.myVote } as any)
                           : prev
                       );
+                      syncQuestionVoteCache(questionId, r.myVote);
                     } catch (e: any) {
                       showToast(e?.message || "Failed to vote", "error");
                     }

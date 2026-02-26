@@ -71,8 +71,17 @@ const Badge = ({
   );
 };
 
-const QuestionCard = ({ question }: { question: Question & { categoryName?: string } }) => {
+const QuestionCard = ({
+  question,
+  onUpvoteQuestion,
+  isUpvoteLoading = false,
+}: {
+  question: Question & { categoryName?: string; myVote?: 1 | -1 | null };
+  onUpvoteQuestion?: (questionId: string) => void;
+  isUpvoteLoading?: boolean;
+}) => {
   const nav = useNavigate();
+  const isUpvoted = question.myVote === 1;
 
   const answered = question.status === "Answered";
   const categoryLabel = (question as any).categoryName || question.subject || "Category";
@@ -179,9 +188,19 @@ const QuestionCard = ({ question }: { question: Question & { categoryName?: stri
         <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
           <button
             type="button"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
-            title="Upvote (static)"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpvoteQuestion?.(question.id);
+            }}
+            disabled={isUpvoteLoading}
+            className={[
+              "inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition",
+              isUpvoteLoading ? "cursor-not-allowed opacity-50" : "",
+              isUpvoted
+                ? "bg-indigo-600 text-white"
+                : "hover:text-indigo-600 dark:hover:text-indigo-300",
+            ].join(" ")}
+            title="Upvote"
           >
             <BiUpvote className="h-4 w-4" />
             Upvote
