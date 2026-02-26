@@ -72,39 +72,41 @@ const CoursesPage = () => {
   const resultCount = useMemo(() => courses.length, [courses]);
 
   return (
-    <div className="space-y-8">
-      <CourseFilters
-        query={query}
-        setQuery={setQuery}
-        level={level}
-        setLevel={setLevel}
-        type={type}
-        setType={setType}
-        price={price}
-        setPrice={setPrice}
-        onReset={handleReset}
-        resultCount={resultCount}
-      />
+    <div className="mx-auto max-w-7xl px-4">
+      <div className="space-y-8">
+        <CourseFilters
+          query={query}
+          setQuery={setQuery}
+          level={level}
+          setLevel={setLevel}
+          type={type}
+          setType={setType}
+          price={price}
+          setPrice={setPrice}
+          onReset={handleReset}
+          resultCount={resultCount}
+        />
 
-      {loading ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-          Loading courses...
-        </div>
-      ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-sm text-red-700">
-          {error}
-        </div>
-      ) : courses.length === 0 ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
-          No courses found.
-        </div>
-      ) : (
-        <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <CourseCard key={course.id} course={course} />
-          ))}
-        </section>
-      )}
+        {loading ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+            Loading courses...
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-8 text-sm text-red-700">
+            {error}
+          </div>
+        ) : courses.length === 0 ? (
+          <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300">
+            No courses found.
+          </div>
+        ) : (
+          <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {courses.map((course) => (
+              <CourseCard key={course.id} course={course} />
+            ))}
+          </section>
+        )}
+      </div>
     </div>
   );
 };

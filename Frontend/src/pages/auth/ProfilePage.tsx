@@ -6,6 +6,7 @@ import {
   updateCurrentUserProfile,
   type UserProfile,
 } from "@/services/userProfile";
+import { listMyCourses } from "@/services/instructorCourse";
 import { getUser, setUser } from "@/services/session";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -13,6 +14,11 @@ const inputBase =
   "w-full rounded-lg border border-base bg-[rgb(var(--bg))] px-3 py-2.5 text-sm text-basec " +
   "placeholder:text-gray-400 dark:placeholder:text-gray-500 " +
   "focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900";
+
+const genderValues = ["", "male", "female", "other", "prefer_not_to_say"] as const;
+type GenderValue = (typeof genderValues)[number];
+const toGenderValue = (value: string): GenderValue =>
+  genderValues.includes(value as GenderValue) ? (value as GenderValue) : "";
 
 const ProfilePage = () => {
   const nav = useNavigate();
@@ -48,7 +54,7 @@ const ProfilePage = () => {
   const [dateOfBirth, setDateOfBirth] = useState(
     profile?.dateOfBirth ? String(profile.dateOfBirth).slice(0, 10) : ""
   );
-  const [gender, setGender] = useState(profile?.gender ?? "");
+  const [gender, setGender] = useState<GenderValue>(toGenderValue(profile?.gender ?? ""));
   const [expertise, setExpertise] = useState(profile?.expertise ?? "");
   const [institution, setInstitution] = useState(profile?.institution ?? "");
 
@@ -66,8 +72,15 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [instructorCourses, setInstructorCourses] = useState<
+    Array<{ status: "Draft" | "Pending" | "Published" | "Rejected" }>
+  >([]);
 
   const isInstructor = profile?.role === "instructor";
+  // Role-based overview switch:
+  // verified instructor sees instructor metrics; student + unverified instructor see learner stats.
+  const isVerifiedInstructor =
+    profile?.role === "instructor" && profile?.verificationStatus === "Verified";
 
   useEffect(() => {
     let mounted = true;
@@ -82,7 +95,7 @@ const ProfilePage = () => {
         setLastName(data.lastName ?? "");
         setEmail(data.email ?? "");
         setDateOfBirth(data.dateOfBirth ? String(data.dateOfBirth).slice(0, 10) : "");
-        setGender(data.gender ?? "");
+        setGender(toGenderValue(data.gender ?? ""));
         setExpertise(data.expertise ?? "");
         setInstitution(data.institution ?? "");
         setBio(data.bio ?? "");
@@ -118,6 +131,33 @@ const ProfilePage = () => {
     };
   }, [nav, showToast, resolveAssetUrl]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    // Reuse the same data source as Instructor Dashboard (/api/instructor/courses/mine).
+    if (!isVerifiedInstructor) {
+      setInstructorCourses([]);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    (async () => {
+      try {
+        const res = await listMyCourses();
+        if (!mounted) return;
+        setInstructorCourses(Array.isArray(res.items) ? res.items : []);
+      } catch {
+        if (!mounted) return;
+        setInstructorCourses([]);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isVerifiedInstructor]);
+
   const canSubmit = useMemo(() => {
     const validNames =
       firstName.trim().length >= 2 &&
@@ -129,6 +169,12 @@ const ProfilePage = () => {
     return validNames;
   }, [firstName, lastName, email, isInstructor]);
   const showAcademicSection = isEditing || academicBackgrounds.length > 0;
+  const instructorMetrics = useMemo(() => {
+    const totalCourses = instructorCourses.length;
+    const publishedCourses = instructorCourses.filter((c) => c.status === "Published").length;
+    const pendingCourses = instructorCourses.filter((c) => c.status === "Pending").length;
+    return { totalCourses, publishedCourses, pendingCourses };
+  }, [instructorCourses]);
 
   const formatShortDate = (value?: string | null) => {
     if (!value) return "Not set";
@@ -171,7 +217,7 @@ const ProfilePage = () => {
     setLastName(profile.lastName ?? "");
     setEmail(profile.email ?? "");
     setDateOfBirth(profile.dateOfBirth ? String(profile.dateOfBirth).slice(0, 10) : "");
-    setGender(profile.gender ?? "");
+    setGender(toGenderValue(profile.gender ?? ""));
     setExpertise(profile.expertise ?? "");
     setInstitution(profile.institution ?? "");
     setBio(profile.bio ?? "");
@@ -425,7 +471,7 @@ const ProfilePage = () => {
                   {isEditing ? (
                     <select
                       value={gender}
-                      onChange={(e) => setGender(e.target.value)}
+                      onChange={(e) => setGender(toGenderValue(e.target.value))}
                       className={`${inputBase} mt-2`}
                       disabled={loading || saving}
                     >
@@ -675,99 +721,125 @@ const ProfilePage = () => {
         </form>
       </section>
 
-      {profile?.stats && (
+      {(profile?.stats || isVerifiedInstructor) && (
         <section className="rounded-2xl bg-surface px-6 py-6 shadow-sm sm:px-8 sm:py-7">
-          <h2 className="text-lg font-semibold text-basec">Learning overview</h2>
-          <p className="mt-1 text-sm text-muted">
-            A snapshot of your progress on GyanLearnia.
-          </p>
+          <h2 className="text-lg font-semibold text-basec">
+            {isVerifiedInstructor ? "Teaching overview" : "Learning overview"}
+          </h2>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-4">
-            <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-              <p className="text-xs font-medium text-muted">Enrolled courses</p>
-              <p className="mt-1 text-2xl font-bold text-basec">
-                {profile.stats.enrolledCoursesCount}
-              </p>
+          {/* Verified instructors get instructor-course metrics. Others keep learner progress metrics. */}
+          {isVerifiedInstructor ? (
+            <div className="mt-5 grid gap-4 sm:grid-cols-4">
+              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                <p className="text-xs font-medium text-muted">Total courses</p>
+                <p className="mt-1 text-2xl font-bold text-basec">{instructorMetrics.totalCourses}</p>
+              </div>
+              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                <p className="text-xs font-medium text-muted">Published courses</p>
+                <p className="mt-1 text-2xl font-bold text-basec">{instructorMetrics.publishedCourses}</p>
+              </div>
+              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                <p className="text-xs font-medium text-muted">Pending courses</p>
+                <p className="mt-1 text-2xl font-bold text-basec">{instructorMetrics.pendingCourses}</p>
+              </div>
+              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                <p className="text-xs font-medium text-muted">Points</p>
+                <p className="mt-1 text-2xl font-bold text-basec">{profile?.stats?.points ?? 0}</p>
+              </div>
             </div>
-            <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-              <p className="text-xs font-medium text-muted">Completed courses</p>
-              <p className="mt-1 text-2xl font-bold text-basec">
-                {profile.stats.completedCoursesCount}
-              </p>
-            </div>
-            <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-              <p className="text-xs font-medium text-muted">Certificates earned</p>
-              <p className="mt-1 text-2xl font-bold text-basec">
-                {profile.stats.certificatesCount}
-              </p>
-            </div>
-            <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-              <p className="text-xs font-medium text-muted">Points & badge</p>
-              <p className="mt-1 text-2xl font-bold text-basec">
-                {profile.stats.points}
-              </p>
-              <p className="mt-1 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                {profile.stats.badge}
-              </p>
-            </div>
-          </div>
+          ) : profile?.stats ? (
+            <>
+              <div className="mt-5 grid gap-4 sm:grid-cols-5">
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                  <p className="text-xs font-medium text-muted">Enrolled courses</p>
+                  <p className="mt-1 text-2xl font-bold text-basec">
+                    {profile.stats.enrolledCoursesCount}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                  <p className="text-xs font-medium text-muted">Completed courses</p>
+                  <p className="mt-1 text-2xl font-bold text-basec">
+                    {profile.stats.completedCoursesCount}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                  <p className="text-xs font-medium text-muted">Certificates earned</p>
+                  <p className="mt-1 text-2xl font-bold text-basec">
+                    {profile.stats.certificatesCount}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                  <p className="text-xs font-medium text-muted">Points</p>
+                  <p className="mt-1 text-2xl font-bold text-basec">
+                    {profile.stats.points}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                  <p className="text-xs font-medium text-muted">Badges</p>
+                  <p className="mt-1 inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                    {profile.stats.badge}
+                  </p>
+                </div>
+              </div>
 
-          {(profile.stats.enrolledCourses.length > 0 ||
-            profile.stats.completedCourses.length > 0) && (
-            <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              {profile.stats.enrolledCourses.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-basec">Enrolled courses</h3>
-                  <div className="mt-3 space-y-2">
-                    {profile.stats.enrolledCourses.map((c) => (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-3 rounded-lg border border-base px-3 py-2 text-sm hover:bg-[rgb(var(--bg))] cursor-pointer"
-                        onClick={() => nav(`/courses/${c.id}`)}
-                      >
-                        {c.thumbnailUrl ? (
-                          <img
-                            src={c.thumbnailUrl}
-                            alt={c.title}
-                            className="h-9 w-9 rounded-md object-cover"
-                          />
-                        ) : (
-                          <div className="h-9 w-9 rounded-md bg-gray-200" />
-                        )}
-                        <span className="line-clamp-2 text-sm text-basec">{c.title}</span>
+              {(profile.stats.enrolledCourses.length > 0 ||
+                profile.stats.completedCourses.length > 0) && (
+                <div className="mt-6 grid gap-5 lg:grid-cols-2">
+                  {profile.stats.enrolledCourses.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-basec">Enrolled courses</h3>
+                      <div className="mt-3 space-y-2">
+                        {profile.stats.enrolledCourses.map((c) => (
+                          <div
+                            key={c.id}
+                            className="flex items-center gap-3 rounded-lg border border-base px-3 py-2 text-sm hover:bg-[rgb(var(--bg))] cursor-pointer"
+                            onClick={() => nav(`/courses/${c.id}`)}
+                          >
+                            {c.thumbnailUrl ? (
+                              <img
+                                src={c.thumbnailUrl}
+                                alt={c.title}
+                                className="h-9 w-9 rounded-md object-cover"
+                              />
+                            ) : (
+                              <div className="h-9 w-9 rounded-md bg-gray-200" />
+                            )}
+                            <span className="line-clamp-2 text-sm text-basec">{c.title}</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+
+                  {profile.stats.completedCourses.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-basec">Completed courses</h3>
+                      <div className="mt-3 space-y-2">
+                        {profile.stats.completedCourses.map((c) => (
+                          <div
+                            key={c.id}
+                            className="flex items-center gap-3 rounded-lg border border-base px-3 py-2 text-sm hover:bg-[rgb(var(--bg))] cursor-pointer"
+                            onClick={() => nav(`/courses/${c.id}`)}
+                          >
+                            {c.thumbnailUrl ? (
+                              <img
+                                src={c.thumbnailUrl}
+                                alt={c.title}
+                                className="h-9 w-9 rounded-md object-cover"
+                              />
+                            ) : (
+                              <div className="h-9 w-9 rounded-md bg-gray-200" />
+                            )}
+                            <span className="line-clamp-2 text-sm text-basec">{c.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-
-              {profile.stats.completedCourses.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-basec">Completed courses</h3>
-                  <div className="mt-3 space-y-2">
-                    {profile.stats.completedCourses.map((c) => (
-                      <div
-                        key={c.id}
-                        className="flex items-center gap-3 rounded-lg border border-base px-3 py-2 text-sm hover:bg-[rgb(var(--bg))] cursor-pointer"
-                        onClick={() => nav(`/courses/${c.id}`)}
-                      >
-                        {c.thumbnailUrl ? (
-                          <img
-                            src={c.thumbnailUrl}
-                            alt={c.title}
-                            className="h-9 w-9 rounded-md object-cover"
-                          />
-                        ) : (
-                          <div className="h-9 w-9 rounded-md bg-gray-200" />
-                        )}
-                        <span className="line-clamp-2 text-sm text-basec">{c.title}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+            </>
+          ) : null}
         </section>
       )}
       <ConfirmDialog

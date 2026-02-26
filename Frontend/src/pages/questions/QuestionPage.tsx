@@ -79,43 +79,45 @@ const QuestionsPage = () => {
   const filtered = useMemo(() => questions, [questions]);
 
   return (
-    <div className="space-y-8">
-      {/* Toolbar supports dark/light via Tailwind dark: classes */}
-      <QuestionsToolbar
-        query={query}
-        setQuery={setQuery}
-        // ✅ keep prop name `subject` for now to avoid refactoring toolbar,
-        // but it actually holds categoryId
-        subject={categoryId}
-        setSubject={setCategoryId}
-        level={level}
-        setLevel={setLevel}
-        sort={sort}
-        setSort={setSort}
-        count={filtered.length}
-        // ✅ optional props (only if your toolbar supports them)
-        categories={categories}
-      />
+    <div className="mx-auto max-w-7xl px-4">
+      <div className="space-y-8">
+        {/* Toolbar supports dark/light via Tailwind dark: classes */}
+        <QuestionsToolbar
+          query={query}
+          setQuery={setQuery}
+          // ✅ keep prop name `subject` for now to avoid refactoring toolbar,
+          // but it actually holds categoryId
+          subject={categoryId}
+          setSubject={setCategoryId}
+          level={level}
+          setLevel={setLevel}
+          sort={sort}
+          setSort={setSort}
+          count={filtered.length}
+          // ✅ optional props (only if your toolbar supports them)
+          categories={categories}
+        />
 
-      {/* Left list + Right leaderboard */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-8">
-          {loading ? (
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-white/10 dark:bg-gray-900 dark:text-gray-300">
-              Loading questions...
-            </div>
-          ) : err ? (
-            <div className="rounded-2xl border border-red-200 bg-white p-8 text-sm text-red-600 dark:border-red-500/30 dark:bg-gray-900 dark:text-red-300">
-              {err}
-            </div>
-          ) : (
-            <QuestionsList questions={filtered} />
-          )}
-        </div>
+        {/* Left list + Right leaderboard */}
+        <div className="grid gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            {loading ? (
+              <div className="rounded-2xl border border-gray-200 bg-white p-8 text-sm text-gray-600 dark:border-white/10 dark:bg-gray-900 dark:text-gray-300">
+                Loading questions...
+              </div>
+            ) : err ? (
+              <div className="rounded-2xl border border-red-200 bg-white p-8 text-sm text-red-600 dark:border-red-500/30 dark:bg-gray-900 dark:text-red-300">
+                {err}
+              </div>
+            ) : (
+              <QuestionsList questions={filtered} />
+            )}
+          </div>
 
-        <div className="lg:col-span-4">
-          <div className="lg:sticky lg:top-6">
-            <Leaderboard />
+          <div className="lg:col-span-4">
+            <div className="lg:sticky lg:top-6">
+              <Leaderboard />
+            </div>
           </div>
         </div>
       </div>
