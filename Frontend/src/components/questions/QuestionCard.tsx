@@ -65,7 +65,9 @@ const Badge = ({
       : "bg-gray-50 text-gray-700 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10";
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${cls}`}>
+    <span
+      className={`inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${cls}`}
+    >
       {text}
     </span>
   );
@@ -120,10 +122,10 @@ const QuestionCard = ({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") openDetails();
       }}
-      className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-200
-                 dark:border-white/10 dark:bg-gray-900 dark:shadow-none dark:hover:ring-1 dark:hover:ring-white/10 dark:focus:ring-indigo-500/30"
+      className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-200
+                 sm:p-5 dark:border-white/10 dark:bg-gray-900 dark:shadow-none dark:hover:ring-1 dark:hover:ring-white/10 dark:focus:ring-indigo-500/30"
     >
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
         {/* Content */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -135,7 +137,7 @@ const QuestionCard = ({
 
             <span
               className={[
-                "ml-auto inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
+                "md:ml-auto inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
                 answered
                   ? "bg-green-50 text-green-700 ring-green-200 dark:bg-green-500/10 dark:text-green-300 dark:ring-green-500/20"
                   : "bg-yellow-50 text-yellow-700 ring-yellow-200 dark:bg-yellow-500/10 dark:text-yellow-300 dark:ring-yellow-500/20",
@@ -149,13 +151,13 @@ const QuestionCard = ({
           <Link
             to={`/questions/${question.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="mt-2 block text-lg font-semibold text-gray-900 hover:text-indigo-700 dark:text-white dark:hover:text-indigo-300"
+            className="mt-2 block break-words text-base font-semibold text-gray-900 hover:text-indigo-700 sm:text-lg dark:text-white dark:hover:text-indigo-300"
           >
             {question.title}
           </Link>
 
           {/* ✅ Plain text only */}
-          <p className="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-gray-300">
+          <p className="mt-2 line-clamp-2 break-words text-sm text-gray-600 dark:text-gray-300">
             {excerptPlain || "No details provided."}
           </p>
 
@@ -164,7 +166,7 @@ const QuestionCard = ({
               <span
                 key={t}
                 onClick={(e) => e.stopPropagation()}
-                className="cursor-default rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
+                className="cursor-default break-all rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/15"
               >
                 {t}
               </span>
@@ -173,7 +175,7 @@ const QuestionCard = ({
         </div>
 
         {/* Meta */}
-        <div className="shrink-0 whitespace-nowrap text-left md:text-right">
+        <div className="w-full shrink-0 border-t border-gray-100 pt-3 text-left dark:border-white/10 md:w-auto md:border-t-0 md:pt-0 md:text-right md:whitespace-nowrap">
           <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateOnly(question.createdAt)}</p>
           <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{authorName}</p>
           <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{authorTypeLabel}</p>
@@ -183,9 +185,9 @@ const QuestionCard = ({
       {/* Action Bar */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 pt-3 dark:border-white/10"
+        className="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-3 dark:border-white/10 md:flex-row md:items-center md:justify-between"
       >
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 sm:gap-4 dark:text-gray-300">
           <button
             type="button"
             onClick={(e) => {
@@ -222,7 +224,7 @@ const QuestionCard = ({
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 sm:gap-4 dark:text-gray-300">
           <button
             type="button"
             onClick={(e) => e.stopPropagation()}

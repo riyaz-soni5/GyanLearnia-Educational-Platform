@@ -10,6 +10,8 @@ import {
   FiShield,
   FiUploadCloud,
   FiSettings,
+  FiMenu,
+  FiX,
 } from "react-icons/fi";
 import Logo from "@/assets/icon.svg";
 
@@ -57,6 +59,7 @@ const Header = () => {
   const isLoggedIn = useMemo(() => !!user?.id, [user]);
 
   const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // theme init
@@ -71,6 +74,7 @@ const Header = () => {
   // reload user on route change (after login redirect)
   useEffect(() => {
     setUser(readStoredUser());
+    setMobileOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -140,7 +144,7 @@ const Header = () => {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex items-center justify-center rounded-lg bg-white p-1 shadow-sm">
@@ -176,6 +180,15 @@ const Header = () => {
               {theme === "dark" ? <FiSun className="h-4 w-4" /> : <FiMoon className="h-4 w-4" />}
             </button>
 
+            <button
+              type="button"
+              onClick={() => setMobileOpen((s) => !s)}
+              aria-label="Toggle mobile menu"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800 md:hidden"
+            >
+              {mobileOpen ? <FiX className="h-4 w-4" /> : <FiMenu className="h-4 w-4" />}
+            </button>
+
             {!isLoggedIn ? (
               <>
                 <Link
@@ -193,7 +206,7 @@ const Header = () => {
                 </Link>
               </>
             ) : (
-              <div className="relative" ref={menuRef}>
+              <div className="relative hidden md:block" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setOpen((s) => !s)}
@@ -300,6 +313,137 @@ const Header = () => {
             )}
           </div>
         </div>
+
+        {mobileOpen && (
+          <div className="absolute left-0 right-0 top-full z-[60] md:hidden">
+            <div className="border-t border-gray-200 bg-white py-3 shadow-lg dark:border-gray-800 dark:bg-gray-900">
+              <nav className="flex flex-col gap-1">
+                {navItems.map((item) => (
+                  <NavLink
+                    key={item.name}
+                    to={item.path}
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) =>
+                      `rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40"
+                          : "text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+                      }`
+                    }
+                  >
+                    {item.name}
+                  </NavLink>
+                ))}
+              </nav>
+
+              <div className="mt-3 border-t border-gray-200 pt-3 dark:border-gray-800">
+                {!isLoggedIn ? (
+                  <div className="flex gap-2">
+                    <Link
+                      to="/login"
+                      onClick={() => setMobileOpen(false)}
+                      className="inline-flex flex-1 items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      to="/register"
+                      onClick={() => setMobileOpen(false)}
+                      className="inline-flex flex-1 items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                    >
+                      Get Started
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-base bg-surface">
+                    <div className="px-4 py-3">
+                      <p className="text-sm font-semibold text-basec">{displayName}</p>
+                      <p className="text-xs text-muted">{user?.email}</p>
+                      <p className="mt-1 text-xs text-muted">
+                        {isAdmin
+                          ? "Admin"
+                          : isInstructor
+                          ? instructorVerified
+                            ? "Verified Instructor"
+                            : "Instructor (Unverified)"
+                          : "Student"}
+                      </p>
+                    </div>
+
+                    <div className="h-px bg-base" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        go("/profile");
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                    >
+                      <FiSettings className="h-4 w-4" />
+                      Profile
+                    </button>
+
+                    {isInstructor ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileOpen(false);
+                            go(instructorVerified ? "/instructor/dashboard" : "/instructor/verify");
+                          }}
+                          className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                        >
+                          <FiShield className="h-4 w-4" />
+                          {instructorVerified ? "Instructor Dashboard" : "Verify Instructor"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileOpen(false);
+                            go("/instructor/upload-course");
+                          }}
+                          className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                        >
+                          <FiUploadCloud className="h-4 w-4" />
+                          Upload Course
+                        </button>
+                      </>
+                    ) : null}
+
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileOpen(false);
+                          go("/admin");
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                      >
+                        <FiShield className="h-4 w-4" />
+                        Admin Dashboard
+                      </button>
+                    ) : null}
+
+                    <div className="h-px bg-base" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        logout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                    >
+                      <FiLogOut className="h-4 w-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </header>
   );

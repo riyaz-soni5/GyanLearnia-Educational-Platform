@@ -38,7 +38,7 @@ const QuestionsToolbar = ({
   categories = [],
 }: Props) => {
   return (
-    <div className="rounded-2xl bg-white p-8 shadow-sm dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
+    <div className="rounded-2xl bg-white p-4 shadow-sm sm:p-6 lg:p-8 dark:bg-gray-900 dark:shadow-none dark:ring-1 dark:ring-white/10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">
@@ -48,14 +48,14 @@ const QuestionsToolbar = ({
 
         <Link
           to="/questions/ask"
-          className="inline-flex w-fit items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+          className="inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 sm:w-fit"
         >
           Ask Question
         </Link>
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-5">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-12">
+        <div className="sm:col-span-2 lg:col-span-5">
           <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Search</label>
           <input
             value={query}
@@ -66,7 +66,7 @@ const QuestionsToolbar = ({
           />
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="sm:col-span-1 lg:col-span-2">
           <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Level</label>
           <select
             value={level}
@@ -82,7 +82,7 @@ const QuestionsToolbar = ({
           </select>
         </div>
 
-        <div className="lg:col-span-3">
+        <div className="sm:col-span-1 lg:col-span-3">
           <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Category</label>
           <select
             value={subject} // holds categoryId or "All"
@@ -106,7 +106,7 @@ const QuestionsToolbar = ({
           </select>
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="sm:col-span-1 lg:col-span-2">
           <label className="text-xs font-medium text-gray-700 dark:text-gray-300">Sort</label>
           <select
             value={sort}
