@@ -15,6 +15,10 @@ const UserSchema = new Schema({
         default: "",
     },
     bio: { type: String, trim: true, default: "" },
+    interests: {
+        type: [String],
+        default: [],
+    },
     academicBackgrounds: {
         type: [
             {

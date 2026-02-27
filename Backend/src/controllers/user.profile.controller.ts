@@ -6,6 +6,18 @@ import Course from "../models/Course.model.js";
 import Certificate from "../models/Certification.model.js";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 
+function sanitizeInterests(values: unknown): string[] {
+  if (!Array.isArray(values)) return [];
+  const unique = new Map<string, string>();
+  for (const value of values) {
+    const trimmed = String(value ?? "").trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLocaleLowerCase();
+    if (!unique.has(key)) unique.set(key, trimmed);
+  }
+  return Array.from(unique.values());
+}
+
 export async function getCurrentUser(req: AuthedRequest, res: Response) {
   try {
     if (!req.user?.id) {
@@ -63,6 +75,7 @@ export async function getCurrentUser(req: AuthedRequest, res: Response) {
       gender: (user as any).gender ?? "",
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+      interests: sanitizeInterests((user as any).interests),
       academicBackgrounds: Array.isArray((user as any).academicBackgrounds)
         ? (user as any).academicBackgrounds.map((item: any) => ({
             institution: item.institution,
@@ -114,6 +127,7 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
       socialLinks,
       expertise,
       institution,
+      interests,
     } = req.body as {
       firstName?: string;
       lastName?: string;
@@ -137,6 +151,7 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
       };
       expertise?: string;
       institution?: string;
+      interests?: string[];
     };
 
     const user = await User.findById(req.user.id);
@@ -202,6 +217,10 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
         website: String(socialLinks.website ?? user.socialLinks?.website ?? "").trim(),
       };
     }
+
+    if (Array.isArray(interests)) {
+      (user as any).interests = sanitizeInterests(interests);
+    }
     user.avatarUrl = String(avatarUrl ?? "").trim() || null;
 
     await user.save();
@@ -216,6 +235,7 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
       gender: (user as any).gender ?? "",
       avatarUrl: user.avatarUrl,
       bio: user.bio,
+      interests: sanitizeInterests((user as any).interests),
       academicBackgrounds: Array.isArray((user as any).academicBackgrounds)
         ? (user as any).academicBackgrounds.map((item: any) => ({
             institution: item.institution,

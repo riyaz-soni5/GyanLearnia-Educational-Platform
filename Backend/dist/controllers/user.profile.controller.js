@@ -2,6 +2,20 @@ import bcrypt from "bcryptjs";
 import User from "../models/User.model.js";
 import Enrollment from "../models/Enrollment.model.js";
 import Certificate from "../models/Certification.model.js";
+function sanitizeInterests(values) {
+    if (!Array.isArray(values))
+        return [];
+    const unique = new Map();
+    for (const value of values) {
+        const trimmed = String(value ?? "").trim();
+        if (!trimmed)
+            continue;
+        const key = trimmed.toLocaleLowerCase();
+        if (!unique.has(key))
+            unique.set(key, trimmed);
+    }
+    return Array.from(unique.values());
+}
 export async function getCurrentUser(req, res) {
     try {
         if (!req.user?.id) {
@@ -54,6 +68,7 @@ export async function getCurrentUser(req, res) {
             gender: user.gender ?? "",
             avatarUrl: user.avatarUrl,
             bio: user.bio,
+            interests: sanitizeInterests(user.interests),
             academicBackgrounds: Array.isArray(user.academicBackgrounds)
                 ? user.academicBackgrounds.map((item) => ({
                     institution: item.institution,
@@ -93,7 +108,7 @@ export async function updateCurrentUser(req, res) {
         if (!req.user?.id) {
             return res.status(401).json({ message: "Unauthorized" });
         }
-        const { firstName, lastName, dateOfBirth, gender, bio, academicBackgrounds, avatarUrl, socialLinks, expertise, institution, } = req.body;
+        const { firstName, lastName, dateOfBirth, gender, bio, academicBackgrounds, avatarUrl, socialLinks, expertise, institution, interests, } = req.body;
         const user = await User.findById(req.user.id);
         if (!user) {
             return res.status(404).json({ message: "User not found" });
@@ -150,6 +165,9 @@ export async function updateCurrentUser(req, res) {
                 website: String(socialLinks.website ?? user.socialLinks?.website ?? "").trim(),
             };
         }
+        if (Array.isArray(interests)) {
+            user.interests = sanitizeInterests(interests);
+        }
         user.avatarUrl = String(avatarUrl ?? "").trim() || null;
         await user.save();
         return res.json({
@@ -162,6 +180,7 @@ export async function updateCurrentUser(req, res) {
             gender: user.gender ?? "",
             avatarUrl: user.avatarUrl,
             bio: user.bio,
+            interests: sanitizeInterests(user.interests),
             academicBackgrounds: Array.isArray(user.academicBackgrounds)
                 ? user.academicBackgrounds.map((item) => ({
                     institution: item.institution,

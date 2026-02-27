@@ -13,6 +13,7 @@ import courseRoutes from "./routes/course.route.js";
 import instructorCoursesRoutes from "./routes/instructor.courses.route.js";
 import adminCoursesRoutes from "./routes/admin.courses.route.js";
 import userProfileRoutes from "./routes/user.profile.route.js";
+import mentorDiscoveryRoutes from "./routes/mentor.discovery.route.js";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/courses", courseRoutes);
 app.use("/api/instructor/courses", instructorCoursesRoutes);
 app.use("/api/admin/courses", adminCoursesRoutes);
 app.use("/api/user", userProfileRoutes);
+app.use("/api/mentors", mentorDiscoveryRoutes);
 
 
 export default app;

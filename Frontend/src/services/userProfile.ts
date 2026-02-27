@@ -12,6 +12,7 @@ export type UserProfile = {
   gender?: "" | "male" | "female" | "other" | "prefer_not_to_say";
   avatarUrl?: string | null;
   bio?: string;
+  interests?: string[];
   academicBackgrounds?: Array<{
     institution: string;
     startDate: string;
@@ -39,6 +40,7 @@ export type UpdateUserProfilePayload = {
   dateOfBirth?: string | null;
   gender?: "" | "male" | "female" | "other" | "prefer_not_to_say" | null;
   bio?: string;
+  interests?: string[];
   academicBackgrounds?: Array<{
     institution: string;
     startDate: string;

@@ -19,6 +19,17 @@ const genderValues = ["", "male", "female", "other", "prefer_not_to_say"] as con
 type GenderValue = (typeof genderValues)[number];
 const toGenderValue = (value: string): GenderValue =>
   genderValues.includes(value as GenderValue) ? (value as GenderValue) : "";
+const sanitizeInterests = (values: string[] | undefined): string[] => {
+  if (!Array.isArray(values)) return [];
+  const unique = new Map<string, string>();
+  values.forEach((value) => {
+    const trimmed = String(value ?? "").trim();
+    if (!trimmed) return;
+    const key = trimmed.toLocaleLowerCase();
+    if (!unique.has(key)) unique.set(key, trimmed);
+  });
+  return Array.from(unique.values());
+};
 
 const ProfilePage = () => {
   const nav = useNavigate();
@@ -59,6 +70,8 @@ const ProfilePage = () => {
   const [institution, setInstitution] = useState(profile?.institution ?? "");
 
   const [bio, setBio] = useState(profile?.bio ?? "");
+  const [interests, setInterests] = useState<string[]>(sanitizeInterests(profile?.interests));
+  const [interestInput, setInterestInput] = useState("");
   const [academicBackgrounds, setAcademicBackgrounds] = useState<
     Array<{ id: string; institution: string; startDate: string; endDate: string; isCurrent: boolean }>
   >([]);
@@ -99,6 +112,8 @@ const ProfilePage = () => {
         setExpertise(data.expertise ?? "");
         setInstitution(data.institution ?? "");
         setBio(data.bio ?? "");
+        setInterests(sanitizeInterests(data.interests));
+        setInterestInput("");
         setAvatarPreview(resolveAssetUrl(data.avatarUrl ?? null));
 
         setAcademicBackgrounds(
@@ -198,6 +213,37 @@ const ProfilePage = () => {
     return `${start} - ${end}`;
   };
 
+  const addInterest = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    const key = trimmed.toLocaleLowerCase();
+    const alreadyExists = interests.some((item) => item.toLocaleLowerCase() === key);
+    if (alreadyExists) {
+      showToast("Interest already added", "error");
+      return;
+    }
+
+    setInterests((prev) => [...prev, trimmed]);
+    setInterestInput("");
+  };
+
+  const removeInterest = (value: string) => {
+    setInterests((prev) => prev.filter((item) => item !== value));
+  };
+
+  const onInterestKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addInterest(interestInput);
+      return;
+    }
+
+    if (e.key === "Backspace" && !interestInput && interests.length > 0) {
+      setInterests((prev) => prev.slice(0, prev.length - 1));
+    }
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -221,6 +267,8 @@ const ProfilePage = () => {
     setExpertise(profile.expertise ?? "");
     setInstitution(profile.institution ?? "");
     setBio(profile.bio ?? "");
+    setInterests(sanitizeInterests(profile.interests));
+    setInterestInput("");
     setAcademicBackgrounds(
       Array.isArray(profile.academicBackgrounds)
         ? profile.academicBackgrounds.map((item, idx) => ({
@@ -283,6 +331,7 @@ const ProfilePage = () => {
         dateOfBirth: dateOfBirth || null,
         gender: gender || null,
         bio: bio.trim() || undefined,
+        interests: sanitizeInterests(interests),
         academicBackgrounds: academicBackgrounds.map((item) => ({
           institution: item.institution.trim(),
           startDate: item.startDate,
@@ -295,6 +344,8 @@ const ProfilePage = () => {
       });
 
       setProfile(updated);
+      setInterests(sanitizeInterests(updated.interests));
+      setInterestInput("");
 
       const storedInLocal = Boolean(localStorage.getItem("gyanlearnia_user"));
 
@@ -380,6 +431,7 @@ const ProfilePage = () => {
                 </div>
               )}
 
+
               {isEditing && (
                 <div className="mt-3 flex items-center gap-3">
                   <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-base px-3 py-2 text-xs font-semibold text-basec hover:bg-[rgb(var(--bg))]">
@@ -413,6 +465,27 @@ const ProfilePage = () => {
                   )}
                 </div>
               )}
+
+              <div className="mt-4 w-full max-w-[220px]">
+                <p className="text-center text-[11px] font-medium uppercase tracking-wide text-muted">
+                  Interests
+                </p>
+                {interests.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap justify-center gap-2">
+                    {interests.map((interest) => (
+                      <span
+                        key={interest}
+                        className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200"
+                      >
+                        {interest}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 text-center text-xs text-muted">No interests added</p>
+                )}
+              </div>
+
             </div>
 
             <div className="space-y-4">
@@ -518,6 +591,43 @@ const ProfilePage = () => {
                   disabled={loading || saving || !isEditing}
                 />
               </div>
+
+              {isEditing && (
+                <div>
+                  <label className="text-xs font-medium text-muted">Interests</label>
+
+                  <div className="mt-2 rounded-lg border border-base px-3 py-2 focus-within:border-indigo-600 focus-within:ring-2 focus-within:ring-indigo-200 dark:focus:ring-indigo-900">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {interests.map((interest) => (
+                        <span
+                          key={interest}
+                          className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700"
+                        >
+                          {interest}
+                          <button
+                            type="button"
+                            onClick={() => removeInterest(interest)}
+                            className="text-indigo-500 hover:text-red-600"
+                            disabled={loading || saving}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+
+                      <input
+                        value={interestInput}
+                        onChange={(e) => setInterestInput(e.target.value)}
+                        onKeyDown={onInterestKeyDown}
+                        placeholder="Add Your Interest"
+                        className="min-w-[160px] flex-1 border-none bg-transparent text-sm text-basec focus:outline-none"
+                        disabled={loading || saving}
+                      />
+                    </div>
+                  </div>
+
+                </div>
+              )}
             </div>
           </div>
 

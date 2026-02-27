@@ -1,0 +1,19 @@
+import { Router } from "express";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import {
+  blockMentor,
+  connectWithMentor,
+  getNextMentorMatch,
+  respondToConnectionRequest,
+  skipMentor,
+} from "../controllers/mentor.discovery.controller.js";
+
+const router = Router();
+
+router.get("/match", requireAuth, getNextMentorMatch);
+router.post("/connect", requireAuth, connectWithMentor);
+router.post("/skip", requireAuth, skipMentor);
+router.post("/block", requireAuth, blockMentor);
+router.post("/connections/:connectionId/respond", requireAuth, respondToConnectionRequest);
+
+export default router;

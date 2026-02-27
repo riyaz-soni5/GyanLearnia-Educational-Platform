@@ -77,7 +77,7 @@ export const router = createBrowserRouter([
       { path: "questions", element: <QuestionsPage /> },
       { path: "questions/:id", element: <QuestionDetailsPage /> },
 
-      { path: "mentors", element: <MentorsPage /> },
+      { path: "mentors", element: <MentorsPage />, loader: requireAuth },
       { path: "pricing", element: <PricingPage /> },
       { path: "about", element: <AboutPage /> },
       { path: "profile", element: <ProfilePage />, loader: requireAuth },
