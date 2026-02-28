@@ -88,6 +88,34 @@ body {
   line-height: 1.6;
 }
 
+/* compact chat composer */
+.chat-quill-editor .ql-container {
+  height: 140px;
+  overflow-y: auto;
+}
+
+.chat-quill-editor .ql-toolbar {
+  border-left: none;
+  border-right: none;
+  border-top: none;
+}
+
+.chat-quill-editor .ql-container {
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+}
+
+.chat-message-html p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-message-html img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
 
 /* =========================
    ✅ Fix Quill width growth (unbroken text)

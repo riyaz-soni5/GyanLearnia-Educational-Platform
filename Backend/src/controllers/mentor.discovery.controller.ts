@@ -5,6 +5,7 @@ import User from "../models/User.model.js";
 import MentorConnection from "../models/MentorConnection.model.js";
 import MentorDiscoveryAction from "../models/MentorDiscoveryAction.model.js";
 import PrivateChatRoom from "../models/PrivateChatRoom.model.js";
+import PrivateChatMessage from "../models/PrivateChatMessage.model.js";
 
 const normalizeText = (value: unknown) => String(value ?? "").trim().toLowerCase();
 
@@ -86,6 +87,40 @@ const getPeerIdFromConnection = (connection: any, currentUserId: string): string
     ? String(connection.receiverId)
     : String(connection.senderId);
 
+const MAX_CHAT_PLAIN_TEXT_LENGTH = 1500;
+const MAX_CHAT_HTML_LENGTH = 20000;
+
+const stripHtml = (html: string): string =>
+  String(html ?? "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<\/?[^>]+(>|$)/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const sanitizeRichTextHtml = (html: string): string =>
+  String(html ?? "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/\son\w+="[^"]*"/gi, "")
+    .replace(/\son\w+='[^']*'/gi, "")
+    .replace(/javascript:/gi, "");
+
+const resolveDisplayName = (user: any): string => {
+  const fullName = `${String(user?.firstName ?? "").trim()} ${String(user?.lastName ?? "").trim()}`.trim();
+  return fullName || String(user?.email ?? "Mentor");
+};
+
+const toConnectionPeerPayload = (user: any, userId: string) => ({
+  id: userId,
+  name: user ? resolveDisplayName(user) : "Unknown User",
+  role: String(user?.role ?? "student"),
+  avatarUrl: user?.avatarUrl ?? null,
+  institution: user ? resolveInstitution(user) : "",
+  expertise: user ? String(user?.expertise ?? "").trim() || null : null,
+});
+
 const ensurePrivateChatRoom = async (
   userAId: string,
   userBId: string,
@@ -113,6 +148,159 @@ const ensurePrivateChatRoom = async (
     new: true,
   });
 };
+
+const findChatRoomForConnection = async (
+  connection: any,
+  createIfMissing: boolean
+) => {
+  const pairKey = String(connection?.pairKey ?? "");
+  let room = await PrivateChatRoom.findOne({ pairKey });
+
+  if (!room && createIfMissing) {
+    room = await ensurePrivateChatRoom(
+      String(connection.senderId),
+      String(connection.receiverId),
+      String(connection._id)
+    );
+  }
+
+  if (room && !room.isActive) return null;
+  return room;
+};
+
+export async function listMentorConnections(req: AuthedRequest, res: Response) {
+  try {
+    const currentUserId = String(req.user?.id || "").trim();
+    if (!currentUserId) return res.status(401).json({ message: "Unauthorized" });
+
+    const connections = (await MentorConnection.find({
+      status: { $in: ["Pending", "Accepted"] },
+      $or: [{ senderId: currentUserId }, { receiverId: currentUserId }],
+    })
+      .sort({ updatedAt: -1 })
+      .lean()) as any[];
+
+    if (!connections.length) {
+      return res.json({
+        incomingPending: [],
+        outgoingPending: [],
+        acceptedConnections: [],
+      });
+    }
+
+    const peerIds = Array.from(
+      new Set(
+        connections
+          .flatMap((item) => [String(item.senderId), String(item.receiverId)])
+          .filter((id) => id !== currentUserId)
+      )
+    );
+
+    const users = peerIds.length
+      ? ((await User.find({ _id: { $in: peerIds } })
+          .select(
+            "_id firstName lastName email role avatarUrl institution expertise academicBackgrounds"
+          )
+          .lean()) as any[])
+      : [];
+
+    const userById = new Map<string, any>();
+    users.forEach((item) => userById.set(String(item._id), item));
+
+    const acceptedPairKeys = Array.from(
+      new Set(
+        connections
+          .filter((item) => String(item.status) === "Accepted")
+          .map((item) => String(item.pairKey))
+      )
+    );
+
+    const rooms = acceptedPairKeys.length
+      ? ((await PrivateChatRoom.find({
+          pairKey: { $in: acceptedPairKeys },
+          isActive: true,
+        })
+          .select("_id pairKey")
+          .lean()) as any[])
+      : [];
+
+    const roomByPairKey = new Map<string, any>();
+    rooms.forEach((item) => roomByPairKey.set(String(item.pairKey), item));
+
+    const roomIds = rooms.map((room) => room._id);
+    const latestMessages = roomIds.length
+      ? ((await PrivateChatMessage.aggregate([
+          { $match: { roomId: { $in: roomIds } } },
+          { $sort: { createdAt: -1 } },
+          {
+            $group: {
+              _id: "$roomId",
+              content: { $first: "$content" },
+              senderId: { $first: "$senderId" },
+              createdAt: { $first: "$createdAt" },
+            },
+          },
+        ])) as any[])
+      : [];
+
+    const latestMessageByRoomId = new Map<string, any>();
+    latestMessages.forEach((item) => latestMessageByRoomId.set(String(item._id), item));
+
+    const incomingPending: any[] = [];
+    const outgoingPending: any[] = [];
+    const acceptedConnections: any[] = [];
+
+    connections.forEach((connection) => {
+      const senderId = String(connection.senderId);
+      const receiverId = String(connection.receiverId);
+      const isIncoming = receiverId === currentUserId;
+      const peerId = isIncoming ? senderId : receiverId;
+      const peer = toConnectionPeerPayload(userById.get(peerId), peerId);
+
+      const basePayload: any = {
+        connectionId: String(connection._id),
+        status: String(connection.status),
+        requestedAt: connection.requestedAt ?? null,
+        respondedAt: connection.respondedAt ?? null,
+        acceptedAt: connection.acceptedAt ?? null,
+        isIncoming,
+        peer,
+      };
+
+      if (String(connection.status) === "Pending") {
+        if (isIncoming) incomingPending.push(basePayload);
+        else outgoingPending.push(basePayload);
+        return;
+      }
+
+      if (String(connection.status) === "Accepted") {
+        const room = roomByPairKey.get(String(connection.pairKey));
+        const roomId = room ? String(room._id) : null;
+        const lastMessage = roomId ? latestMessageByRoomId.get(roomId) : null;
+
+        acceptedConnections.push({
+          ...basePayload,
+          chatRoomId: roomId,
+          lastMessage: lastMessage
+            ? {
+                content: sanitizeRichTextHtml(String(lastMessage.content ?? "")),
+                senderId: String(lastMessage.senderId ?? ""),
+                createdAt: lastMessage.createdAt ?? null,
+              }
+            : null,
+        });
+      }
+    });
+
+    return res.json({
+      incomingPending,
+      outgoingPending,
+      acceptedConnections,
+    });
+  } catch {
+    return res.status(500).json({ message: "Failed to load mentor connections" });
+  }
+}
 
 export async function getNextMentorMatch(req: AuthedRequest, res: Response) {
   try {
@@ -480,6 +668,133 @@ export async function connectWithMentor(req: AuthedRequest, res: Response) {
     });
   } catch {
     return res.status(500).json({ message: "Failed to create connection request" });
+  }
+}
+
+export async function getConnectionMessages(req: AuthedRequest, res: Response) {
+  try {
+    const currentUserId = String(req.user?.id || "").trim();
+    if (!currentUserId) return res.status(401).json({ message: "Unauthorized" });
+
+    const connectionId = String(req.params.connectionId || "").trim();
+    if (!connectionId || !mongoose.Types.ObjectId.isValid(connectionId)) {
+      return res.status(400).json({ message: "Valid connectionId is required" });
+    }
+
+    const connection = await MentorConnection.findById(connectionId).lean();
+    if (!connection) return res.status(404).json({ message: "Connection not found" });
+
+    const isSender = String(connection.senderId) === currentUserId;
+    const isReceiver = String(connection.receiverId) === currentUserId;
+    if (!isSender && !isReceiver) {
+      return res.status(403).json({ message: "Not allowed to view this chat" });
+    }
+
+    if (String(connection.status) !== "Accepted") {
+      return res.status(400).json({ message: "Connection is not accepted yet" });
+    }
+
+    const room = await findChatRoomForConnection(connection, false);
+    if (!room) {
+      return res.json({ messages: [], nextCursor: null });
+    }
+
+    const beforeRaw = String((req.query as any)?.before ?? "").trim();
+    let beforeDate: Date | null = null;
+    if (beforeRaw) {
+      const parsed = new Date(beforeRaw);
+      if (!Number.isNaN(parsed.getTime())) beforeDate = parsed;
+    }
+
+    const query: Record<string, unknown> = { roomId: room._id };
+    if (beforeDate) query.createdAt = { $lt: beforeDate };
+
+    const limit = 50;
+    const messages = (await PrivateChatMessage.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean()) as any[];
+
+    const ordered = [...messages].reverse();
+    const nextCursor = messages.length === limit ? messages[messages.length - 1]?.createdAt : null;
+
+    return res.json({
+      messages: ordered.map((item) => ({
+        id: String(item._id),
+        roomId: String(item.roomId),
+        senderId: String(item.senderId),
+        content: sanitizeRichTextHtml(String(item.content ?? "")),
+        createdAt: item.createdAt,
+      })),
+      nextCursor,
+    });
+  } catch {
+    return res.status(500).json({ message: "Failed to load chat messages" });
+  }
+}
+
+export async function sendConnectionMessage(req: AuthedRequest, res: Response) {
+  try {
+    const currentUserId = String(req.user?.id || "").trim();
+    if (!currentUserId) return res.status(401).json({ message: "Unauthorized" });
+
+    const connectionId = String(req.params.connectionId || "").trim();
+    if (!connectionId || !mongoose.Types.ObjectId.isValid(connectionId)) {
+      return res.status(400).json({ message: "Valid connectionId is required" });
+    }
+
+    const rawHtml = String((req.body as any)?.content ?? "");
+    const content = sanitizeRichTextHtml(rawHtml).trim();
+    const plainText = stripHtml(content);
+    const hasImage = /<img\b/i.test(content);
+
+    if (!plainText && !hasImage) {
+      return res.status(400).json({ message: "Message content is required" });
+    }
+    if (content.length > MAX_CHAT_HTML_LENGTH) {
+      return res.status(400).json({ message: "Message HTML is too long" });
+    }
+    if (plainText.length > MAX_CHAT_PLAIN_TEXT_LENGTH) {
+      return res.status(400).json({ message: "Message text is too long" });
+    }
+
+    const connection = await MentorConnection.findById(connectionId);
+    if (!connection) return res.status(404).json({ message: "Connection not found" });
+
+    const isSender = String(connection.senderId) === currentUserId;
+    const isReceiver = String(connection.receiverId) === currentUserId;
+    if (!isSender && !isReceiver) {
+      return res.status(403).json({ message: "Not allowed to send message in this chat" });
+    }
+
+    if (String(connection.status) !== "Accepted") {
+      return res.status(400).json({ message: "Connection is not accepted yet" });
+    }
+
+    const room = await findChatRoomForConnection(connection, true);
+    if (!room) {
+      return res.status(400).json({ message: "Private chat is currently inactive" });
+    }
+
+    const message = await PrivateChatMessage.create({
+      roomId: room._id,
+      senderId: new mongoose.Types.ObjectId(currentUserId),
+      content,
+    });
+
+    await PrivateChatRoom.updateOne({ _id: room._id }, { $set: { lastMessageAt: message.createdAt } });
+
+    return res.status(201).json({
+      message: {
+        id: String(message._id),
+        roomId: String(message.roomId),
+        senderId: String(message.senderId),
+        content: message.content,
+        createdAt: message.createdAt,
+      },
+    });
+  } catch {
+    return res.status(500).json({ message: "Failed to send chat message" });
   }
 }
 
