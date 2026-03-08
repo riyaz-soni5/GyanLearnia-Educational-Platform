@@ -4,6 +4,27 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.model.js";
 
+type UserPlanSnapshot = {
+  currentPlan: "Free" | "Pro";
+  planStatus: "Active" | "Expired";
+  planActivatedAt: Date | null;
+  planExpiresAt: Date | null;
+};
+
+const getUserPlanSnapshot = (user: any): UserPlanSnapshot => {
+  const rawPlan = String(user?.plan ?? "Free") === "Pro" ? "Pro" : "Free";
+  const rawExpiry = user?.planExpiresAt ? new Date(user.planExpiresAt) : null;
+  const expiryValid = rawExpiry && !Number.isNaN(rawExpiry.getTime()) ? rawExpiry : null;
+  const isExpired = rawPlan === "Pro" && !!expiryValid && expiryValid.getTime() < Date.now();
+
+  return {
+    currentPlan: isExpired ? "Free" : rawPlan,
+    planStatus: isExpired ? "Expired" : "Active",
+    planActivatedAt: user?.planActivatedAt ? new Date(user.planActivatedAt) : null,
+    planExpiresAt: expiryValid,
+  };
+};
+
 
 export const login = async (req: Request, res: Response) => {
   try {
@@ -33,6 +54,8 @@ export const login = async (req: Request, res: Response) => {
       ...(rememberMe ? { maxAge: 7 * 24 * 60 * 60 * 1000 } : {}), // no maxAge => session cookie
     });
 
+    const plan = getUserPlanSnapshot(user);
+
     return res.json({
       message: "Login successful",
       user: {
@@ -44,6 +67,10 @@ export const login = async (req: Request, res: Response) => {
         avatarUrl: user.avatarUrl ?? null,
         isVerified: Boolean(user.isVerified),
         verificationStatus: user.verificationStatus, // ✅ add this
+        currentPlan: plan.currentPlan,
+        planStatus: plan.planStatus,
+        planActivatedAt: plan.planActivatedAt,
+        planExpiresAt: plan.planExpiresAt,
       },
     });
   } catch {
@@ -86,6 +113,10 @@ export const register = async (req: Request, res: Response) => {
         role: user.role,
         email: user.email,
         avatarUrl: user.avatarUrl ?? null,
+        currentPlan: "Free",
+        planStatus: "Active",
+        planActivatedAt: user.planActivatedAt ?? null,
+        planExpiresAt: user.planExpiresAt ?? null,
       },
     });
   } catch (err) {

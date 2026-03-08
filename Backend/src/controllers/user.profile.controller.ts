@@ -18,6 +18,27 @@ function sanitizeInterests(values: unknown): string[] {
   return Array.from(unique.values());
 }
 
+type UserPlanSnapshot = {
+  currentPlan: "Free" | "Pro";
+  planStatus: "Active" | "Expired";
+  planActivatedAt: Date | null;
+  planExpiresAt: Date | null;
+};
+
+const getUserPlanSnapshot = (user: any): UserPlanSnapshot => {
+  const rawPlan = String(user?.plan ?? "Free") === "Pro" ? "Pro" : "Free";
+  const rawExpiry = user?.planExpiresAt ? new Date(user.planExpiresAt) : null;
+  const expiryValid = rawExpiry && !Number.isNaN(rawExpiry.getTime()) ? rawExpiry : null;
+  const isExpired = rawPlan === "Pro" && !!expiryValid && expiryValid.getTime() < Date.now();
+
+  return {
+    currentPlan: isExpired ? "Free" : rawPlan,
+    planStatus: isExpired ? "Expired" : "Active",
+    planActivatedAt: user?.planActivatedAt ? new Date(user.planActivatedAt) : null,
+    planExpiresAt: expiryValid,
+  };
+};
+
 export async function getCurrentUser(req: AuthedRequest, res: Response) {
   try {
     if (!req.user?.id) {
@@ -65,6 +86,8 @@ export async function getCurrentUser(req: AuthedRequest, res: Response) {
     else if (points >= 500) badge = "Top Performer";
     else if (points >= 100) badge = "Active Learner";
 
+    const plan = getUserPlanSnapshot(user);
+
     return res.json({
       id: String(user._id),
       firstName: user.firstName,
@@ -95,6 +118,10 @@ export async function getCurrentUser(req: AuthedRequest, res: Response) {
       institution: user.institution,
       isVerified: Boolean(user.isVerified),
       verificationStatus: user.verificationStatus,
+      currentPlan: plan.currentPlan,
+      planStatus: plan.planStatus,
+      planActivatedAt: plan.planActivatedAt,
+      planExpiresAt: plan.planExpiresAt,
       stats: {
         enrolledCoursesCount: enrollmentAgg,
         completedCoursesCount: completedAgg,
@@ -225,6 +252,8 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
 
     await user.save();
 
+    const plan = getUserPlanSnapshot(user);
+
     return res.json({
       id: String(user._id),
       firstName: user.firstName,
@@ -255,6 +284,10 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
       institution: user.institution,
       isVerified: Boolean(user.isVerified),
       verificationStatus: user.verificationStatus,
+      currentPlan: plan.currentPlan,
+      planStatus: plan.planStatus,
+      planActivatedAt: plan.planActivatedAt,
+      planExpiresAt: plan.planExpiresAt,
     });
   } catch {
     return res.status(500).json({ message: "Failed to update profile" });

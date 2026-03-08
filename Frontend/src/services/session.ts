@@ -10,6 +10,10 @@ export type SessionUser = {
   avatarUrl?: string | null;
   isVerified?: boolean; // ✅ needed for instructor gating
   verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
+  currentPlan?: "Free" | "Pro";
+  planStatus?: "Active" | "Expired";
+  planActivatedAt?: string | null;
+  planExpiresAt?: string | null;
 };
 
 // ✅ get logged user

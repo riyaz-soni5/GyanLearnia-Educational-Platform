@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { FiCheckCircle } from "react-icons/fi";
-import { getUser } from "@/services/session";
+import axios from "axios";
+import { useToast } from "@/components/toast";
+import { getUser, setUser } from "@/services/session";
+import { fetchCurrentUserProfile } from "@/services/userProfile";
 
 type Plan = {
   name: string;
@@ -48,6 +51,25 @@ const plans: Plan[] = [
     ctaTo: "/register",
   },
 ];
+
+type KhaltiApiSuccess = {
+  success: true;
+  message: string;
+  paymentInfo: {
+    paymentUrl?: string;
+    pidx?: string;
+    status?: string;
+    [key: string]: unknown;
+  };
+};
+
+type KhaltiApiFailure = {
+  success: false;
+  error: string;
+};
+
+type KhaltiApiResponse = KhaltiApiSuccess | KhaltiApiFailure;
+type CurrentPlan = "Free" | "Pro";
 
 function useInViewOnce<T extends HTMLElement>(threshold = 0.16) {
   const ref = useRef<T | null>(null);
@@ -98,8 +120,214 @@ const Reveal = ({
 };
 
 const PricingPage = () => {
-  const user = getUser();
-  const isLoggedIn = Boolean(user?.id);
+  const { showToast } = useToast();
+  const [sessionUser, setSessionUserState] = useState(getUser());
+  const isLoggedIn = Boolean(sessionUser?.id);
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [currentPlan, setCurrentPlan] = useState<CurrentPlan>(
+    sessionUser?.currentPlan === "Pro" ? "Pro" : "Free"
+  );
+
+  useEffect(() => {
+    const syncSession = () => {
+      const next = getUser();
+      setSessionUserState(next);
+      setCurrentPlan(next?.currentPlan === "Pro" ? "Pro" : "Free");
+    };
+
+    window.addEventListener("gyanlearnia_user_updated", syncSession);
+    return () => window.removeEventListener("gyanlearnia_user_updated", syncSession);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionUser?.id) {
+      setCurrentPlan("Free");
+      return;
+    }
+
+    let cancelled = false;
+    const syncPlanFromProfile = async () => {
+      try {
+        const profile = await fetchCurrentUserProfile();
+        if (cancelled) return;
+
+        const nextPlan: CurrentPlan = profile.currentPlan === "Pro" ? "Pro" : "Free";
+        setCurrentPlan(nextPlan);
+
+        const persistedInLocal = Boolean(localStorage.getItem("gyanlearnia_user"));
+        setUser(
+          {
+            id: profile.id,
+            role: profile.role,
+            email: profile.email,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            avatarUrl: profile.avatarUrl ?? null,
+            isVerified: profile.isVerified,
+            verificationStatus: profile.verificationStatus,
+            currentPlan: nextPlan,
+            planStatus: profile.planStatus ?? "Active",
+            planActivatedAt: profile.planActivatedAt ?? null,
+            planExpiresAt: profile.planExpiresAt ?? null,
+          },
+          persistedInLocal
+        );
+      } catch {
+        // keep existing session plan fallback
+      }
+    };
+
+    void syncPlanFromProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionUser?.id]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pidx = String(params.get("pidx") || "").trim();
+    if (!pidx) return;
+
+    let cancelled = false;
+
+    const verifyPayment = async () => {
+      setPaymentLoading(true);
+
+      try {
+        const response = await axios.post<KhaltiApiResponse>(
+          `${API_BASE}/api/payment/khalti/verify`,
+          { pidx },
+          { withCredentials: true }
+        );
+
+        if (cancelled) return;
+
+        if (response.data.success) {
+          showToast("Payment successful. Your plan is now Pro.", "success");
+          setCurrentPlan("Pro");
+
+          try {
+            const profile = await fetchCurrentUserProfile();
+            if (!cancelled) {
+              const persistedInLocal = Boolean(localStorage.getItem("gyanlearnia_user"));
+              setUser(
+                {
+                  id: profile.id,
+                  role: profile.role,
+                  email: profile.email,
+                  firstName: profile.firstName,
+                  lastName: profile.lastName,
+                  avatarUrl: profile.avatarUrl ?? null,
+                  isVerified: profile.isVerified,
+                  verificationStatus: profile.verificationStatus,
+                  currentPlan: profile.currentPlan === "Pro" ? "Pro" : "Free",
+                  planStatus: profile.planStatus ?? "Active",
+                  planActivatedAt: profile.planActivatedAt ?? null,
+                  planExpiresAt: profile.planExpiresAt ?? null,
+                },
+                persistedInLocal
+              );
+            }
+          } catch {
+            // no-op
+          }
+        } else {
+          showToast(response.data.error || "Payment verification failed.", "error", {
+            durationMs: 3000,
+          });
+        }
+      } catch (error: unknown) {
+        if (cancelled) return;
+        const message =
+          axios.isAxiosError(error) && error.response?.data?.error
+            ? String(error.response.data.error)
+            : "Could not verify payment. Please try again.";
+        showToast(message, "error", { durationMs: 3000 });
+      } finally {
+        if (!cancelled) setPaymentLoading(false);
+      }
+
+      const cleanUrl = new URL(window.location.href);
+      const khaltiParams = [
+        "pidx",
+        "status",
+        "transaction_id",
+        "purchase_order_id",
+        "purchase_order_name",
+        "total_amount",
+      ];
+
+      for (const key of khaltiParams) {
+        cleanUrl.searchParams.delete(key);
+      }
+
+      window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+    };
+
+    void verifyPayment();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [API_BASE, showToast]);
+
+  const handleKhaltiPayment = async () => {
+    if (!sessionUser?.id) return;
+    if (currentPlan === "Pro") {
+      showToast("You are already on the Pro plan.", "info");
+      return;
+    }
+
+    const customerName =
+      [sessionUser.firstName, sessionUser.lastName].filter(Boolean).join(" ").trim() || "GyanLearnia User";
+    const purchaseOrderId = `pro-${sessionUser.id}-${Date.now()}`;
+
+    setPaymentLoading(true);
+
+    try {
+      const response = await axios.post<KhaltiApiResponse>(
+        `${API_BASE}/api/payment/khalti/initiate`,
+        {
+          amount: 49900, // NPR 499 in paisa
+          returnUrl: `${window.location.origin}/pricing`,
+          websiteUrl: window.location.origin,
+          purchaseOrderId,
+          purchaseOrderName: "GyanLearnia Pro Monthly",
+          customerInfo: {
+            name: customerName,
+            email: sessionUser.email,
+          },
+        },
+        { withCredentials: true }
+      );
+
+      if (!response.data.success) {
+        showToast(response.data.error || "Could not initiate payment.", "error", {
+          durationMs: 3000,
+        });
+        setPaymentLoading(false);
+        return;
+      }
+
+      const paymentUrl = String(response.data.paymentInfo?.paymentUrl || "");
+      if (!paymentUrl) {
+        showToast("Payment URL was not returned.", "error", { durationMs: 3000 });
+        setPaymentLoading(false);
+        return;
+      }
+
+      window.location.href = paymentUrl;
+    } catch (error: unknown) {
+      const message =
+        axios.isAxiosError(error) && error.response?.data?.error
+          ? String(error.response.data.error)
+          : "Failed to initiate payment.";
+      showToast(message, "error", { durationMs: 3000 });
+      setPaymentLoading(false);
+    }
+  };
+
 
   return (
     <div className="mx-auto max-w-7xl space-y-14 px-4">
@@ -127,7 +355,10 @@ const PricingPage = () => {
 
       <section className="grid gap-6 lg:grid-cols-2">
         {plans.map((plan, idx) => {
-          const isCurrentPlan = isLoggedIn && plan.name === "Free";
+          const isCurrentPlan =
+            isLoggedIn &&
+            ((plan.name === "Free" && currentPlan === "Free") ||
+              (plan.name === "GyanLearnia Pro" && currentPlan === "Pro"));
 
           return (
             <Reveal key={plan.name} delay={idx * 120}>
@@ -171,6 +402,22 @@ const PricingPage = () => {
                 {isCurrentPlan ? (
                   <div className="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700">
                     Your Current Plan
+                  </div>
+                ) : plan.name === "GyanLearnia Pro" && isLoggedIn ? (
+                  <button
+                    type="button"
+                    onClick={handleKhaltiPayment}
+                    disabled={paymentLoading}
+                    className={[
+                      "mt-8 inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
+                      paymentLoading ? "cursor-not-allowed bg-indigo-400" : "bg-indigo-600 hover:bg-indigo-700",
+                    ].join(" ")}
+                  >
+                    {paymentLoading ? "Redirecting to Khalti..." : "Pay Rs 499 & Upgrade"}
+                  </button>
+                ) : plan.name === "Free" && isLoggedIn ? (
+                  <div className="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-base bg-[rgb(var(--bg))] px-4 py-2.5 text-sm font-semibold text-basec">
+                    Free Plan
                   </div>
                 ) : (
                   <Link

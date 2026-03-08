@@ -34,6 +34,10 @@ type StoredUser = {
   avatarUrl?: string | null;
   isVerified?: boolean;
   verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
+  currentPlan?: "Free" | "Pro";
+  planStatus?: "Active" | "Expired";
+  planActivatedAt?: string | null;
+  planExpiresAt?: string | null;
 };
 
 function readStoredUser(): StoredUser | null {
@@ -233,10 +237,22 @@ const Header = () => {
                 {open && (
                   <div className="absolute right-0 mt-2 w-64 overflow-hidden rounded-xl border border-base bg-surface shadow-lg">
                     <div className="px-4 py-3">
-                      <p className="text-sm font-semibold text-basec">{displayName}</p>
-                      <p className="text-xs text-muted">{user?.email}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-basec">{displayName}</p>
 
-                      {/* optional: show role line */}
+                        <span
+                          className={`text-[10px] px-2 py-[2px] rounded-full border font-medium
+                            ${
+                              user?.currentPlan === "Pro"
+                                ? "border-[#F4C430] text-black bg-[#F4C430]"
+                                : "border-[#50C878] text-black bg-[#50C878]"
+                            }`}
+                        >
+                          {user?.currentPlan ?? "Free"}
+                        </span>
+                      </div>
+
+                      {/* role */}
                       <p className="mt-1 text-xs text-muted">
                         {isAdmin
                           ? "Admin"
@@ -256,7 +272,7 @@ const Header = () => {
                       onClick={() => go("/profile")}
                       className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                     >
-                      <FiSettings className="h-4 w-4" />
+                      <FiUser className="h-4 w-4" />
                       Profile
                     </button>
 
@@ -368,6 +384,9 @@ const Header = () => {
                             : "Instructor (Unverified)"
                           : "Student"}
                       </p>
+                      <p className="mt-1 text-xs font-semibold text-basec">
+                        Plan: {user?.currentPlan ?? "Free"} ({user?.planStatus ?? "Active"})
+                      </p>
                     </div>
 
                     <div className="h-px bg-base" />
@@ -380,7 +399,7 @@ const Header = () => {
                       }}
                       className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                     >
-                      <FiSettings className="h-4 w-4" />
+                      <FiUser className="h-4 w-4" />
                       Profile
                     </button>
 

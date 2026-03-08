@@ -12,6 +12,10 @@ export type LoginResponse = {
     avatarUrl?: string | null;
     isVerified?: boolean;
     verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
+    currentPlan?: "Free" | "Pro";
+    planStatus?: "Active" | "Expired";
+    planActivatedAt?: string | null;
+    planExpiresAt?: string | null;
   };
 };
 

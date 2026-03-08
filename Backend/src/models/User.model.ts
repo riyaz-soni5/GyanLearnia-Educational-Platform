@@ -3,6 +3,7 @@ import { Schema, model } from "mongoose";
 
 export type UserRole = "student" | "instructor" | "admin";
 export type VerificationStatus = "NotSubmitted" | "Pending" | "Rejected" | "Verified";
+export type UserPlan = "Free" | "Pro";
 
 const UserSchema = new Schema(
   {
@@ -58,6 +59,15 @@ const UserSchema = new Schema(
     verificationReason: { type: String, trim: true, default: null },
 
     isVerified: { type: Boolean, default: false },
+
+    // Pricing plan
+    plan: {
+      type: String,
+      enum: ["Free", "Pro"],
+      default: "Free",
+    },
+    planActivatedAt: { type: Date, default: Date.now },
+    planExpiresAt: { type: Date, default: null },
 
     points: { type: Number, default: 0 },
     acceptedAnswers: { type: Number, default: 0 },

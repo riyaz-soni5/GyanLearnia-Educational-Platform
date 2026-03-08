@@ -55,6 +55,10 @@ const ProfilePage = () => {
           email: initialUser.email,
           role: initialUser.role,
           avatarUrl: initialUser.avatarUrl ?? null,
+          currentPlan: initialUser.currentPlan,
+          planStatus: initialUser.planStatus,
+          planActivatedAt: initialUser.planActivatedAt ?? null,
+          planExpiresAt: initialUser.planExpiresAt ?? null,
         }
       : null
   );
@@ -359,6 +363,10 @@ const ProfilePage = () => {
           avatarUrl: updated.avatarUrl ?? uploadedAvatarUrl ?? null,
           isVerified: updated.isVerified,
           verificationStatus: updated.verificationStatus,
+          currentPlan: updated.currentPlan,
+          planStatus: updated.planStatus,
+          planActivatedAt: updated.planActivatedAt ?? null,
+          planExpiresAt: updated.planExpiresAt ?? null,
         },
         storedInLocal
       );
@@ -389,6 +397,11 @@ const ProfilePage = () => {
               <span className="inline-flex items-center rounded-full bg-[rgb(var(--bg))] px-3 py-1 text-xs font-semibold text-muted ring-1 ring-base">
                 {displayRole}
               </span>
+              {profile?.currentPlan ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  {profile.currentPlan}
+                </span>
+              ) : null}
               {profile.role === "instructor" && (
                 <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
                   {profile.verificationStatus === "Verified"
@@ -950,6 +963,18 @@ const ProfilePage = () => {
               )}
             </>
           ) : null}
+
+          <div className="mt-5 rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+            <p className="text-xs font-medium text-muted">Plan status</p>
+            <p className="mt-1 text-base font-semibold text-basec">
+              {profile?.currentPlan ?? "Free"}
+            </p>
+            {profile?.planExpiresAt ? (
+              <p className="mt-1 text-xs text-muted">
+                Expires on {new Date(profile.planExpiresAt).toLocaleDateString()}
+              </p>
+            ) : null}
+          </div>
         </section>
       )}
       <ConfirmDialog

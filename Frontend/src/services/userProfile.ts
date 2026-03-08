@@ -23,6 +23,10 @@ export type UserProfile = {
   institution?: string;
   isVerified?: boolean;
   verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
+  currentPlan?: "Free" | "Pro";
+  planStatus?: "Active" | "Expired";
+  planActivatedAt?: string | null;
+  planExpiresAt?: string | null;
   stats?: {
     enrolledCoursesCount: number;
     completedCoursesCount: number;
