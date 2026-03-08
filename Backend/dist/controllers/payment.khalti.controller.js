@@ -1,5 +1,6 @@
 import axios from "axios";
 import User from "../models/User.model.js";
+import { createNotification } from "../services/notification.service.js";
 const KHALTI_INITIATE_URL = "https://dev.khalti.com/api/v2/epayment/initiate/";
 const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
 const normalizeKhaltiSecretKey = (raw) => {
@@ -93,6 +94,22 @@ export async function verifyKhaltiPayment(req, res) {
         user.planActivatedAt = now;
         user.planExpiresAt = nextExpiry;
         await user.save();
+        await createNotification({
+            userId: String(user._id),
+            type: "system",
+            title: "Payment successful",
+            message: `Your Pro plan is active until ${nextExpiry.toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+            })}.`,
+            link: "/pricing",
+            metadata: {
+                pidx,
+                plan: "Pro",
+                planExpiresAt: nextExpiry.toISOString(),
+            },
+        });
         return res.json({
             success: true,
             message: "Payment verified successfully",

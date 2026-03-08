@@ -1,6 +1,7 @@
 import Reply from "../models/Reply.model.js";
 import Answer from "../models/Answer.model.js";
 import User from "../models/User.model.js";
+import { createNotification } from "../services/notification.service.js";
 // helper: apply vote switch / toggle (same as your Answer logic)
 const applyVote = (existing, next) => {
     if (existing === next)
@@ -9,6 +10,13 @@ const applyVote = (existing, next) => {
         return { newValue: next, delta: next };
     return { newValue: next, delta: next - existing };
 };
+const toPlainText = (html) => String(html ?? "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<\/?[^>]+(>|$)/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 // GET /api/questions/:id/answers/:answerId/replies?parentId=&limit=5&cursor=ISO_DATE
 export const listReplies = async (req, res) => {
     try {
@@ -84,11 +92,13 @@ export const postReply = async (req, res) => {
         const ans = await Answer.findOne({ _id: answerId, questionId }).lean();
         if (!ans)
             return res.status(404).json({ message: "Answer not found" });
+        let parentReplyAuthorId = "";
         // if replying to a reply, ensure it belongs to same answer/question
         if (parentReplyId) {
             const parent = await Reply.findOne({ _id: parentReplyId, questionId, answerId }).lean();
             if (!parent)
                 return res.status(404).json({ message: "Parent reply not found" });
+            parentReplyAuthorId = String(parent?.authorId ?? "");
         }
         const created = await Reply.create({
             questionId,
@@ -100,6 +110,31 @@ export const postReply = async (req, res) => {
         const authorDoc = await User.findById(req.user.id)
             .select("firstName lastName role email avatarUrl")
             .lean();
+        const actorId = String(req.user.id);
+        const answerAuthorId = String(ans?.authorId ?? "");
+        const recipientIds = new Set();
+        if (answerAuthorId && answerAuthorId !== actorId)
+            recipientIds.add(answerAuthorId);
+        if (parentReplyAuthorId && parentReplyAuthorId !== actorId)
+            recipientIds.add(parentReplyAuthorId);
+        const preview = toPlainText(html).slice(0, 140) || "You received a new reply.";
+        for (const recipientId of recipientIds) {
+            const isReplyThreadNotification = recipientId === parentReplyAuthorId && parentReplyId;
+            await createNotification({
+                userId: recipientId,
+                actorId,
+                type: isReplyThreadNotification ? "reply_replied" : "answer_replied",
+                title: isReplyThreadNotification ? "New reply to your reply" : "New reply to your answer",
+                message: preview,
+                link: `/questions/${questionId}`,
+                metadata: {
+                    questionId,
+                    answerId,
+                    replyId: String(created._id),
+                    parentReplyId: parentReplyId || null,
+                },
+            });
+        }
         return res.status(201).json({
             message: "Reply posted",
             item: {

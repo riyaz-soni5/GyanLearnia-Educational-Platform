@@ -4,8 +4,18 @@ import Answer from "../models/Answer.model.js";
 import Question from "../models/Question.model.js";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import User from "../models/User.model.js"; // ✅ add
+import { createNotification } from "../services/notification.service.js";
 
 const ACCEPT_POINTS = 15;
+
+const toPlainText = (html: string) =>
+  String(html ?? "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<\/?[^>]+(>|$)/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 // GET /api/questions/:id/answers
 export const listAnswers = async (req: AuthedRequest, res: Response) => {
@@ -86,6 +96,21 @@ export const postAnswer = async (req: AuthedRequest, res: Response) => {
 
     // ✅ update cached count only (DO NOT mark as answered here)
     await Question.findByIdAndUpdate(questionId, { $inc: { answersCount: 1 } });
+
+    const questionOwnerId = String((q as any)?.authorId ?? "");
+    const actorId = String(req.user.id);
+    if (questionOwnerId && questionOwnerId !== actorId) {
+      const preview = toPlainText(String(content || "")).slice(0, 140);
+      await createNotification({
+        userId: questionOwnerId,
+        actorId,
+        type: "question_answered",
+        title: "New answer on your question",
+        message: preview || "Someone answered your question.",
+        link: `/questions/${questionId}`,
+        metadata: { questionId, answerId: String(answer._id) },
+      });
+    }
 
     return res.status(201).json({
       message: "Answer posted",

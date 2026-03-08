@@ -2,6 +2,8 @@
 import { Request, Response } from "express";
 import InstructorDoc from "../models/InstructorDoc.model.js";
 import User from "../models/User.model.js";
+import type { AuthedRequest } from "../middlewares/auth.middleware.js";
+import { createNotification } from "../services/notification.service.js";
 
 type Status = "Pending" | "Verified" | "Rejected";
 
@@ -111,6 +113,8 @@ export const listInstructorVerifications = async (req: Request, res: Response) =
 
 export const approveInstructor = async (req: Request, res: Response) => {
   try {
+    const authedReq = req as AuthedRequest;
+    const actorId = String(authedReq.user?.id || "").trim();
     const instructorId = String(req.params.id);
 
     const u = await User.findById(instructorId);
@@ -126,6 +130,16 @@ export const approveInstructor = async (req: Request, res: Response) => {
       { $set: { status: "Verified" } }
     );
 
+    await createNotification({
+      userId: instructorId,
+      actorId: actorId || undefined,
+      type: "instructor_verified",
+      title: "Instructor verification approved",
+      message: "Your instructor profile is now verified. You can publish courses and access instructor features.",
+      link: "/instructor/dashboard",
+      metadata: { instructorId },
+    });
+
     return res.json({ message: "Instructor approved" });
   } catch (e: any) {
     return res.status(500).json({ message: e?.message || "Approve failed" });
@@ -134,6 +148,8 @@ export const approveInstructor = async (req: Request, res: Response) => {
 
 export const rejectInstructor = async (req: Request, res: Response) => {
   try {
+    const authedReq = req as AuthedRequest;
+    const actorId = String(authedReq.user?.id || "").trim();
     const instructorId = String(req.params.id);
     const { reason } = req.body as { reason?: string };
 
@@ -152,6 +168,16 @@ export const rejectInstructor = async (req: Request, res: Response) => {
       { userId: instructorId },
       { $set: { status: "Rejected" } }
     );
+
+    await createNotification({
+      userId: instructorId,
+      actorId: actorId || undefined,
+      type: "instructor_rejected",
+      title: "Instructor verification rejected",
+      message: `Your verification request was rejected. Reason: ${msg}`.slice(0, 500),
+      link: "/instructor/verify",
+      metadata: { instructorId, reason: msg },
+    });
 
     return res.json({ message: "Instructor rejected" });
   } catch (e: any) {

@@ -4,6 +4,7 @@ import MentorConnection from "../models/MentorConnection.model.js";
 import MentorDiscoveryAction from "../models/MentorDiscoveryAction.model.js";
 import PrivateChatRoom from "../models/PrivateChatRoom.model.js";
 import PrivateChatMessage from "../models/PrivateChatMessage.model.js";
+import { createNotification } from "../services/notification.service.js";
 const normalizeText = (value) => String(value ?? "").trim().toLowerCase();
 const sanitizeStringArray = (values) => {
     if (!Array.isArray(values))
@@ -472,6 +473,15 @@ export async function connectWithMentor(req, res) {
                 status: "Pending",
                 requestedAt: new Date(),
             });
+            await createNotification({
+                userId: mentorId,
+                actorId: currentUserId,
+                type: "mentor_request",
+                title: "New mentor connection request",
+                message: "Someone sent you a mentor connection request.",
+                link: "/mentors",
+                metadata: { connectionId: String(connection._id) },
+            });
             return res.status(201).json({
                 connectionId: String(connection._id),
                 status: connection.status,
@@ -480,6 +490,15 @@ export async function connectWithMentor(req, res) {
         }
         if (connection.status === "Accepted") {
             const room = await ensurePrivateChatRoom(currentUserId, mentorId, String(connection._id));
+            await createNotification({
+                userId: String(connection.senderId),
+                actorId: currentUserId,
+                type: "mentor_connection_accepted",
+                title: "Mentor connection accepted",
+                message: "Your mentor connection request has been accepted.",
+                link: "/mentors",
+                metadata: { connectionId: String(connection._id), chatRoomId: room ? String(room._id) : null },
+            });
             return res.json({
                 connectionId: String(connection._id),
                 status: connection.status,
@@ -517,6 +536,15 @@ export async function connectWithMentor(req, res) {
         connection.acceptedAt = null;
         connection.respondedById = null;
         await connection.save();
+        await createNotification({
+            userId: mentorId,
+            actorId: currentUserId,
+            type: "mentor_request",
+            title: "New mentor connection request",
+            message: "Someone sent you a mentor connection request.",
+            link: "/mentors",
+            metadata: { connectionId: String(connection._id) },
+        });
         return res.json({
             connectionId: String(connection._id),
             status: connection.status,
@@ -626,6 +654,19 @@ export async function sendConnectionMessage(req, res) {
             content,
         });
         await PrivateChatRoom.updateOne({ _id: room._id }, { $set: { lastMessageAt: message.createdAt } });
+        const recipientId = isSender ? String(connection.receiverId) : String(connection.senderId);
+        const preview = plainText || "Sent an image";
+        if (recipientId && recipientId !== currentUserId) {
+            await createNotification({
+                userId: recipientId,
+                actorId: currentUserId,
+                type: "mentor_message",
+                title: "New mentor message",
+                message: preview.slice(0, 500),
+                link: "/mentors",
+                metadata: { connectionId: String(connection._id), roomId: String(room._id), messageId: String(message._id) },
+            });
+        }
         return res.status(201).json({
             message: {
                 id: String(message._id),
@@ -685,6 +726,15 @@ export async function respondToConnectionRequest(req, res) {
             connection.respondedById = new mongoose.Types.ObjectId(currentUserId);
             await connection.save();
             const room = await ensurePrivateChatRoom(String(connection.senderId), String(connection.receiverId), String(connection._id));
+            await createNotification({
+                userId: String(connection.senderId),
+                actorId: currentUserId,
+                type: "mentor_connection_accepted",
+                title: "Mentor connection accepted",
+                message: "Your mentor connection request has been accepted.",
+                link: "/mentors",
+                metadata: { connectionId: String(connection._id), chatRoomId: room ? String(room._id) : null },
+            });
             return res.json({
                 connectionId: String(connection._id),
                 status: connection.status,
@@ -696,6 +746,15 @@ export async function respondToConnectionRequest(req, res) {
         connection.respondedAt = new Date();
         connection.respondedById = new mongoose.Types.ObjectId(currentUserId);
         await connection.save();
+        await createNotification({
+            userId: String(connection.senderId),
+            actorId: currentUserId,
+            type: "mentor_connection_rejected",
+            title: "Mentor connection rejected",
+            message: "Your mentor connection request was rejected.",
+            link: "/mentors",
+            metadata: { connectionId: String(connection._id) },
+        });
         return res.json({
             connectionId: String(connection._id),
             status: connection.status,

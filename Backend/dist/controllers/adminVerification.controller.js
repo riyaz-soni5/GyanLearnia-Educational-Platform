@@ -1,5 +1,6 @@
 import InstructorDoc from "../models/InstructorDoc.model.js";
 import User from "../models/User.model.js";
+import { createNotification } from "../services/notification.service.js";
 const toBool = (v) => Boolean(v);
 export const listInstructorVerifications = async (req, res) => {
     try {
@@ -90,6 +91,8 @@ export const listInstructorVerifications = async (req, res) => {
 };
 export const approveInstructor = async (req, res) => {
     try {
+        const authedReq = req;
+        const actorId = String(authedReq.user?.id || "").trim();
         const instructorId = String(req.params.id);
         const u = await User.findById(instructorId);
         if (!u)
@@ -99,6 +102,15 @@ export const approveInstructor = async (req, res) => {
         u.verificationReason = undefined;
         await u.save();
         await InstructorDoc.updateMany({ userId: instructorId }, { $set: { status: "Verified" } });
+        await createNotification({
+            userId: instructorId,
+            actorId: actorId || undefined,
+            type: "instructor_verified",
+            title: "Instructor verification approved",
+            message: "Your instructor profile is now verified. You can publish courses and access instructor features.",
+            link: "/instructor/dashboard",
+            metadata: { instructorId },
+        });
         return res.json({ message: "Instructor approved" });
     }
     catch (e) {
@@ -107,6 +119,8 @@ export const approveInstructor = async (req, res) => {
 };
 export const rejectInstructor = async (req, res) => {
     try {
+        const authedReq = req;
+        const actorId = String(authedReq.user?.id || "").trim();
         const instructorId = String(req.params.id);
         const { reason } = req.body;
         const msg = String(reason || "").trim();
@@ -120,6 +134,15 @@ export const rejectInstructor = async (req, res) => {
         u.verificationReason = msg;
         await u.save();
         await InstructorDoc.updateMany({ userId: instructorId }, { $set: { status: "Rejected" } });
+        await createNotification({
+            userId: instructorId,
+            actorId: actorId || undefined,
+            type: "instructor_rejected",
+            title: "Instructor verification rejected",
+            message: `Your verification request was rejected. Reason: ${msg}`.slice(0, 500),
+            link: "/instructor/verify",
+            metadata: { instructorId, reason: msg },
+        });
         return res.json({ message: "Instructor rejected" });
     }
     catch (e) {
