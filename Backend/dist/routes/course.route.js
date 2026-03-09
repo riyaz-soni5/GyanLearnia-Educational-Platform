@@ -1,13 +1,15 @@
 import { Router } from "express";
-import { completeCourseLecture, enrollPublishedCourse, getCourseCertificate, getMyCourseProgress, getPublishedCourse, getPublishedCourseQuiz, listPublishedCourses, submitPublishedCourseQuiz, } from "../controllers/courses.controller.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { completeCourseLecture, enrollPublishedCourse, getCourseCertificate, getMyCourseProgress, getPublishedCourse, getPublishedCourseReviews, getPublishedCourseQuiz, listPublishedCourses, upsertCourseReview, submitPublishedCourseQuiz, } from "../controllers/courses.controller.js";
+import { optionalAuth, requireAuth } from "../middlewares/auth.middleware.js";
 const router = Router();
-router.get("/", listPublishedCourses);
+router.get("/", optionalAuth, listPublishedCourses);
 router.get("/:id/quizzes/:quizId", getPublishedCourseQuiz);
 router.post("/:id/quizzes/:quizId/submit", requireAuth, submitPublishedCourseQuiz);
 router.post("/:id/enroll", requireAuth, enrollPublishedCourse);
 router.get("/:id/progress", requireAuth, getMyCourseProgress);
 router.post("/:id/lectures/:lectureId/complete", requireAuth, completeCourseLecture);
+router.get("/:id/reviews", optionalAuth, getPublishedCourseReviews);
+router.post("/:id/reviews", requireAuth, upsertCourseReview);
 router.get("/:id/certificate", requireAuth, getCourseCertificate);
 router.get("/:id", getPublishedCourse);
 export default router;

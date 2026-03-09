@@ -56,6 +56,24 @@ export type CourseCertificate = {
   downloadUrl?: string;
   html: string;
 };
+export type CourseReview = {
+  id: string;
+  rating: number;
+  comment: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  isMine?: boolean;
+  user: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+  };
+};
+export type CourseReviewsPayload = {
+  averageRating: number;
+  reviewsCount: number;
+  items: CourseReview[];
+};
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
 
@@ -112,6 +130,19 @@ export const coursesApi = {
   getCertificate: (courseId: string) =>
     http<{ item: CourseCertificate }>(`/api/courses/${courseId}/certificate`, {
       credentials: "include",
+    }),
+
+  getReviews: (courseId: string) =>
+    http<{ item: CourseReviewsPayload }>(`/api/courses/${courseId}/reviews`, {
+      credentials: "include",
+    }),
+
+  submitReview: (courseId: string, body: { rating: number; comment: string }) =>
+    http<{ item: CourseReview }>(`/api/courses/${courseId}/reviews`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     }),
 
   lessons: (id: string) => http<Lesson[]>(`/api/courses/${id}/lessons`),

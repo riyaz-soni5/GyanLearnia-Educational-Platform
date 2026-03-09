@@ -1,5 +1,6 @@
 // src/components/courses/CourseCard.tsx
 import { Link } from "react-router-dom";
+import { FiStar, FiUsers } from "react-icons/fi";
 import type { CourseListItem } from "@/app/types/course.type";
 
 type CourseCardModel = CourseListItem & {
@@ -38,6 +39,9 @@ const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; 
     typeof course.totalVideoSec === "number"
       ? Math.round((course.totalVideoSec / 3600) * 10) / 10
       : undefined;
+  const averageRating = Number(course.averageRating ?? course.rating ?? 0);
+  const reviewsCount = Math.max(0, Number(course.reviewsCount ?? 0));
+  const enrolledCount = Math.max(0, Number(course.enrolled ?? 0));
 
   // prefer email if available (you said your site doesn't use username)
   const instructorLine =
@@ -83,6 +87,17 @@ const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; 
           </p>
         ) : null}
 
+        <div className="mt-2 flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+          <span className="inline-flex items-center gap-1">
+            <FiStar className="h-3.5 w-3.5 text-amber-500" />
+            {reviewsCount > 0 ? `${averageRating.toFixed(1)} (${reviewsCount})` : "No ratings"}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <FiUsers className="h-3.5 w-3.5" />
+            {enrolledCount} students
+          </span>
+        </div>
+
         <p className="mt-2 line-clamp-2 text-xs text-gray-600 dark:text-gray-300">
           {course.subtitle}
         </p>
@@ -108,21 +123,13 @@ const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; 
       )}
 
       {!previewMode ? (
-        <div className="flex gap-3 border-t border-gray-100 p-4 dark:border-gray-800">
+        <div className="border-t border-gray-100 p-4 dark:border-gray-800">
           <Link
             to={`/courses/${course.id}`}
-            className="inline-flex flex-1 items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
           >
-            View
+            {course.isEnrolled ? "View" : "Buy Now"}
           </Link>
-
-          <button
-            type="button"
-            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
-            title="Save (static)"
-          >
-            Save
-          </button>
         </div>
       ) : null}
     </article>

@@ -1,7 +1,9 @@
+import { Types } from "mongoose";
 import Course from "../models/Course.model.js";
 import Quiz from "../models/Quiz.model.js";
 import Enrollment from "../models/Enrollment.model.js";
 import User from "../models/User.model.js";
+import CourseReview from "../models/CourseReview.model.js";
 const escapeHtml = (value) => value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -64,15 +66,69 @@ const recalcCompletion = async (enrollment, course) => {
         isCompleted: Boolean(enrollment.completedAt),
     };
 };
-export async function listPublishedCourses(_req, res) {
+const toOneDecimal = (value) => Math.round(value * 10) / 10;
+const toReviewItem = (review, currentUserId) => {
+    const user = review?.userId;
+    const userName = [String(user?.firstName || "").trim(), String(user?.lastName || "").trim()]
+        .filter(Boolean)
+        .join(" ")
+        .trim() || "Student";
+    return {
+        id: String(review?._id || ""),
+        rating: Number(review?.rating || 0),
+        comment: String(review?.comment || ""),
+        createdAt: review?.createdAt || null,
+        updatedAt: review?.updatedAt || null,
+        user: {
+            id: String(user?._id || ""),
+            name: userName,
+            avatarUrl: user?.avatarUrl ?? null,
+        },
+        isMine: Boolean(currentUserId && String(user?._id || "") === String(currentUserId)),
+    };
+};
+export async function listPublishedCourses(req, res) {
     try {
+        const userId = req.user?.id;
         const items = await Course.find({ status: "Published" })
             .select("title subtitle thumbnailUrl category level language price currency tags totalLectures totalVideoSec createdAt")
             .populate("instructorId", "firstName lastName email avatarUrl")
             .sort({ createdAt: -1 })
             .lean();
+        const courseIds = items
+            .map((c) => c?._id)
+            .filter((id) => Boolean(id))
+            .map((id) => new Types.ObjectId(String(id)));
+        const ratingAgg = courseIds.length > 0
+            ? await CourseReview.aggregate([
+                { $match: { courseId: { $in: courseIds } } },
+                { $group: { _id: "$courseId", averageRating: { $avg: "$rating" }, reviewsCount: { $sum: 1 } } },
+            ])
+            : [];
+        const enrolledAgg = courseIds.length > 0
+            ? await Enrollment.aggregate([
+                { $match: { courseId: { $in: courseIds } } },
+                { $group: { _id: "$courseId", enrolled: { $sum: 1 } } },
+            ])
+            : [];
+        const ratingMap = new Map(ratingAgg.map((r) => [
+            String(r._id),
+            {
+                averageRating: toOneDecimal(Number(r.averageRating || 0)),
+                reviewsCount: Number(r.reviewsCount || 0),
+            },
+        ]));
+        const enrolledMap = new Map(enrolledAgg.map((r) => [String(r._id), Number(r.enrolled || 0)]));
+        const myEnrollmentSet = userId && courseIds.length > 0
+            ? new Set((await Enrollment.find({ userId, courseId: { $in: courseIds } })
+                .select("courseId")
+                .lean()).map((row) => String(row.courseId)))
+            : new Set();
         return res.json({
             items: items.map((c) => ({
+                ...(ratingMap.get(String(c._id)) || { averageRating: 0, reviewsCount: 0 }),
+                enrolled: enrolledMap.get(String(c._id)) || 0,
+                isEnrolled: myEnrollmentSet.has(String(c._id)),
                 id: String(c._id),
                 title: c.title,
                 subtitle: c.subtitle,
@@ -115,10 +171,23 @@ export async function getPublishedCourse(req, res) {
                 avatarUrl: instructorDoc.avatarUrl ?? null,
             }
             : null;
+        const [ratingAgg, enrolledCount] = await Promise.all([
+            CourseReview.aggregate([
+                { $match: { courseId: new Types.ObjectId(String(c._id)) } },
+                { $group: { _id: null, averageRating: { $avg: "$rating" }, reviewsCount: { $sum: 1 } } },
+            ]).then((rows) => rows[0]),
+            Enrollment.countDocuments({ courseId: c._id }),
+        ]);
+        const averageRating = toOneDecimal(Number(ratingAgg?.averageRating || 0));
+        const reviewsCount = Number(ratingAgg?.reviewsCount || 0);
         return res.json({
             item: {
                 ...c,
                 instructor,
+                averageRating,
+                reviewsCount,
+                enrolled: Number(enrolledCount || 0),
+                rating: averageRating,
                 certificate: {
                     enabled: Boolean(c?.certificate?.enabled),
                     template: {
@@ -365,6 +434,85 @@ export async function completeCourseLecture(req, res) {
     }
     catch (e) {
         return res.status(500).json({ message: e?.message || "Failed to complete lecture" });
+    }
+}
+export async function getPublishedCourseReviews(req, res) {
+    try {
+        const courseId = String(req.params.id || "");
+        const currentUserId = req.user?.id;
+        const course = await Course.findOne({ _id: courseId, status: "Published" }).select("_id").lean();
+        if (!course)
+            return res.status(404).json({ message: "Course not found" });
+        const reviews = await CourseReview.find({ courseId })
+            .populate("userId", "firstName lastName avatarUrl")
+            .sort({ updatedAt: -1, createdAt: -1 })
+            .lean();
+        const reviewsCount = reviews.length;
+        const averageRating = reviewsCount > 0
+            ? toOneDecimal(reviews.reduce((acc, review) => acc + Number(review.rating || 0), 0) / reviewsCount)
+            : 0;
+        return res.json({
+            item: {
+                averageRating,
+                reviewsCount,
+                items: reviews.map((review) => toReviewItem(review, currentUserId)),
+            },
+        });
+    }
+    catch {
+        return res.status(400).json({ message: "Invalid id" });
+    }
+}
+export async function upsertCourseReview(req, res) {
+    try {
+        const courseId = String(req.params.id || "");
+        const userId = req.user?.id;
+        if (!userId)
+            return res.status(401).json({ message: "Unauthorized" });
+        const rating = Number(req.body?.rating);
+        const comment = String(req.body?.comment || "").trim();
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+            return res.status(400).json({ message: "Rating must be an integer from 1 to 5" });
+        }
+        if (comment.length < 3) {
+            return res.status(400).json({ message: "Review comment must be at least 3 characters" });
+        }
+        if (comment.length > 1200) {
+            return res.status(400).json({ message: "Review comment is too long" });
+        }
+        const [course, enrollment] = await Promise.all([
+            Course.findOne({ _id: courseId, status: "Published" }).select("_id").lean(),
+            Enrollment.findOne({ userId, courseId }).select("completedAt").lean(),
+        ]);
+        if (!course)
+            return res.status(404).json({ message: "Course not found" });
+        if (!enrollment?.completedAt) {
+            return res.status(403).json({ message: "Complete the course before leaving a review" });
+        }
+        const existing = await CourseReview.findOne({ userId, courseId }).select("_id").lean();
+        if (existing) {
+            return res.status(409).json({ message: "You have already submitted a review for this course" });
+        }
+        const created = await CourseReview.create({
+            userId,
+            courseId,
+            rating,
+            comment,
+        });
+        const review = await CourseReview.findById(created._id)
+            .populate("userId", "firstName lastName avatarUrl")
+            .lean();
+        if (!review)
+            return res.status(500).json({ message: "Failed to save review" });
+        return res.json({
+            item: toReviewItem(review, userId),
+        });
+    }
+    catch (e) {
+        if (e?.code === 11000) {
+            return res.status(409).json({ message: "You have already submitted a review for this course" });
+        }
+        return res.status(500).json({ message: e?.message || "Failed to submit review" });
     }
 }
 export async function getCourseCertificate(req, res) {

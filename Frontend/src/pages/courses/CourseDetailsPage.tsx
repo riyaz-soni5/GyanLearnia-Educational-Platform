@@ -24,6 +24,7 @@ import {
   type CourseProgress,
   type CourseQuiz,
   type CourseQuizResult,
+  type CourseReview,
 } from "@/app/api/courses.api";
 import type { CourseListItem } from "@/app/types/course.type";
 
@@ -129,6 +130,8 @@ type RawCourse = {
   sections?: unknown;
   totalVideoSec?: unknown;
   updatedAt?: unknown;
+  averageRating?: unknown;
+  reviewsCount?: unknown;
 };
 
 type RawLectureResource = {
@@ -294,7 +297,7 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
     language: String(c.language ?? "English"),
     priceType: Number(c.price ?? 0) > 0 ? "Paid" : "Free",
     priceNpr: Number(c.price ?? 0),
-    rating: Number(c.rating ?? 4.5),
+    rating: Number(c.averageRating ?? c.rating ?? 0),
     hours,
     lessons,
     enrolled: Number(c.enrolled ?? 0),
@@ -332,6 +335,14 @@ const CourseDetailsPage = () => {
   const [certificateLoading, setCertificateLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [contentLecture, setContentLecture] = useState<UiLecture | null>(null);
+  const [reviews, setReviews] = useState<CourseReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState("");
+  const [reviewAverageRating, setReviewAverageRating] = useState(0);
+  const [reviewsCount, setReviewsCount] = useState(0);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -386,6 +397,34 @@ const CourseDetailsPage = () => {
   useEffect(() => {
     if (!course?.id) return;
     void loadProgress(course.id);
+  }, [course?.id]);
+
+  const loadReviews = async (courseId: string) => {
+    try {
+      setReviewsLoading(true);
+      setReviewsError("");
+      const res = await coursesApi.getReviews(courseId);
+      setReviews(Array.isArray(res.item.items) ? res.item.items : []);
+      setReviewAverageRating(Number(res.item.averageRating || 0));
+      setReviewsCount(Number(res.item.reviewsCount || 0));
+    } catch (e: unknown) {
+      setReviews([]);
+      setReviewAverageRating(0);
+      setReviewsCount(0);
+      setReviewsError(e instanceof Error ? e.message : "Failed to load reviews");
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!course?.id) {
+      setReviews([]);
+      setReviewAverageRating(0);
+      setReviewsCount(0);
+      return;
+    }
+    void loadReviews(course.id);
   }, [course?.id]);
 
   useEffect(() => {
@@ -451,32 +490,6 @@ const CourseDetailsPage = () => {
       (acc, s) => acc + s.lectures.reduce((sum, l) => sum + l.durationMin, 0),
       0
     );
-  }, [course]);
-
-  const reviews = useMemo(() => {
-    if (!course) return [];
-
-    const base = Math.max(1, Math.round(course.rating * 2));
-    return [
-      {
-        id: "r1",
-        name: "Student A",
-        rating: Math.min(5, Math.max(3, base / 2)),
-        text: `Clear explanation style for ${course.title}.`,
-      },
-      {
-        id: "r2",
-        name: "Student B",
-        rating: Math.min(5, Math.max(3, course.rating)),
-        text: `Curriculum is structured and easy to follow.`,
-      },
-      {
-        id: "r3",
-        name: "Student C",
-        rating: Math.min(5, Math.max(3, course.rating - 0.3)),
-        text: `Good for ${course.level} learners with practical coverage.`,
-      },
-    ];
   }, [course]);
 
   const toggleSection = (sectionId: string) => {
@@ -628,51 +641,81 @@ const CourseDetailsPage = () => {
     }
   };
 
+  const submitReview = async () => {
+    if (!course) return;
+    const comment = reviewComment.trim();
+    if (comment.length < 3) {
+      setActionError("Review comment must be at least 3 characters.");
+      return;
+    }
+
+    try {
+      setActionError("");
+      setReviewSubmitting(true);
+      await coursesApi.submitReview(course.id, { rating: reviewRating, comment });
+      setReviewComment("");
+      await loadReviews(course.id);
+    } catch (e: unknown) {
+      setActionError(e instanceof Error ? e.message : "Failed to submit review");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-        <p className="text-sm font-semibold text-gray-900">Loading course...</p>
-        <p className="mt-2 text-sm text-gray-600">Please wait a moment.</p>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm">
+          <p className="text-sm font-semibold text-gray-900">Loading course...</p>
+          <p className="mt-2 text-sm text-gray-600">Please wait a moment.</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-10 text-center">
-        <p className="text-lg font-semibold text-red-800">Could not load course</p>
-        <p className="mt-2 text-sm text-red-700">{error}</p>
-        <Link
-          to="/courses"
-          className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-        >
-          Back to Courses
-        </Link>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-10 text-center">
+          <p className="text-lg font-semibold text-red-800">Could not load course</p>
+          <p className="mt-2 text-sm text-red-700">{error}</p>
+          <Link
+            to="/courses"
+            className="mt-5 inline-flex cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            Back to Courses
+          </Link>
+        </div>
       </div>
     );
   }
 
   if (!course) {
     return (
-      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
-        <p className="text-lg font-semibold text-gray-900">Course not found</p>
-        <p className="mt-2 text-sm text-gray-600">The course you are trying to open does not exist.</p>
-        <Link
-          to="/courses"
-          className="mt-5 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-        >
-          Back to Courses
-        </Link>
+      <div className="mx-auto max-w-7xl px-4">
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-10 text-center">
+          <p className="text-lg font-semibold text-gray-900">Course not found</p>
+          <p className="mt-2 text-sm text-gray-600">The course you are trying to open does not exist.</p>
+          <Link
+            to="/courses"
+            className="mt-5 inline-flex cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            Back to Courses
+          </Link>
+        </div>
       </div>
     );
   }
 
   const priceText = course.priceType === "Free" ? "Free" : `NPR ${course.priceNpr.toLocaleString()}`;
   const completedLectureSet = new Set(progress?.completedLectureIds ?? []);
+  const myReview = reviews.find((review) => review.isMine);
+  const canSubmitReview = Boolean(progress?.isCompleted) && !myReview;
 
   return (
-    <div className="space-y-8">
-      <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-900 text-white">
+    <div className="mx-auto max-w-7xl px-4">
+      <div className="space-y-8">
+        <section className="relative overflow-hidden rounded-2xl border border-gray-200 bg-gray-900 text-white">
         <img
           src={course.thumbnailUrl}
           alt={course.title}
@@ -702,7 +745,7 @@ const CourseDetailsPage = () => {
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-100">
               <span className="inline-flex items-center gap-2">
                 <FiStar className="h-4 w-4 text-yellow-300" />
-                {course.rating.toFixed(1)} rating
+                {reviewsCount > 0 ? `${reviewAverageRating.toFixed(1)} rating` : "No ratings yet"}
               </span>
               <span className="inline-flex items-center gap-2">
                 <FiUsers className="h-4 w-4" />
@@ -749,11 +792,11 @@ const CourseDetailsPage = () => {
               <button
                 type="button"
                 onClick={() => void enrollCourse()}
-                disabled={progressLoading}
+                disabled={progressLoading || isEnrolled}
                 className={[
-                  "mt-4 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
+                  "mt-4 w-full cursor-pointer rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
                   isEnrolled
-                    ? "bg-green-600 hover:bg-green-700"
+                    ? "cursor-not-allowed bg-green-600"
                     : progressLoading
                     ? "cursor-not-allowed bg-gray-400"
                     : "bg-indigo-600 hover:bg-indigo-700",
@@ -787,7 +830,7 @@ const CourseDetailsPage = () => {
                 </p>
               </div>
 
-              {progress ? (
+              {progress?.enrolled ? (
                 <div className="mt-5 rounded-xl border border-gray-200 p-3">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs font-semibold text-gray-700">Your Progress</p>
@@ -805,7 +848,7 @@ const CourseDetailsPage = () => {
                       onClick={() => void openCertificate()}
                       disabled={!progress.certificateEligible || certificateLoading}
                       className={[
-                        "mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold",
+                        "mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold",
                         progress.certificateEligible && !certificateLoading
                           ? "bg-gray-900 text-white hover:bg-gray-800"
                           : "cursor-not-allowed border border-gray-300 bg-white text-gray-400",
@@ -820,10 +863,10 @@ const CourseDetailsPage = () => {
             </div>
           </aside>
         </div>
-      </section>
+        </section>
 
-      <div className="grid gap-6 lg:grid-cols-12">
-        <main className="space-y-6 lg:col-span-8">
+        <div className="grid gap-6 lg:grid-cols-12">
+          <main className="space-y-6 lg:col-span-8">
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">What you'll learn</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -869,7 +912,7 @@ const CourseDetailsPage = () => {
                       <button
                         type="button"
                         onClick={() => toggleSection(section.id)}
-                        className="flex w-full items-center justify-between bg-gray-50 px-4 py-3 text-left hover:bg-gray-100"
+                        className="flex w-full cursor-pointer items-center justify-between bg-gray-50 px-4 py-3 text-left hover:bg-gray-100"
                       >
                         <div>
                           <p className="text-sm font-semibold text-gray-900">
@@ -947,24 +990,81 @@ const CourseDetailsPage = () => {
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-gray-900">Reviews</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {reviewsCount > 0 ? `${reviewAverageRating.toFixed(1)} average from ${reviewsCount} review(s)` : "No reviews yet"}
+            </p>
+
+            {canSubmitReview ? (
+              <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
+                <p className="text-sm font-semibold text-gray-900">Leave your review</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-3">
+                    <label className="text-xs font-medium text-gray-700">Rating</label>
+                    <select
+                      value={reviewRating}
+                      onChange={(e) => setReviewRating(Number(e.target.value || 5))}
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value={5}>5 - Excellent</option>
+                      <option value={4}>4 - Good</option>
+                      <option value={3}>3 - Average</option>
+                      <option value={2}>2 - Poor</option>
+                      <option value={1}>1 - Very Poor</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-9">
+                    <label className="text-xs font-medium text-gray-700">Comment</label>
+                    <textarea
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      rows={3}
+                      placeholder="Share your learning experience from this course..."
+                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => void submitReview()}
+                    disabled={reviewSubmitting}
+                    className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                  >
+                    {reviewSubmitting ? "Submitting..." : "Submit Review"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-4 space-y-3">
-              {reviews.map((review) => (
-                <div key={review.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-gray-900">{review.name}</p>
-                    <p className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
-                      <FiStar className="h-3.5 w-3.5" />
-                      {review.rating.toFixed(1)}
+              {reviewsLoading ? (
+                <p className="text-sm text-gray-600">Loading reviews...</p>
+              ) : reviewsError ? (
+                <p className="text-sm text-red-700">{reviewsError}</p>
+              ) : reviews.length === 0 ? (
+                <p className="text-sm text-gray-600">No reviews yet.</p>
+              ) : (
+                reviews.map((review) => (
+                  <div key={review.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-900">{review.user.name}</p>
+                      <p className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                        <FiStar className="h-3.5 w-3.5" />
+                        {Number(review.rating || 0).toFixed(1)}
+                      </p>
+                    </div>
+                    <p className="mt-2 text-sm text-gray-700">{review.comment}</p>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {review.updatedAt ? new Date(review.updatedAt).toLocaleDateString() : ""}
                     </p>
                   </div>
-                  <p className="mt-2 text-sm text-gray-700">{review.text}</p>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </section>
-        </main>
+          </main>
 
-        <aside className="space-y-6 lg:col-span-4">
+          <aside className="space-y-6 lg:col-span-4">
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900">This course includes</h3>
             <div className="mt-4 space-y-3 text-sm text-gray-700">
@@ -1035,7 +1135,7 @@ const CourseDetailsPage = () => {
                     <Link
                       key={item.id}
                       to={`/courses/${item.id}`}
-                      className="block rounded-xl border border-gray-200 p-3 hover:bg-gray-50"
+                      className="block cursor-pointer rounded-xl border border-gray-200 p-3 hover:bg-gray-50"
                     >
                       <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.title}</p>
                       <p className="mt-1 text-xs text-gray-600">By {teacher}</p>
@@ -1049,11 +1149,11 @@ const CourseDetailsPage = () => {
               </div>
             )}
           </section>
-        </aside>
-      </div>
+          </aside>
+        </div>
 
-      {quizOpen ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+        {quizOpen ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
           <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 p-4">
               <div>
@@ -1066,7 +1166,7 @@ const CourseDetailsPage = () => {
                   if (quizSubmitting) return;
                   setQuizOpen(false);
                 }}
-                className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
+                className="cursor-pointer rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
               >
                 <FiX className="h-4 w-4" />
               </button>
@@ -1157,7 +1257,7 @@ const CourseDetailsPage = () => {
                         return acc;
                       }, {}));
                     }}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                    className="cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                   >
                     Retry
                   </button>
@@ -1168,7 +1268,7 @@ const CourseDetailsPage = () => {
                     type="button"
                     onClick={() => void submitQuiz()}
                     disabled={quizSubmitting || !quizData}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                    className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
                   >
                     {quizSubmitting ? "Submitting..." : "Submit Quiz"}
                   </button>
@@ -1176,7 +1276,7 @@ const CourseDetailsPage = () => {
                   <button
                     type="button"
                     onClick={() => setQuizOpen(false)}
-                    className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
+                    className="cursor-pointer rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
                   >
                     Close
                   </button>
@@ -1184,11 +1284,11 @@ const CourseDetailsPage = () => {
               </div>
             </div>
           </div>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
 
-      {contentLecture ? (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+        {contentLecture ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 p-4">
               <div>
@@ -1198,7 +1298,7 @@ const CourseDetailsPage = () => {
               <button
                 type="button"
                 onClick={() => setContentLecture(null)}
-                className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
+                className="cursor-pointer rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
               >
                 <FiX className="h-4 w-4" />
               </button>
@@ -1242,14 +1342,14 @@ const CourseDetailsPage = () => {
                           href={resource.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                          className="cursor-pointer rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
                         >
                           Open
                         </a>
                         <a
                           href={resource.url}
                           download
-                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                          className="cursor-pointer rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
                         >
                           Download
                         </a>
@@ -1262,8 +1362,9 @@ const CourseDetailsPage = () => {
               )}
             </div>
           </div>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

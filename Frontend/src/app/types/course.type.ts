@@ -115,6 +115,11 @@ export type CourseListItem = {
   };
   totalLectures?: number;
   totalVideoSec?: number;
+  enrolled?: number;
+  isEnrolled?: boolean;
+  rating?: number;
+  averageRating?: number;
+  reviewsCount?: number;
 };
 
 export type AdminCourseRow = {
