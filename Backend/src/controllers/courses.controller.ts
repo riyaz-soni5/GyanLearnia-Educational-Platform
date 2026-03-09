@@ -1,11 +1,16 @@
 import { Request, Response } from "express";
+import axios from "axios";
 import { Types } from "mongoose";
 import Course from "../models/Course.model.js";
 import Quiz from "../models/Quiz.model.js";
 import Enrollment from "../models/Enrollment.model.js";
 import User from "../models/User.model.js";
 import CourseReview from "../models/CourseReview.model.js";
+import CoursePurchase from "../models/CoursePurchase.model.js";
+import WalletTransaction from "../models/WalletTransaction.model.js";
+import Question from "../models/Question.model.js";
 import { AuthedRequest } from "../middlewares/auth.middleware.js";
+import { creditUserWallet } from "../services/wallet.service.js";
 
 const escapeHtml = (value: string) =>
   value
@@ -113,6 +118,168 @@ const toReviewItem = (review: any, currentUserId?: string) => {
     },
     isMine: Boolean(currentUserId && String(user?._id || "") === String(currentUserId)),
   };
+};
+
+const KHALTI_INITIATE_URL = "https://dev.khalti.com/api/v2/epayment/initiate/";
+const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
+
+const normalizeKhaltiSecretKey = (raw: string): string => {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  if (value.startsWith("test_secret_key_")) return value.replace("test_secret_key_", "");
+  if (value.startsWith("live_secret_key_")) return value.replace("live_secret_key_", "");
+  return value;
+};
+
+const formatKhaltiError = (payload: unknown): string => {
+  if (!payload) return "Khalti request failed";
+  if (typeof payload === "string") return payload;
+  if (typeof payload !== "object") return "Khalti request failed";
+
+  const data = payload as Record<string, unknown>;
+  if (typeof data.detail === "string" && data.detail.trim()) return data.detail;
+  if (typeof data.error_key === "string" && data.error_key.trim()) return data.error_key;
+
+  const first = Object.values(data).find((value) => typeof value === "string");
+  if (typeof first === "string" && first.trim()) return first;
+  return "Khalti request failed";
+};
+
+const isValidHttpUrl = (value: string): boolean => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const asPaisa = (value: unknown): number => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 0;
+  const rounded = Math.round(amount);
+  return rounded > 0 ? rounded : 0;
+};
+
+const coursePriceToPaisa = (priceNpr: unknown): number => {
+  const amount = Number(priceNpr);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.round(amount * 100);
+};
+
+const ensureCourseEnrollment = async (userId: string, courseId: string, course: any) => {
+  const enrollment = await Enrollment.findOneAndUpdate(
+    { userId, courseId },
+    { $setOnInsert: { userId, courseId } },
+    { upsert: true, new: true }
+  );
+  if (!enrollment) return null;
+
+  const progress = await recalcCompletion(enrollment, course);
+  return { enrollment, progress };
+};
+
+const ensureInstructorCreditForPurchase = async (purchase: any, courseTitle: string) => {
+  const purchaseId = String(purchase?._id || "").trim();
+  const pidx = String(purchase?.pidx || "").trim();
+  const instructorId = String(purchase?.instructorId || "").trim();
+  const pricePaisa = asPaisa(purchase?.pricePaisa);
+  const instructorSharePaisa = asPaisa(purchase?.instructorSharePaisa) || Math.floor(pricePaisa * 0.7);
+  const platformFeePaisa = Math.max(0, Number(purchase?.platformFeePaisa || pricePaisa - instructorSharePaisa));
+  const existingCreditTxId = String(purchase?.instructorCreditTxId || "").trim();
+
+  if (!purchaseId || !pidx || !instructorId || instructorSharePaisa <= 0) {
+    return { ok: false as const, error: "Invalid instructor payout details" };
+  }
+
+  if (existingCreditTxId && !existingCreditTxId.startsWith("pending-")) {
+    return { ok: true as const, transactionId: existingCreditTxId };
+  }
+
+  const lockToken = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const lockAcquired = await CoursePurchase.findOneAndUpdate(
+    {
+      _id: purchaseId,
+      $or: [{ instructorCreditTxId: null }, { instructorCreditTxId: "" }],
+    },
+    { $set: { instructorCreditTxId: lockToken } },
+    { new: true }
+  )
+    .select("_id")
+    .lean();
+
+  if (!lockAcquired) {
+    const latest = await CoursePurchase.findById(purchaseId).select("instructorCreditTxId").lean();
+    const latestTxId = String((latest as any)?.instructorCreditTxId || "").trim();
+    if (latestTxId && !latestTxId.startsWith("pending-")) {
+      return { ok: true as const, transactionId: latestTxId };
+    }
+    return { ok: false as const, error: "Instructor payout is being processed. Please retry shortly." };
+  }
+
+  const existingCreditTx = await WalletTransaction.findOne({
+    type: "course_sale_credit",
+    status: "completed",
+    "metadata.pidx": pidx,
+  })
+    .select("_id")
+    .lean();
+
+  if (existingCreditTx?._id) {
+    const txId = String(existingCreditTx._id);
+    await CoursePurchase.findOneAndUpdate(
+      { _id: purchaseId, instructorCreditTxId: lockToken },
+      {
+        $set: {
+          instructorCreditTxId: txId,
+          instructorCreditedAt: purchase?.instructorCreditedAt || new Date(),
+        },
+      }
+    );
+    return { ok: true as const, transactionId: txId };
+  }
+
+  const credited = await creditUserWallet({
+    userId: instructorId,
+    amountPaisa: instructorSharePaisa,
+    type: "course_sale_credit",
+    note: `Course sale payout (${courseTitle})`,
+    referenceId: `course-sale-${pidx}`,
+    metadata: {
+      provider: "khalti",
+      pidx,
+      courseId: String(purchase?.courseId || ""),
+      buyerId: String(purchase?.userId || ""),
+      paidAmountPaisa: asPaisa(purchase?.paidAmountPaisa),
+      instructorSharePaisa,
+      platformFeePaisa,
+    },
+  });
+
+  if (!credited.ok) {
+    await CoursePurchase.findOneAndUpdate(
+      { _id: purchaseId, instructorCreditTxId: lockToken },
+      {
+        $set: {
+          instructorCreditTxId: null,
+        },
+      }
+    );
+    return { ok: false as const, error: credited.error || "Failed to credit instructor wallet" };
+  }
+
+  const txId = String(credited.transactionId || "");
+  await CoursePurchase.findOneAndUpdate(
+    { _id: purchaseId, instructorCreditTxId: lockToken },
+    {
+      $set: {
+        instructorCreditTxId: txId,
+        instructorCreditedAt: new Date(),
+      },
+    }
+  );
+
+  return { ok: true as const, transactionId: txId };
 };
 
 export async function listPublishedCourses(req: AuthedRequest, res: Response) {
@@ -394,22 +561,344 @@ export async function submitPublishedCourseQuiz(req: AuthedRequest, res: Respons
   }
 }
 
+export async function initiateCoursePurchase(req: AuthedRequest, res: Response) {
+  try {
+    const courseId = String(req.params.id || "").trim();
+    const userId = String(req.user?.id || "").trim();
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+    const returnUrl = String(req.body?.returnUrl || "").trim();
+    const websiteUrl = String(req.body?.websiteUrl || "").trim();
+    if (!returnUrl || !isValidHttpUrl(returnUrl)) {
+      return res.status(400).json({ message: "Valid returnUrl is required" });
+    }
+    if (!websiteUrl || !isValidHttpUrl(websiteUrl)) {
+      return res.status(400).json({ message: "Valid websiteUrl is required" });
+    }
+
+    const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
+    if (!khaltiTestSecretKey) {
+      return res.status(500).json({ message: "Khalti test secret key is missing" });
+    }
+
+    const course = await Course.findOne({ _id: courseId, status: "Published" })
+      .select("title price currency instructorId")
+      .lean();
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    const pricePaisa = coursePriceToPaisa((course as any).price);
+    if (pricePaisa <= 0) {
+      return res.status(400).json({ message: "This course is free. Please use enroll." });
+    }
+
+    const instructorId = String((course as any).instructorId || "").trim();
+    if (!instructorId) {
+      return res.status(400).json({ message: "Course instructor is not configured" });
+    }
+
+    const [alreadyEnrolled, alreadyPurchased, customer] = await Promise.all([
+      Enrollment.findOne({ userId, courseId }).select("_id").lean(),
+      CoursePurchase.findOne({ userId, courseId, status: "completed" }).select("_id").lean(),
+      User.findById(userId).select("firstName lastName email").lean(),
+    ]);
+
+    if (alreadyEnrolled || alreadyPurchased) {
+      return res.status(409).json({ message: "You are already enrolled in this course" });
+    }
+
+    const customerName =
+      customer && `${String((customer as any).firstName || "")} ${String((customer as any).lastName || "")}`.trim();
+    const customerEmail = customer ? String((customer as any).email || "").trim() : "";
+    const customerInfo =
+      (customerName && customerName.length > 0) || customerEmail
+        ? {
+            ...(customerName ? { name: customerName } : {}),
+            ...(customerEmail ? { email: customerEmail } : {}),
+          }
+        : undefined;
+
+    const purchaseOrderId = `course-${courseId}-${userId}-${Date.now()}`;
+    const purchaseOrderName =
+      String((course as any).title || "Course Purchase").trim().slice(0, 120) || "Course Purchase";
+
+    const initiate = await axios.post(
+      KHALTI_INITIATE_URL,
+      {
+        return_url: returnUrl,
+        website_url: websiteUrl,
+        amount: pricePaisa,
+        purchase_order_id: purchaseOrderId,
+        purchase_order_name: purchaseOrderName,
+        ...(customerInfo ? { customer_info: customerInfo } : {}),
+      },
+      {
+        headers: {
+          Authorization: `Key ${khaltiTestSecretKey}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    const payload = initiate.data as Record<string, unknown>;
+    const paymentUrl = String(payload.payment_url || "").trim();
+    const pidx = String(payload.pidx || "").trim();
+
+    if (!paymentUrl || !pidx) {
+      return res.status(502).json({ message: "Khalti did not return a valid payment reference" });
+    }
+
+    const [usedInWalletTopup, usedInQuestionEscrow, existingPurchaseForPidx] = await Promise.all([
+      WalletTransaction.findOne({
+        type: "wallet_topup",
+        status: "completed",
+        "metadata.pidx": pidx,
+      })
+        .select("_id")
+        .lean(),
+      Question.findOne({
+        isFastResponse: true,
+        fastResponseEscrowSource: "khalti",
+        fastResponseEscrowSourceRef: pidx,
+      })
+        .select("_id")
+        .lean(),
+      CoursePurchase.findOne({ pidx }).select("userId courseId").lean(),
+    ]);
+
+    if (usedInWalletTopup || usedInQuestionEscrow) {
+      return res.status(409).json({ message: "This Khalti payment reference is already used" });
+    }
+
+    if (
+      existingPurchaseForPidx &&
+      (String((existingPurchaseForPidx as any).userId || "") !== userId ||
+        String((existingPurchaseForPidx as any).courseId || "") !== courseId)
+    ) {
+      return res.status(409).json({ message: "This Khalti payment reference is already used" });
+    }
+
+    await CoursePurchase.findOneAndUpdate(
+      { pidx },
+      {
+        $set: {
+          userId,
+          courseId,
+          instructorId,
+          provider: "khalti",
+          status: "initiated",
+          pricePaisa,
+          paidAmountPaisa: 0,
+          instructorSharePaisa: 0,
+          platformFeePaisa: 0,
+          paymentCompletedAt: null,
+          instructorCreditTxId: null,
+          instructorCreditedAt: null,
+          metadata: {
+            returnUrl,
+            websiteUrl,
+            purchaseOrderId,
+            purchaseOrderName,
+            coursePriceNpr: Number((course as any).price || 0),
+            courseCurrency: String((course as any).currency || "NPR"),
+            khaltiInit: {
+              pidx,
+              paymentUrl,
+              expiresAt: payload.expires_at ?? null,
+              expiresIn: payload.expires_in ?? null,
+            },
+          },
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    return res.json({
+      item: {
+        pidx,
+        paymentUrl,
+        expiresAt: payload.expires_at ?? null,
+        expiresIn: payload.expires_in ?? null,
+      },
+    });
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      return res.status(502).json({
+        message: formatKhaltiError(error.response?.data) || error.message || "Failed to initiate Khalti payment",
+      });
+    }
+    return res.status(500).json({ message: "Failed to initiate course purchase" });
+  }
+}
+
+export async function verifyCoursePurchase(req: AuthedRequest, res: Response) {
+  try {
+    const courseId = String(req.params.id || "").trim();
+    const userId = String(req.user?.id || "").trim();
+    const pidx = String(req.body?.pidx || "").trim();
+
+    if (!userId) return res.status(401).json({ message: "Unauthorized" });
+    if (!pidx) return res.status(400).json({ message: "pidx is required" });
+
+    const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
+    if (!khaltiTestSecretKey) {
+      return res.status(500).json({ message: "Khalti test secret key is missing" });
+    }
+
+    const course = await Course.findOne({ _id: courseId, status: "Published" })
+      .select("title sections")
+      .lean();
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    const purchase = await CoursePurchase.findOne({ userId, courseId, pidx });
+    if (!purchase) {
+      return res.status(404).json({ message: "Purchase reference not found for this course" });
+    }
+
+    const [usedInWalletTopup, usedInQuestionEscrow] = await Promise.all([
+      WalletTransaction.findOne({
+        type: "wallet_topup",
+        status: "completed",
+        "metadata.pidx": pidx,
+      })
+        .select("_id")
+        .lean(),
+      Question.findOne({
+        isFastResponse: true,
+        fastResponseEscrowSource: "khalti",
+        fastResponseEscrowSourceRef: pidx,
+      })
+        .select("_id")
+        .lean(),
+    ]);
+
+    if (usedInWalletTopup || usedInQuestionEscrow) {
+      return res.status(409).json({ message: "This Khalti payment reference is already used" });
+    }
+
+    const verifyAndReturnProgress = async () => {
+      const payout = await ensureInstructorCreditForPurchase(purchase, String((course as any).title || "Course"));
+      if (!payout.ok) {
+        return res.status(500).json({
+          message: payout.error || "Payment verified but instructor payout failed. Please retry verification.",
+        });
+      }
+
+      const enrolled = await ensureCourseEnrollment(userId, courseId, course);
+      if (!enrolled) return res.status(500).json({ message: "Failed to enroll after payment verification" });
+
+      return res.json({
+        item: {
+          enrolled: true,
+          ...enrolled.progress,
+        },
+      });
+    };
+
+    if (String(purchase.status || "") === "completed") {
+      return await verifyAndReturnProgress();
+    }
+
+    const lookup = await axios.post(
+      KHALTI_LOOKUP_URL,
+      { pidx },
+      {
+        headers: {
+          Authorization: `Key ${khaltiTestSecretKey}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 15000,
+      }
+    );
+
+    const lookupData = lookup.data as Record<string, unknown>;
+    const status = String(lookupData.status || "");
+    if (status !== "Completed") {
+      return res.status(400).json({
+        message: status ? `Payment status: ${status}` : "Payment is not completed",
+      });
+    }
+
+    const paidAmountPaisa = asPaisa(lookupData.total_amount);
+    const expectedPricePaisa = asPaisa(purchase.pricePaisa);
+    if (expectedPricePaisa <= 0) {
+      return res.status(400).json({ message: "Invalid purchase amount" });
+    }
+    if (paidAmountPaisa < expectedPricePaisa) {
+      return res.status(400).json({ message: "Paid amount is lower than course price" });
+    }
+
+    const lookupOrderId = String(lookupData.purchase_order_id || "").trim();
+    const expectedOrderId = String((purchase.metadata as any)?.purchaseOrderId || "").trim();
+    if (lookupOrderId && expectedOrderId && lookupOrderId !== expectedOrderId) {
+      return res.status(409).json({ message: "Payment reference does not match this purchase request" });
+    }
+
+    const instructorSharePaisa = Math.floor(expectedPricePaisa * 0.7);
+    const platformFeePaisa = expectedPricePaisa - instructorSharePaisa;
+
+    purchase.status = "completed";
+    purchase.paidAmountPaisa = paidAmountPaisa;
+    purchase.instructorSharePaisa = instructorSharePaisa;
+    purchase.platformFeePaisa = platformFeePaisa;
+    purchase.paymentCompletedAt = new Date();
+    purchase.metadata = {
+      ...(purchase.metadata && typeof purchase.metadata === "object" ? purchase.metadata : {}),
+      khaltiLookup: {
+        status,
+        total_amount: paidAmountPaisa,
+        transaction_id: lookupData.transaction_id ?? null,
+      },
+    };
+    await purchase.save();
+
+    return await verifyAndReturnProgress();
+  } catch (error: unknown) {
+    if (axios.isAxiosError(error)) {
+      return res.status(502).json({
+        message: formatKhaltiError(error.response?.data) || error.message || "Failed to verify Khalti payment",
+      });
+    }
+    return res.status(500).json({ message: "Failed to verify course purchase" });
+  }
+}
+
 export async function enrollPublishedCourse(req: AuthedRequest, res: Response) {
   try {
     const courseId = String(req.params.id || "");
     const userId = req.user?.id;
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const course = await Course.findOne({ _id: courseId, status: "Published" }).select("sections").lean();
+    const course = await Course.findOne({ _id: courseId, status: "Published" }).select("sections price").lean();
     if (!course) return res.status(404).json({ message: "Course not found" });
 
-    const enrollment = await Enrollment.findOneAndUpdate(
-      { userId, courseId },
-      { $setOnInsert: { userId, courseId } },
-      { upsert: true, new: true }
-    );
+    let enrollment = await Enrollment.findOne({ userId, courseId });
 
+    if (!enrollment && coursePriceToPaisa((course as any).price) > 0) {
+      const hasCompletedPurchase = await CoursePurchase.findOne({
+        userId,
+        courseId,
+        status: "completed",
+      })
+        .select("_id")
+        .lean();
+
+      if (!hasCompletedPurchase) {
+        return res.status(402).json({
+          message: "Please complete payment through Buy Now to enroll in this course",
+        });
+      }
+    }
+
+    if (!enrollment) {
+      enrollment = await Enrollment.findOneAndUpdate(
+        { userId, courseId },
+        { $setOnInsert: { userId, courseId } },
+        { upsert: true, new: true }
+      );
+    }
     if (!enrollment) return res.status(500).json({ message: "Failed to enroll" });
+
     const progress = await recalcCompletion(enrollment, course);
 
     return res.json({ item: { enrolled: true, ...progress } });

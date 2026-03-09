@@ -74,6 +74,12 @@ export type CourseReviewsPayload = {
   reviewsCount: number;
   items: CourseReview[];
 };
+export type CoursePurchaseInitPayload = {
+  pidx: string;
+  paymentUrl: string;
+  expiresAt?: string | null;
+  expiresIn?: number | null;
+};
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
 
@@ -114,6 +120,22 @@ export const coursesApi = {
     http<{ item: CourseProgress }>(`/api/courses/${courseId}/enroll`, {
       method: "POST",
       credentials: "include",
+    }),
+
+  initiatePurchase: (courseId: string, body: { returnUrl: string; websiteUrl: string }) =>
+    http<{ item: CoursePurchaseInitPayload }>(`/api/courses/${courseId}/purchase/initiate`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  verifyPurchase: (courseId: string, pidx: string) =>
+    http<{ item: CourseProgress }>(`/api/courses/${courseId}/purchase/verify`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pidx }),
     }),
 
   progress: (courseId: string) =>

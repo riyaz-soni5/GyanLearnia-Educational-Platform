@@ -122,13 +122,13 @@ const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; 
         </Link>
       )}
 
-      {!previewMode ? (
+      {!previewMode && course.isEnrolled ? (
         <div className="border-t border-gray-100 p-4 dark:border-gray-800">
           <Link
             to={`/courses/${course.id}`}
-            className="inline-flex w-full items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+            className="inline-flex w-full cursor-pointer items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
           >
-            {course.isEnrolled ? "View" : "Buy Now"}
+            View
           </Link>
         </div>
       ) : null}

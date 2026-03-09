@@ -7,9 +7,11 @@ import {
   getPublishedCourse,
   getPublishedCourseReviews,
   getPublishedCourseQuiz,
+  initiateCoursePurchase,
   listPublishedCourses,
   upsertCourseReview,
   submitPublishedCourseQuiz,
+  verifyCoursePurchase,
 } from "../controllers/courses.controller.js";
 import { optionalAuth, requireAuth } from "../middlewares/auth.middleware.js";
 
@@ -18,6 +20,8 @@ const router = Router();
 router.get("/", optionalAuth, listPublishedCourses);
 router.get("/:id/quizzes/:quizId", getPublishedCourseQuiz);
 router.post("/:id/quizzes/:quizId/submit", requireAuth, submitPublishedCourseQuiz);
+router.post("/:id/purchase/initiate", requireAuth, initiateCoursePurchase);
+router.post("/:id/purchase/verify", requireAuth, verifyCoursePurchase);
 router.post("/:id/enroll", requireAuth, enrollPublishedCourse);
 router.get("/:id/progress", requireAuth, getMyCourseProgress);
 router.post("/:id/lectures/:lectureId/complete", requireAuth, completeCourseLecture);

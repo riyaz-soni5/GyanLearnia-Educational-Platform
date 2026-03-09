@@ -1,6 +1,6 @@
 // src/pages/CourseDetailsPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   FiBarChart2,
   FiBookOpen,
@@ -27,6 +27,7 @@ import {
   type CourseReview,
 } from "@/app/api/courses.api";
 import type { CourseListItem } from "@/app/types/course.type";
+import { getUser } from "@/services/session";
 
 type LectureKind = "Video" | "Quiz" | "File";
 
@@ -182,6 +183,22 @@ const formatMin = (min: number): string => {
   return `${min} min`;
 };
 
+const parseApiError = (error: unknown, fallback: string): string => {
+  if (!(error instanceof Error)) return fallback;
+  const raw = String(error.message || "").trim();
+  if (!raw) return fallback;
+
+  try {
+    const parsed = JSON.parse(raw) as { message?: unknown; error?: unknown };
+    if (typeof parsed.message === "string" && parsed.message.trim()) return parsed.message;
+    if (typeof parsed.error === "string" && parsed.error.trim()) return parsed.error;
+  } catch {
+    // keep raw fallback
+  }
+
+  return raw;
+};
+
 const lessonIcon = (type: LectureKind) => {
   if (type === "Video") return <FiPlayCircle className="h-4 w-4" />;
   if (type === "File") return <FiPaperclip className="h-4 w-4" />;
@@ -315,6 +332,8 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
 
 const CourseDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [course, setCourse] = useState<CourseUiModel | null>(null);
   const [relatedCourses, setRelatedCourses] = useState<RelatedCourse[]>([]);
@@ -343,6 +362,7 @@ const CourseDetailsPage = () => {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [purchaseProcessing, setPurchaseProcessing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -398,6 +418,49 @@ const CourseDetailsPage = () => {
     if (!course?.id) return;
     void loadProgress(course.id);
   }, [course?.id]);
+
+  useEffect(() => {
+    if (!course?.id) return;
+
+    const params = new URLSearchParams(location.search);
+    const pidx = String(params.get("pidx") || "").trim();
+    const status = String(params.get("status") || "").trim();
+    if (!pidx) return;
+
+    const clearPaymentParams = () => {
+      navigate(location.pathname, { replace: true });
+    };
+
+    if (status && status.toLowerCase() !== "completed") {
+      setPurchaseProcessing(false);
+      setActionError(`Payment status: ${status}`);
+      clearPaymentParams();
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setPurchaseProcessing(true);
+        setActionError("");
+        const res = await coursesApi.verifyPurchase(course.id, pidx);
+        if (cancelled) return;
+        setIsEnrolled(true);
+        setProgress(res.item);
+        clearPaymentParams();
+      } catch (e: unknown) {
+        if (cancelled) return;
+        setActionError(parseApiError(e, "Failed to verify payment"));
+      } finally {
+        if (!cancelled) setPurchaseProcessing(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [course?.id, location.pathname, location.search, navigate]);
 
   const loadReviews = async (courseId: string) => {
     try {
@@ -497,14 +560,44 @@ const CourseDetailsPage = () => {
   };
 
   const enrollCourse = async () => {
-    if (!course) return;
+    if (!course || purchaseProcessing || progressLoading || isEnrolled) return;
+    setActionError("");
+
+    const me = getUser();
+    if (!me?.id) {
+      navigate("/login", {
+        state: { from: `${location.pathname}${location.search}` || `/courses/${course.id}` },
+      });
+      return;
+    }
+
+    if (course.priceType === "Free") {
+      try {
+        const res = await coursesApi.enroll(course.id);
+        setIsEnrolled(true);
+        setProgress(res.item);
+      } catch (e: unknown) {
+        setActionError(parseApiError(e, "Failed to enroll"));
+      }
+      return;
+    }
+
     try {
-      setActionError("");
-      const res = await coursesApi.enroll(course.id);
-      setIsEnrolled(true);
-      setProgress(res.item);
+      setPurchaseProcessing(true);
+      const returnUrl = `${window.location.origin}/courses/${course.id}`;
+      const websiteUrl = window.location.origin;
+
+      const res = await coursesApi.initiatePurchase(course.id, { returnUrl, websiteUrl });
+      const paymentUrl = String(res.item.paymentUrl || "").trim();
+
+      if (!paymentUrl) {
+        throw new Error("Payment link is missing from Khalti response");
+      }
+
+      window.location.assign(paymentUrl);
     } catch (e: unknown) {
-      setActionError(e instanceof Error ? e.message : "Failed to enroll");
+      setPurchaseProcessing(false);
+      setActionError(parseApiError(e, "Failed to start payment"));
     }
   };
 
@@ -792,19 +885,19 @@ const CourseDetailsPage = () => {
               <button
                 type="button"
                 onClick={() => void enrollCourse()}
-                disabled={progressLoading || isEnrolled}
+                disabled={progressLoading || purchaseProcessing || isEnrolled}
                 className={[
                   "mt-4 w-full cursor-pointer rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
                   isEnrolled
                     ? "cursor-not-allowed bg-green-600"
-                    : progressLoading
+                    : progressLoading || purchaseProcessing
                     ? "cursor-not-allowed bg-gray-400"
                     : "bg-indigo-600 hover:bg-indigo-700",
                 ].join(" ")}
               >
                 {isEnrolled
                   ? "You are enrolled"
-                  : progressLoading
+                  : progressLoading || purchaseProcessing
                   ? "Please wait..."
                   : course.priceType === "Free"
                   ? "Enroll for Free"

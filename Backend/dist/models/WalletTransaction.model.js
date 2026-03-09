@@ -9,6 +9,7 @@ const WalletTransactionSchema = new Schema({
             "fast_response_escrow_debit",
             "fast_response_escrow_refund",
             "fast_response_reward_credit",
+            "course_sale_credit",
         ],
         required: true,
         index: true,

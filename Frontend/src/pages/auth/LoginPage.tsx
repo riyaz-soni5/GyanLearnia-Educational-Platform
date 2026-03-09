@@ -1,6 +1,6 @@
 
 import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import Logo from "@/assets/icon.svg";
 import { useToast } from "@/components/toast";
 import { loginApi } from "@/services/auth";
@@ -10,6 +10,7 @@ import { setUser } from "@/services/session";
 
 const LoginPage = () => {
   const nav = useNavigate();
+  const loc = useLocation();
   const { showToast } = useToast();
 
   const [emailOrUsername, setEmailOrUsername] = useState("");
@@ -23,6 +24,14 @@ const LoginPage = () => {
     () => emailOrUsername.trim().length >= 3 && password.trim().length >= 4,
     [emailOrUsername, password]
   );
+
+  const redirectFrom = useMemo(() => {
+    const raw = (loc.state as { from?: unknown } | null)?.from;
+    if (typeof raw !== "string") return "";
+    const path = raw.trim();
+    if (!path.startsWith("/")) return "";
+    return path;
+  }, [loc.state]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +69,7 @@ const LoginPage = () => {
           });
         }
 
-        nav("/courses", { replace: true });
+        nav(redirectFrom || "/courses", { replace: true });
       }, 700);
     } catch (err: any) {
       setError(err?.message || "Login failed. Please try again.");
