@@ -1,13 +1,13 @@
-// src/routes/index.tsx
+
 import { createBrowserRouter, redirect } from "react-router-dom";
 import MainLayout from "@/layouts/MainLayout";
 import AuthLayout from "@/layouts/AuthLayout";
 import AdminLayout from "@/layouts/AdminLayout";
 
-// ✅ add these
+
 import { getUser, isLoggedIn } from "@/services/session";
 
-// Pages
+
 import HomePage from "@/pages/public/HomePage";
 import CoursesPage from "@/pages/courses/CoursePage";
 import QuestionsPage from "@/pages/questions/QuestionPage";
@@ -15,6 +15,7 @@ import MentorsPage from "@/pages/public/MentorsDiscovryPage";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import ProfilePage from "@/pages/auth/ProfilePage";
+import WalletPage from "@/pages/auth/WalletPage";
 import PricingPage from "@/pages/public/PricingPage";
 import AboutPage from "@/pages/public/AboutPage";
 import QuestionDetailsPage from "@/pages/questions/QuestionDetailsPage";
@@ -30,7 +31,7 @@ import SettingsPage from "@/pages/admin/SettingsPage";
 import AskQuestionPage from "@/pages/questions/AskQuestionPage";
 import InstructorVerificationPage from "@/pages/instructor/InstructorVerificationPage";
 
-// ✅ helpers (loaders)
+
 const redirectIfLoggedIn = () => {
   if (isLoggedIn()) return redirect("/courses");
   return null;
@@ -44,12 +45,12 @@ const requireAuth = () => {
 const requireRole = (...roles: Array<"student" | "instructor" | "admin">) => {
   const u = getUser();
   if (!u) return redirect("/login");
-  if (!roles.includes(u.role)) return redirect("/"); // or redirect("/courses")
+  if (!roles.includes(u.role)) return redirect("/");
   return null;
 };
 
 export const router = createBrowserRouter([
-  // Auth pages (no header/footer)
+
   {
     path: "/",
     element: <AuthLayout />,
@@ -60,18 +61,18 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Main public pages (with header/footer)
+
   {
     path: "/",
     element: <MainLayout />,
     children: [
-      // ✅ Key change: conditional landing
+
       { index: true, element: <HomePage />, loader: redirectIfLoggedIn },
 
       { path: "courses", element: <CoursesPage /> },
       { path: "courses/:id", element: <CourseDetailsPage /> },
 
-      // ✅ protect ask page (common)
+
       { path: "questions/ask", element: <AskQuestionPage />, loader: requireAuth },
 
       { path: "questions", element: <QuestionsPage /> },
@@ -81,8 +82,9 @@ export const router = createBrowserRouter([
       { path: "pricing", element: <PricingPage /> },
       { path: "about", element: <AboutPage /> },
       { path: "profile", element: <ProfilePage />, loader: requireAuth },
+      { path: "wallet", element: <WalletPage />, loader: requireAuth },
 
-      // ✅ instructor protected
+
       {
         path: "instructor/upload-course",
         element: <UploadCoursePage />,
@@ -96,7 +98,7 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Admin area (different layout) ✅ protect admin group
+
   {
     path: "/admin",
     element: <AdminLayout />,

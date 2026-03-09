@@ -20,6 +20,22 @@ const QuestionSchema = new Schema({
     hasVerifiedAnswer: { type: Boolean, default: false },
     acceptedAnswerId: { type: Types.ObjectId, ref: "Answer", default: null },
     isFastResponse: { type: Boolean, default: false },
+    fastResponsePricePaisa: { type: Number, default: 0, min: 0 },
+    fastResponseEscrowStatus: {
+        type: String,
+        enum: ["none", "funded", "released", "refunded"],
+        default: "none",
+    },
+    fastResponseEscrowSource: {
+        type: String,
+        enum: ["none", "wallet", "khalti", "pro"],
+        default: "none",
+    },
+    fastResponseEscrowSourceRef: { type: String, trim: true, default: null },
+    fastResponseWinnerAnswerId: { type: Types.ObjectId, ref: "Answer", default: null },
+    fastResponsePayoutPaisa: { type: Number, default: 0, min: 0 },
+    fastResponsePlatformFeePaisa: { type: Number, default: 0, min: 0 },
+    fastResponseReleasedAt: { type: Date, default: null },
 }, { timestamps: true });
 // extra safety (same pattern as Answer)
 QuestionSchema.index({ _id: 1, "voters.userId": 1 });

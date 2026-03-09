@@ -101,10 +101,10 @@ const HomePage = () => {
 
   return (
     <div className="mx-auto max-w-7xl space-y-20 px-4">
-      {/* HERO */}
+
       <section className=" bg-surface p-10 border-base">
         <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
-          {/* LEFT */}
+
           <Reveal className="lg:col-span-7" delay={40}>
             <h1 className="text-5xl font-bold leading-tight text-basec sm:text-6xl lg:text-7xl">
               GyanLearnia
@@ -120,7 +120,7 @@ const HomePage = () => {
             </div>
           </Reveal>
 
-          {/* RIGHT CTA */}
+
           <Reveal className="lg:col-span-5" delay={120}>
             <div className="rounded-2xl bg-surface border border-base p-6 shadow-sm">
               <h2 className="text-3xl font-bold leading-tight text-basec">
@@ -146,7 +146,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* IMPACT */}
+
       <section className="flex flex-col items-center justify-center">
         <Reveal>
           <h2 className="text-4xl font-bold leading-tight text-basec">Learning Impact</h2>
@@ -195,7 +195,7 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* FEATURES */}
+
       <section className="mt-20">
         <Reveal>
           <h2 className="text-center text-4xl font-bold leading-tight text-basec">
@@ -238,14 +238,14 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
+
       <Reveal>
         <section className="w-full max-w-full overflow-x-hidden">
           <TestimonialsSection />
         </section>
       </Reveal>
 
-      {/* CTA */}
+
       <Reveal delay={80}>
         <section className="relative overflow-hidden rounded-2xl border border-indigo-300/50 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-400 px-6 py-12 text-center text-white shadow-sm sm:px-10 dark:border-indigo-800/60 dark:from-indigo-900 dark:via-indigo-800 dark:to-slate-900">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.28),rgba(255,255,255,0)_58%)] dark:bg-[radial-gradient(circle_at_top,rgba(129,140,248,0.24),rgba(129,140,248,0)_58%)]" />

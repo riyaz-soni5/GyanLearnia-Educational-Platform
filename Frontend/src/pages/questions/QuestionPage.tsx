@@ -1,4 +1,4 @@
-// src/pages/QuestionsPage.tsx
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import QuestionsToolbar from "@/components/questions/QuestionToolbar";
@@ -55,7 +55,7 @@ const QuestionsPage = () => {
   const [err, setErr] = useState<string | null>(null);
   const [votingQuestionIds, setVotingQuestionIds] = useState<Set<string>>(new Set());
 
-  // ✅ categories from DB
+
   const [categories, setCategories] = useState<CategoryDTO[]>([]);
   const [categoryId, setCategoryId] = useState("All");
 
@@ -63,13 +63,13 @@ const QuestionsPage = () => {
   const [level, setLevel] = useState("All");
   const [sort, setSort] = useState("Newest");
 
-  // Status filter is driven by sort selection for Answered/Unanswered modes.
+
   const status = useMemo(
     () => (sort === "Answered" || sort === "Unanswered" ? sort : "All"),
     [sort]
   );
 
-  // ✅ load categories once
+
   useEffect(() => {
     let alive = true;
 
@@ -79,7 +79,7 @@ const QuestionsPage = () => {
         if (!alive) return;
         setCategories(res.items ?? []);
       } catch {
-        // keep silent; page still works without categories
+
       }
     })();
 
@@ -88,7 +88,7 @@ const QuestionsPage = () => {
     };
   }, []);
 
-  // ✅ load questions when filters change
+
   useEffect(() => {
     let alive = true;
 
@@ -98,7 +98,7 @@ const QuestionsPage = () => {
       try {
         const res = await fetchQuestions({
           q: query,
-          categoryId, // ✅ backend expects categoryId now
+          categoryId,
           level,
           sort,
           status,
@@ -107,7 +107,7 @@ const QuestionsPage = () => {
         });
         if (!alive) return;
         const latestVoteCache = readVoteCache();
-        // Sync active upvote state after remount/back-nav because list API doesn't include myVote.
+
         setQuestions(
           ((res.items ?? []) as QuestionWithVote[]).map((item) => ({
             ...item,
@@ -155,7 +155,6 @@ const QuestionsPage = () => {
     return true;
   };
 
-  // Reuse the same upvote API behavior as Question Details and keep local count/vote state in sync.
   const onUpvoteQuestion = async (questionId: string) => {
     if (!requireLoginForVote()) return;
     if (votingQuestionIds.has(questionId)) return;
@@ -192,12 +191,11 @@ const QuestionsPage = () => {
   return (
     <div className="mx-auto max-w-7xl px-4">
       <div className="space-y-8">
-        {/* Toolbar supports dark/light via Tailwind dark: classes */}
+
         <QuestionsToolbar
           query={query}
           setQuery={setQuery}
-          // ✅ keep prop name `subject` for now to avoid refactoring toolbar,
-          // but it actually holds categoryId
+
           subject={categoryId}
           setSubject={setCategoryId}
           level={level}
@@ -205,11 +203,9 @@ const QuestionsPage = () => {
           sort={sort}
           setSort={setSort}
           count={filtered.length}
-          // ✅ optional props (only if your toolbar supports them)
           categories={categories}
         />
 
-        {/* Left list + Right leaderboard */}
         <div className="grid gap-6 lg:grid-cols-12">
           <div className="lg:col-span-8">
             {loading ? (

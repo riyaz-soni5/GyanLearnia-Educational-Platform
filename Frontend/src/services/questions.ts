@@ -23,6 +23,9 @@ export type CreateQuestionPayload = {
   level: string;
   tags: string[];
   isFastResponse?: boolean;
+  fastResponsePrice?: number;
+  fastResponsePaymentMode?: "pro" | "wallet" | "khalti";
+  fastResponseKhaltiPidx?: string;
 };
 
 export type CreateQuestionResponse = {

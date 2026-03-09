@@ -16,6 +16,7 @@ import userProfileRoutes from "./routes/user.profile.route.js";
 import mentorDiscoveryRoutes from "./routes/mentor.discovery.route.js";
 import khaltiPaymentRoutes from "./routes/payment.khalti.route.js";
 import notificationRoutes from "./routes/notification.route.js";
+import walletRoutes from "./routes/wallet.route.js";
 const app = express();
 app.use(cors({
     origin: "http://localhost:5173",
@@ -38,4 +39,5 @@ app.use("/api/user", userProfileRoutes);
 app.use("/api/mentors", mentorDiscoveryRoutes);
 app.use("/api/payment", khaltiPaymentRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/wallet", walletRoutes);
 export default app;

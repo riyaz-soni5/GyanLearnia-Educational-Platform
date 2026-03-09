@@ -68,7 +68,6 @@ const RegisterPage = () => {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // One place for all validation errors
     if (passwordTooShort) {
       setError("Password must be at least 6 characters.");
       return;
@@ -134,11 +133,10 @@ const RegisterPage = () => {
               </div>
             </div>
 
-            {/* Right panel */}
             <div className="md:col-span-8 p-8 sm:p-10">
               <h1 className="text-2xl font-bold text-basec">Create account</h1>
 
-              {/* Role segmented control */}
+
               <div className="mt-2">
                 <p className="text-xs font-medium text-muted">Register as</p>
                 <div className="mt-2 inline-flex rounded-xl border border-base bg-[rgb(var(--bg))] p-1">
@@ -171,7 +169,7 @@ const RegisterPage = () => {
               </div>
 
               <form onSubmit={onSubmit} className="mt-2 space-y-4">
-                {/* First + Last name */}
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="text-xs font-medium text-muted">First name</label>
@@ -206,7 +204,7 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-                {/* Email */}
+
                 <div>
                   <label className="text-xs font-medium text-muted">Email</label>
                   <div className="mt-2 relative">
@@ -224,7 +222,7 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-                {/* Password */}
+
                 <div>
                   <label className="text-xs font-medium text-muted">Password</label>
                   <div className="relative mt-2">
@@ -260,7 +258,7 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-                {/* Confirm password */}
+
                 <div>
                   <label className="text-xs font-medium text-muted">Confirm password</label>
                   <div className="relative mt-2">
@@ -293,7 +291,7 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-                {/* Instructor fields (animated expand/collapse) */}
+
                 <div
                   className={[
                     "overflow-hidden transition-all duration-300 ease-in-out",
@@ -329,7 +327,7 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-                {/* ONE fixed error placeholder (never changes height) */}
+
                 <div
                   className={[
                     "text-[12px] text-red-500 transition",
@@ -340,7 +338,7 @@ const RegisterPage = () => {
                   *{error ?? "\u00A0"}
                 </div>
 
-                {/* Submit */}
+
                 <button
                   type="submit"
                   disabled={loading}

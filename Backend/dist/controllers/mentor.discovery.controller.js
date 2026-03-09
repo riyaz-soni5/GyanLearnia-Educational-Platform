@@ -72,6 +72,15 @@ const getPeerIdFromConnection = (connection, currentUserId) => String(connection
     : String(connection.senderId);
 const MAX_CHAT_PLAIN_TEXT_LENGTH = 1500;
 const MAX_CHAT_HTML_LENGTH = 20000;
+const hasActiveProPlan = (user) => {
+    const rawPlan = String(user?.plan ?? "Free");
+    if (rawPlan !== "Pro")
+        return false;
+    const rawExpiry = user?.planExpiresAt ? new Date(user.planExpiresAt) : null;
+    if (!rawExpiry || Number.isNaN(rawExpiry.getTime()))
+        return true;
+    return rawExpiry.getTime() > Date.now();
+};
 const stripHtml = (html) => String(html ?? "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -246,9 +255,14 @@ export async function getNextMentorMatch(req, res) {
         if (!requestedInterestTags.length) {
             return res.status(400).json({ message: "Please enter at least one interest tag" });
         }
-        const currentUser = await User.findById(currentUserId).select("role").lean();
+        const currentUser = await User.findById(currentUserId).select("role plan planExpiresAt").lean();
         if (!currentUser)
             return res.status(404).json({ message: "User not found" });
+        if (!hasActiveProPlan(currentUser)) {
+            return res.status(403).json({
+                message: "Pro plan is required to find mentors",
+            });
+        }
         const [actions, activeConnections] = await Promise.all([
             MentorDiscoveryAction.find({
                 userId: currentUserId,
@@ -435,6 +449,14 @@ export async function connectWithMentor(req, res) {
         const currentUserId = String(req.user?.id || "").trim();
         if (!currentUserId)
             return res.status(401).json({ message: "Unauthorized" });
+        const currentUser = await User.findById(currentUserId).select("plan planExpiresAt").lean();
+        if (!currentUser)
+            return res.status(404).json({ message: "User not found" });
+        if (!hasActiveProPlan(currentUser)) {
+            return res.status(403).json({
+                message: "Pro plan is required to send mentor connection requests",
+            });
+        }
         const mentorId = String(req.body?.mentorId ?? "").trim();
         if (!mentorId || !mongoose.Types.ObjectId.isValid(mentorId)) {
             return res.status(400).json({ message: "Valid mentorId is required" });

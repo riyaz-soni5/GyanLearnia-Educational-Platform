@@ -5,8 +5,10 @@ import Question from "../models/Question.model.js";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import User from "../models/User.model.js"; // ✅ add
 import { createNotification } from "../services/notification.service.js";
+import { creditUserWallet } from "../services/wallet.service.js";
 
 const ACCEPT_POINTS = 15;
+const FAST_RESPONSE_PLATFORM_FEE_PERCENT = 30;
 
 const toPlainText = (html: string) =>
   String(html ?? "")
@@ -156,6 +158,20 @@ export const acceptAnswer = async (req: AuthedRequest, res: Response) => {
       return res.status(403).json({ message: "Only the question owner can accept an answer" });
     }
 
+    const isFundedFastResponse =
+      Boolean((q as any).isFastResponse) &&
+      Number((q as any).fastResponsePricePaisa || 0) > 0 &&
+      String((q as any).fastResponseEscrowStatus || "none") === "funded";
+    const isReleasedFastResponse =
+      Boolean((q as any).isFastResponse) &&
+      String((q as any).fastResponseEscrowStatus || "none") === "released";
+
+    if (isReleasedFastResponse) {
+      return res.status(400).json({
+        message: "Reward is already released. Accepted answer cannot be changed.",
+      });
+    }
+
     const ans = await Answer.findOne({ _id: answerId, questionId });
     if (!ans) return res.status(404).json({ message: "Answer not found" });
 
@@ -209,12 +225,76 @@ export const acceptAnswer = async (req: AuthedRequest, res: Response) => {
     // ✅ update question solved state
     q.acceptedAnswerId = ans._id as any;
     q.hasVerifiedAnswer = true;
+
+    let payoutInfo: null | { rewardPaisa: number; payoutPaisa: number; feePaisa: number } = null;
+
+    if (isFundedFastResponse) {
+      const rewardPaisa = Number((q as any).fastResponsePricePaisa || 0);
+      const payoutPaisa = Math.floor(
+        (rewardPaisa * (100 - FAST_RESPONSE_PLATFORM_FEE_PERCENT)) / 100
+      );
+      const feePaisa = Math.max(0, rewardPaisa - payoutPaisa);
+
+      const credited = await creditUserWallet({
+        userId: String(ans.authorId),
+        amountPaisa: payoutPaisa,
+        type: "fast_response_reward_credit",
+        note: "Fast response reward payout",
+        referenceId: `fast-response-payout-${questionId}`,
+        metadata: {
+          questionId,
+          answerId: String(ans._id),
+          rewardPaisa,
+          payoutPaisa,
+          feePaisa,
+          feePercent: FAST_RESPONSE_PLATFORM_FEE_PERCENT,
+        },
+      });
+
+      if (!credited.ok) {
+        return res.status(500).json({
+          message: credited.error || "Failed to release fast response reward",
+        });
+      }
+
+      (q as any).fastResponseEscrowStatus = "released";
+      (q as any).fastResponseWinnerAnswerId = ans._id;
+      (q as any).fastResponsePayoutPaisa = payoutPaisa;
+      (q as any).fastResponsePlatformFeePaisa = feePaisa;
+      (q as any).fastResponseReleasedAt = new Date();
+      payoutInfo = { rewardPaisa, payoutPaisa, feePaisa };
+
+      const winnerId = String(ans.authorId);
+      const ownerId = String(q.authorId);
+
+      if (winnerId) {
+        await createNotification({
+          userId: winnerId,
+          actorId: ownerId,
+          type: "system",
+          title: "Fast response reward received",
+          message: `You received NPR ${(payoutPaisa / 100).toFixed(2)} for accepted answer.`,
+          link: `/questions/${questionId}`,
+          metadata: { questionId, answerId: String(ans._id), payoutPaisa, feePaisa },
+        });
+      }
+    }
+
     await q.save();
 
     return res.json({
       message: "Answer accepted",
       acceptedAnswerId: String(ans._id),
       hasVerifiedAnswer: true,
+      ...(payoutInfo
+        ? {
+            reward: {
+              total: Number((payoutInfo.rewardPaisa / 100).toFixed(2)),
+              paidToWinner: Number((payoutInfo.payoutPaisa / 100).toFixed(2)),
+              platformFee: Number((payoutInfo.feePaisa / 100).toFixed(2)),
+            },
+          }
+        : {}),
     });
   } catch {
     return res.status(500).json({ message: "Failed to accept answer" });

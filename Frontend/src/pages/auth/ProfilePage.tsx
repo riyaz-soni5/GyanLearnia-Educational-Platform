@@ -94,8 +94,7 @@ const ProfilePage = () => {
   >([]);
 
   const isInstructor = profile?.role === "instructor";
-  // Role-based overview switch:
-  // verified instructor sees instructor metrics; student + unverified instructor see learner stats.
+
   const isVerifiedInstructor =
     profile?.role === "instructor" && profile?.verificationStatus === "Verified";
 
@@ -153,7 +152,6 @@ const ProfilePage = () => {
   useEffect(() => {
     let mounted = true;
 
-    // Reuse the same data source as Instructor Dashboard (/api/instructor/courses/mine).
     if (!isVerifiedInstructor) {
       setInstructorCourses([]);
       return () => {
@@ -850,7 +848,6 @@ const ProfilePage = () => {
             {isVerifiedInstructor ? "Teaching overview" : "Learning overview"}
           </h2>
 
-          {/* Verified instructors get instructor-course metrics. Others keep learner progress metrics. */}
           {isVerifiedInstructor ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-4">
               <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">

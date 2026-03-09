@@ -21,4 +21,6 @@ export type Question = {
   updatedAt?: string;
   hasVerifiedAnswer?: boolean;
   isFastResponse?: boolean;
+  fastResponsePrice?: number;
+  fastResponseEscrowStatus?: "none" | "funded" | "released" | "refunded";
 };

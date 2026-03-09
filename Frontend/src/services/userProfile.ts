@@ -27,6 +27,8 @@ export type UserProfile = {
   planStatus?: "Active" | "Expired";
   planActivatedAt?: string | null;
   planExpiresAt?: string | null;
+  walletBalancePaisa?: number;
+  walletBalance?: number;
   stats?: {
     enrolledCoursesCount: number;
     completedCoursesCount: number;

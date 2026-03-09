@@ -156,7 +156,7 @@ export default function UploadCoursePage() {
       const parsed = normalizeDraft(JSON.parse(raw));
       if (parsed) setDraft(parsed);
     } catch {
-      // ignore invalid local draft payload
+
     }
   }, [editCourseId]);
 
@@ -516,9 +516,9 @@ export default function UploadCoursePage() {
 
       if (canResubmit) {
         navigate("/instructor/upload-course", { replace: true });
-        showToast("Course updated and resubmitted ✅", "success");
+        showToast("Course updated and resubmitted", "success");
       } else {
-        showToast("Submitted to admin for approval ✅", "success");
+        showToast("Submitted to admin for approval", "success");
       }
     } catch (e) {
       showToast(getErrorMessage(e), "error");

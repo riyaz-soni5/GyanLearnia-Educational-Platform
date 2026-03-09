@@ -91,6 +91,16 @@ const getPeerIdFromConnection = (connection: any, currentUserId: string): string
 const MAX_CHAT_PLAIN_TEXT_LENGTH = 1500;
 const MAX_CHAT_HTML_LENGTH = 20000;
 
+const hasActiveProPlan = (user: any): boolean => {
+  const rawPlan = String(user?.plan ?? "Free");
+  if (rawPlan !== "Pro") return false;
+
+  const rawExpiry = user?.planExpiresAt ? new Date(user.planExpiresAt) : null;
+  if (!rawExpiry || Number.isNaN(rawExpiry.getTime())) return true;
+
+  return rawExpiry.getTime() > Date.now();
+};
+
 const stripHtml = (html: string): string =>
   String(html ?? "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -313,9 +323,14 @@ export async function getNextMentorMatch(req: AuthedRequest, res: Response) {
       return res.status(400).json({ message: "Please enter at least one interest tag" });
     }
 
-    const currentUser = await User.findById(currentUserId).select("role").lean();
+    const currentUser = await User.findById(currentUserId).select("role plan planExpiresAt").lean();
 
     if (!currentUser) return res.status(404).json({ message: "User not found" });
+    if (!hasActiveProPlan(currentUser)) {
+      return res.status(403).json({
+        message: "Pro plan is required to find mentors",
+      });
+    }
 
     const [actions, activeConnections] = await Promise.all([
       MentorDiscoveryAction.find({
@@ -553,6 +568,14 @@ export async function connectWithMentor(req: AuthedRequest, res: Response) {
   try {
     const currentUserId = String(req.user?.id || "").trim();
     if (!currentUserId) return res.status(401).json({ message: "Unauthorized" });
+
+    const currentUser = await User.findById(currentUserId).select("plan planExpiresAt").lean();
+    if (!currentUser) return res.status(404).json({ message: "User not found" });
+    if (!hasActiveProPlan(currentUser)) {
+      return res.status(403).json({
+        message: "Pro plan is required to send mentor connection requests",
+      });
+    }
 
     const mentorId = String((req.body as any)?.mentorId ?? "").trim();
     if (!mentorId || !mongoose.Types.ObjectId.isValid(mentorId)) {

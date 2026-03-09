@@ -1,4 +1,4 @@
-// src/app/api/courses.api.ts
+
 import type { CourseListItem } from "../types/course.type";
 
 export type Lesson = {

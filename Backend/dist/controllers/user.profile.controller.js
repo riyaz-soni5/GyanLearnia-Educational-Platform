@@ -105,6 +105,8 @@ export async function getCurrentUser(req, res) {
             planStatus: plan.planStatus,
             planActivatedAt: plan.planActivatedAt,
             planExpiresAt: plan.planExpiresAt,
+            walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
+            walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
             stats: {
                 enrolledCoursesCount: enrollmentAgg,
                 completedCoursesCount: completedAgg,
@@ -222,6 +224,8 @@ export async function updateCurrentUser(req, res) {
             planStatus: plan.planStatus,
             planActivatedAt: plan.planActivatedAt,
             planExpiresAt: plan.planExpiresAt,
+            walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
+            walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
         });
     }
     catch {

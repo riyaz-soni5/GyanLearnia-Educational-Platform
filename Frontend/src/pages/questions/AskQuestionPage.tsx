@@ -1,14 +1,29 @@
 // src/pages/AskQuestionPage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 import { createQuestion } from "@/services/questions";
 import { fetchCategories } from "@/services/category";
 import type { CategoryDTO } from "@/services/category";
 import RichTextEditor from "@/components/RichTextEditor";
 import { useToast } from "@/components/toast";
+import { getUser } from "@/services/session";
+import { fetchWalletSummary } from "@/services/wallet";
 
 
 const LEVELS = ["School", "+2/High School", "Bachelor", "Master", "PhD", "Others"] as const;
+const MIN_FAST_RESPONSE_PRICE_NPR = 10;
+const ASK_DRAFT_KEY = "gyanlearnia_ask_question_draft";
+
+type PaymentInitiateResponse = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  paymentInfo?: {
+    paymentUrl?: string;
+    pidx?: string;
+  };
+};
 
 const AskQuestionPage = () => {
   const nav = useNavigate();
@@ -18,11 +33,11 @@ const AskQuestionPage = () => {
   const [title, setTitle] = useState("");
   const [excerpt, setExcerpt] = useState("");
 
-  // ✅ category from DB
+
   const [categories, setCategories] = useState<CategoryDTO[]>([]);
   const [categoryId, setCategoryId] = useState<string>("");
 
-  // ✅ fixed levels
+
   const [level, setLevel] = useState<(typeof LEVELS)[number]>("School");
   const [fast, setFast] = useState(false);
 
@@ -31,8 +46,21 @@ const AskQuestionPage = () => {
 
   const [posting, setPosting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [fastFreeOption, setFastFreeOption] = useState<"upgrade" | "pay">("upgrade");
+  const [fastPriceNpr, setFastPriceNpr] = useState<number>(MIN_FAST_RESPONSE_PRICE_NPR);
+  const [fastPaymentMode, setFastPaymentMode] = useState<"wallet" | "khalti">("wallet");
+  const [fastKhaltiPidx, setFastKhaltiPidx] = useState("");
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [khaltiLoading, setKhaltiLoading] = useState(false);
 
-  // load categories once
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+  const sessionUser = getUser();
+  const isProUser =
+    String(sessionUser?.currentPlan ?? "Free") === "Pro" &&
+    String(sessionUser?.planStatus ?? "Active") !== "Expired";
+
+
   useEffect(() => {
     let alive = true;
 
@@ -44,7 +72,7 @@ const AskQuestionPage = () => {
         const items = res.items ?? [];
         setCategories(items);
 
-        // default to first category
+
         if (items.length && !categoryId) {
           setCategoryId(items[0].id);
         }
@@ -57,8 +85,103 @@ const AskQuestionPage = () => {
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pidx = String(params.get("pidx") || "").trim();
+    const statusRaw = String(params.get("status") || "").trim().toLowerCase();
+    if (!pidx && !statusRaw) return;
+
+    try {
+      const rawDraft = sessionStorage.getItem(ASK_DRAFT_KEY);
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft) as {
+          title?: string;
+          excerpt?: string;
+          categoryId?: string;
+          level?: (typeof LEVELS)[number];
+          tags?: string[];
+          fast?: boolean;
+          fastFreeOption?: "upgrade" | "pay";
+          fastPriceNpr?: number;
+          fastPaymentMode?: "wallet" | "khalti";
+        };
+
+        if (draft.title) setTitle(String(draft.title));
+        if (draft.excerpt) setExcerpt(String(draft.excerpt));
+        if (draft.categoryId) setCategoryId(String(draft.categoryId));
+        if (draft.level && LEVELS.includes(draft.level)) setLevel(draft.level);
+        if (Array.isArray(draft.tags)) setTags(draft.tags.map((t) => String(t)).filter(Boolean));
+        if (typeof draft.fast === "boolean") setFast(Boolean(draft.fast));
+        if (draft.fastFreeOption === "upgrade" || draft.fastFreeOption === "pay") {
+          setFastFreeOption(draft.fastFreeOption);
+        }
+        if (Number.isFinite(Number(draft.fastPriceNpr))) {
+          setFastPriceNpr(Math.max(MIN_FAST_RESPONSE_PRICE_NPR, Math.floor(Number(draft.fastPriceNpr))));
+        }
+        if (draft.fastPaymentMode === "wallet" || draft.fastPaymentMode === "khalti") {
+          setFastPaymentMode(draft.fastPaymentMode);
+        }
+      }
+    } catch {
+
+    }
+
+    const isCompleted = !statusRaw || statusRaw === "completed";
+    if (!isCompleted) {
+      const cancelled =
+        statusRaw === "cancelled" || statusRaw === "canceled" || statusRaw.includes("cancel");
+      showToast(
+        cancelled
+          ? "Khalti payment was cancelled."
+          : `Khalti payment did not complete (${statusRaw}).`,
+        "error",
+        { durationMs: 3000 }
+      );
+      setFastKhaltiPidx("");
+    } else if (pidx) {
+      setFast(true);
+      setFastFreeOption("pay");
+      setFastPaymentMode("khalti");
+      setFastKhaltiPidx(pidx);
+      showToast("Khalti payment received. Click Post Question to finalize.", "success", {
+        durationMs: 2500,
+      });
+    } else {
+      showToast("Payment completed but reference was missing. Please pay again.", "error");
+      setFastKhaltiPidx("");
+    }
+
+    const cleanUrl = new URL(window.location.href);
+    ["pidx", "status", "transaction_id", "purchase_order_id", "purchase_order_name", "total_amount"].forEach(
+      (key) => cleanUrl.searchParams.delete(key)
+    );
+    window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+    sessionStorage.removeItem(ASK_DRAFT_KEY);
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!fast || isProUser || fastFreeOption !== "pay") return;
+    let cancelled = false;
+    const loadWallet = async () => {
+      setWalletLoading(true);
+      try {
+        const data = await fetchWalletSummary();
+        if (cancelled) return;
+        setWalletBalance(Number(data.walletBalance || 0));
+      } catch {
+        if (cancelled) return;
+      } finally {
+        if (!cancelled) setWalletLoading(false);
+      }
+    };
+    void loadWallet();
+    return () => {
+      cancelled = true;
+    };
+  }, [fast, isProUser, fastFreeOption]);
 
   const addTag = (value: string) => {
   const v = value.trim();
@@ -83,60 +206,159 @@ const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     setTagInput("");
   }
 
-  // remove last tag when backspace and input empty
+
   if (e.key === "Backspace" && !tagInput && tags.length) {
     setTags((prev) => prev.slice(0, prev.length - 1));
   }
 };
 
+  const initiateFastResponseKhaltiPayment = async () => {
+    const amountNpr = Math.floor(Number(fastPriceNpr) || 0);
+    if (amountNpr < MIN_FAST_RESPONSE_PRICE_NPR) {
+      showToast(`Minimum fast response price is NPR ${MIN_FAST_RESPONSE_PRICE_NPR}`, "error");
+      return;
+    }
+
+    if (!sessionUser?.id) {
+      nav("/login");
+      return;
+    }
+
+    setKhaltiLoading(true);
+    try {
+      sessionStorage.setItem(
+        ASK_DRAFT_KEY,
+        JSON.stringify({
+          title,
+          excerpt,
+          categoryId,
+          level,
+          tags,
+          fast,
+          fastFreeOption,
+          fastPriceNpr: amountNpr,
+          fastPaymentMode,
+        })
+      );
+
+      const purchaseOrderId = `fast-response-${sessionUser.id}-${Date.now()}`;
+      const response = await axios.post<PaymentInitiateResponse>(
+        `${API_BASE}/api/payment/khalti/initiate`,
+        {
+          amount: amountNpr * 100,
+          returnUrl: `${window.location.origin}/questions/ask`,
+          websiteUrl: window.location.origin,
+          purchaseOrderId,
+          purchaseOrderName: "Fast Response Question Reward",
+          customerInfo: {
+            name:
+              [sessionUser.firstName, sessionUser.lastName].filter(Boolean).join(" ").trim() ||
+              "GyanLearnia User",
+            email: sessionUser.email,
+          },
+        },
+        { withCredentials: true }
+      );
+
+      if (!response.data.success || !response.data.paymentInfo?.paymentUrl) {
+        showToast(response.data.error || "Could not initiate Khalti payment", "error");
+        setKhaltiLoading(false);
+        return;
+      }
+
+      window.location.href = String(response.data.paymentInfo.paymentUrl);
+    } catch (error: unknown) {
+      const message =
+        axios.isAxiosError(error) && error.response?.data?.error
+          ? String(error.response.data.error)
+          : "Could not initiate Khalti payment";
+      showToast(message, "error");
+      setKhaltiLoading(false);
+    }
+  };
+
 
   const submit = async () => {
-  setErr(null);
+    setErr(null);
 
-  if (title.trim().length < 10) {
-    showToast("Title must be at least 10 characters.", "error");
-    return;
-  }
-  if (excerpt.trim().length < 20) {
-    showToast("Question details must be at least 20 characters.", "error");
-    return;
-  }
-  if (!categoryId) {
-    showToast("Please select a category.", "error");
-    return;
-  }
-  if (!level) {
-    showToast("Please select a level.", "error");
-    return;
-  }
+    if (title.trim().length < 10) {
+      showToast("Title must be at least 10 characters.", "error");
+      return;
+    }
+    if (excerpt.trim().length < 20) {
+      showToast("Question details must be at least 20 characters.", "error");
+      return;
+    }
+    if (!categoryId) {
+      showToast("Please select a category.", "error");
+      return;
+    }
+    if (!level) {
+      showToast("Please select a level.", "error");
+      return;
+    }
 
-  setPosting(true);
-
-  try {
-    const res: any = await createQuestion({
+    const payload: any = {
       title: title.trim(),
       excerpt: excerpt.trim(),
       categoryId,
       level,
       tags,
       isFastResponse: fast,
-    });
+    };
 
-    const item = res?.item ?? res?.question ?? res?.data ?? res;
-    const newId = item?.id ?? item?._id;
+    if (fast) {
+      if (isProUser) {
+        payload.fastResponsePaymentMode = "pro";
+      } else {
+        if (fastFreeOption === "upgrade") {
+          showToast("Upgrade to Pro for unlimited fast response questions.", "info", {
+            durationMs: 2200,
+          });
+          nav("/pricing");
+          return;
+        }
 
-    showToast("Question posted successfully", "success");
+        const amountNpr = Math.floor(Number(fastPriceNpr) || 0);
+        if (amountNpr < MIN_FAST_RESPONSE_PRICE_NPR) {
+          showToast(`Minimum fast response price is NPR ${MIN_FAST_RESPONSE_PRICE_NPR}`, "error");
+          return;
+        }
 
-    if (newId) nav(`/questions/${newId}`);
-    else nav("/questions");
-  } catch (e: any) {
-    const msg = e?.message || "Failed to create question";
-    setErr(msg);
-    showToast(msg, "error", { durationMs: 3500 });
-  } finally {
-    setPosting(false);
-  }
-};
+        payload.fastResponsePrice = amountNpr;
+        payload.fastResponsePaymentMode = fastPaymentMode;
+
+        if (fastPaymentMode === "khalti") {
+          if (!fastKhaltiPidx) {
+            showToast("Complete Khalti payment first, then post your question.", "error");
+            return;
+          }
+          payload.fastResponseKhaltiPidx = fastKhaltiPidx;
+        }
+      }
+    }
+
+    setPosting(true);
+
+    try {
+      const res: any = await createQuestion(payload);
+
+      const item = res?.item ?? res?.question ?? res?.data ?? res;
+      const newId = item?.id ?? item?._id;
+
+      showToast("Question posted successfully", "success");
+      setFastKhaltiPidx("");
+
+      if (newId) nav(`/questions/${newId}`);
+      else nav("/questions");
+    } catch (e: any) {
+      const msg = e?.message || "Failed to create question";
+      setErr(msg);
+      showToast(msg, "error", { durationMs: 3500 });
+    } finally {
+      setPosting(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -241,7 +463,7 @@ const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
               </span>
             ))}
 
-            {/* input */}
+
             <input
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
@@ -255,11 +477,143 @@ const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
           <input
             type="checkbox"
             checked={fast}
-            onChange={(e) => setFast(e.target.checked)}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setFast(checked);
+              if (!checked) {
+                setFastKhaltiPidx("");
+                setFastFreeOption("upgrade");
+                setFastPaymentMode("wallet");
+              }
+            }}
             className="h-4 w-4"
           />
           Request Fast Response
         </label>
+
+        {fast ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+            {isProUser ? (
+              <p className="text-sm text-gray-700">
+                You are on Pro plan. You can post fast response questions directly.
+              </p>
+            ) : (
+              <div className="space-y-4">
+
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <label className="inline-flex items-center gap-2 text-gray-700">
+                    <input
+                      type="radio"
+                      name="fast_free_option"
+                      checked={fastFreeOption === "upgrade"}
+                      onChange={() => setFastFreeOption("upgrade")}
+                    />
+                    Upgrade to Pro Plan
+                  </label>
+                  <label className="inline-flex items-center gap-2 text-gray-700">
+                    <input
+                      type="radio"
+                      name="fast_free_option"
+                      checked={fastFreeOption === "pay"}
+                      onChange={() => setFastFreeOption("pay")}
+                    />
+                    Pay per question
+                  </label>
+                </div>
+
+                {fastFreeOption === "upgrade" ? (
+                  <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
+                    Upgrade to Pro for unlimited fast response posting.
+                    <button
+                      type="button"
+                      onClick={() => nav("/pricing")}
+                      className="ml-2 font-semibold underline underline-offset-2"
+                    >
+                      Go to pricing
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-medium text-gray-700">Reward Price (NPR)</label>
+                      <input
+                        type="number"
+                        min={MIN_FAST_RESPONSE_PRICE_NPR}
+                        step={1}
+                        value={fastPriceNpr}
+                        onChange={(e) => {
+                          setFastPriceNpr(Math.max(0, Number(e.target.value)));
+                          if (fastKhaltiPidx) setFastKhaltiPidx("");
+                        }}
+                        className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Minimum NPR {MIN_FAST_RESPONSE_PRICE_NPR}. This is the reward pool.
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <label className="inline-flex items-center gap-2 text-gray-700">
+                        <input
+                          type="radio"
+                          name="fast_payment_mode"
+                          checked={fastPaymentMode === "wallet"}
+                          onChange={() => {
+                            setFastPaymentMode("wallet");
+                            setFastKhaltiPidx("");
+                          }}
+                        />
+                        Wallet payment
+                      </label>
+                      <label className="inline-flex items-center gap-2 text-gray-700">
+                        <input
+                          type="radio"
+                          name="fast_payment_mode"
+                          checked={fastPaymentMode === "khalti"}
+                          onChange={() => {
+                            setFastPaymentMode("khalti");
+                            setFastKhaltiPidx("");
+                          }}
+                        />
+                        Direct Khalti payment
+                      </label>
+                    </div>
+
+                    {fastPaymentMode === "wallet" ? (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                        Wallet Balance: {walletLoading ? "Loading..." : `NPR ${walletBalance.toFixed(2)}`}
+                        <Link to="/wallet" className="ml-2 font-semibold underline underline-offset-2">
+                          Load wallet
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+                        {fastKhaltiPidx ? (
+                          <p>
+                            Khalti payment reference added. You can now post the question.
+                            <span className="ml-2 font-mono text-xs">{fastKhaltiPidx}</span>
+                          </p>
+                        ) : (
+                          <p>Complete Khalti payment first, then click Post Question.</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void initiateFastResponseKhaltiPayment()}
+                          disabled={khaltiLoading}
+                          className={`mt-3 inline-flex items-center rounded-lg px-3 py-2 text-xs font-semibold text-white ${
+                            khaltiLoading ? "cursor-not-allowed bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"
+                          }`}
+                        >
+                          {khaltiLoading ? "Redirecting..." : "Pay with Khalti"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
           <Link

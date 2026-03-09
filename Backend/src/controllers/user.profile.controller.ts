@@ -122,6 +122,8 @@ export async function getCurrentUser(req: AuthedRequest, res: Response) {
       planStatus: plan.planStatus,
       planActivatedAt: plan.planActivatedAt,
       planExpiresAt: plan.planExpiresAt,
+      walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
+      walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
       stats: {
         enrolledCoursesCount: enrollmentAgg,
         completedCoursesCount: completedAgg,
@@ -288,6 +290,8 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
       planStatus: plan.planStatus,
       planActivatedAt: plan.planActivatedAt,
       planExpiresAt: plan.planExpiresAt,
+      walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
+      walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
     });
   } catch {
     return res.status(500).json({ message: "Failed to update profile" });

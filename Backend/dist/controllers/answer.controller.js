@@ -2,7 +2,9 @@ import Answer from "../models/Answer.model.js";
 import Question from "../models/Question.model.js";
 import User from "../models/User.model.js"; // ✅ add
 import { createNotification } from "../services/notification.service.js";
+import { creditUserWallet } from "../services/wallet.service.js";
 const ACCEPT_POINTS = 15;
+const FAST_RESPONSE_PLATFORM_FEE_PERCENT = 30;
 const toPlainText = (html) => String(html ?? "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<script[\s\S]*?<\/script>/gi, "")
@@ -133,6 +135,16 @@ export const acceptAnswer = async (req, res) => {
         if (!isOwner && !isAdmin) {
             return res.status(403).json({ message: "Only the question owner can accept an answer" });
         }
+        const isFundedFastResponse = Boolean(q.isFastResponse) &&
+            Number(q.fastResponsePricePaisa || 0) > 0 &&
+            String(q.fastResponseEscrowStatus || "none") === "funded";
+        const isReleasedFastResponse = Boolean(q.isFastResponse) &&
+            String(q.fastResponseEscrowStatus || "none") === "released";
+        if (isReleasedFastResponse) {
+            return res.status(400).json({
+                message: "Reward is already released. Accepted answer cannot be changed.",
+            });
+        }
         const ans = await Answer.findOne({ _id: answerId, questionId });
         if (!ans)
             return res.status(404).json({ message: "Answer not found" });
@@ -168,11 +180,65 @@ export const acceptAnswer = async (req, res) => {
         // ✅ update question solved state
         q.acceptedAnswerId = ans._id;
         q.hasVerifiedAnswer = true;
+        let payoutInfo = null;
+        if (isFundedFastResponse) {
+            const rewardPaisa = Number(q.fastResponsePricePaisa || 0);
+            const payoutPaisa = Math.floor((rewardPaisa * (100 - FAST_RESPONSE_PLATFORM_FEE_PERCENT)) / 100);
+            const feePaisa = Math.max(0, rewardPaisa - payoutPaisa);
+            const credited = await creditUserWallet({
+                userId: String(ans.authorId),
+                amountPaisa: payoutPaisa,
+                type: "fast_response_reward_credit",
+                note: "Fast response reward payout",
+                referenceId: `fast-response-payout-${questionId}`,
+                metadata: {
+                    questionId,
+                    answerId: String(ans._id),
+                    rewardPaisa,
+                    payoutPaisa,
+                    feePaisa,
+                    feePercent: FAST_RESPONSE_PLATFORM_FEE_PERCENT,
+                },
+            });
+            if (!credited.ok) {
+                return res.status(500).json({
+                    message: credited.error || "Failed to release fast response reward",
+                });
+            }
+            q.fastResponseEscrowStatus = "released";
+            q.fastResponseWinnerAnswerId = ans._id;
+            q.fastResponsePayoutPaisa = payoutPaisa;
+            q.fastResponsePlatformFeePaisa = feePaisa;
+            q.fastResponseReleasedAt = new Date();
+            payoutInfo = { rewardPaisa, payoutPaisa, feePaisa };
+            const winnerId = String(ans.authorId);
+            const ownerId = String(q.authorId);
+            if (winnerId) {
+                await createNotification({
+                    userId: winnerId,
+                    actorId: ownerId,
+                    type: "system",
+                    title: "Fast response reward received",
+                    message: `You received NPR ${(payoutPaisa / 100).toFixed(2)} for accepted answer.`,
+                    link: `/questions/${questionId}`,
+                    metadata: { questionId, answerId: String(ans._id), payoutPaisa, feePaisa },
+                });
+            }
+        }
         await q.save();
         return res.json({
             message: "Answer accepted",
             acceptedAnswerId: String(ans._id),
             hasVerifiedAnswer: true,
+            ...(payoutInfo
+                ? {
+                    reward: {
+                        total: Number((payoutInfo.rewardPaisa / 100).toFixed(2)),
+                        paidToWinner: Number((payoutInfo.payoutPaisa / 100).toFixed(2)),
+                        platformFee: Number((payoutInfo.feePaisa / 100).toFixed(2)),
+                    },
+                }
+                : {}),
         });
     }
     catch {

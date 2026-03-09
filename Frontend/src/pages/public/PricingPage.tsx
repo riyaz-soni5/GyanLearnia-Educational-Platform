@@ -174,7 +174,7 @@ const PricingPage = () => {
           persistedInLocal
         );
       } catch {
-        // keep existing session plan fallback
+
       }
     };
 
@@ -230,7 +230,7 @@ const PricingPage = () => {
               );
             }
           } catch {
-            // no-op
+
           }
         } else {
           showToast(response.data.error || "Payment verification failed.", "error", {
@@ -289,7 +289,7 @@ const PricingPage = () => {
       const response = await axios.post<KhaltiApiResponse>(
         `${API_BASE}/api/payment/khalti/initiate`,
         {
-          amount: 49900, // NPR 499 in paisa
+          amount: 49900,
           returnUrl: `${window.location.origin}/pricing`,
           websiteUrl: window.location.origin,
           purchaseOrderId,

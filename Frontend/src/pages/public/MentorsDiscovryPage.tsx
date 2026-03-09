@@ -63,6 +63,9 @@ const MentorDiscoveryPage = () => {
   const user = getUser();
   const currentUserId = String(user?.id ?? "");
   const isLoggedIn = Boolean(user?.id);
+  const isProUser =
+    String(user?.currentPlan ?? "Free") === "Pro" &&
+    String(user?.planStatus ?? "Active") !== "Expired";
   const isBusy = loadingMatch || actionLoading;
 
   const resolveAvatarUrl = useCallback(
@@ -228,6 +231,13 @@ const MentorDiscoveryPage = () => {
       nav("/login");
       return;
     }
+    if (!isProUser) {
+      const message = "Find Mentor is available on Pro plan. Redirecting to pricing...";
+      setError(message);
+      showToast(message, "info", { durationMs: 2400 });
+      nav("/pricing");
+      return;
+    }
 
     const normalizedTags = searchTags
       .map((tag) => String(tag ?? "").trim())
@@ -240,7 +250,7 @@ const MentorDiscoveryPage = () => {
       return;
     }
 
-    setHasSearched(true);          // ✅ mark that user clicked Find Mentor
+    setHasSearched(true);
     setLoadingMatch(true);
     setError(null);
 
@@ -258,6 +268,12 @@ const MentorDiscoveryPage = () => {
 
   const handleConnect = async () => {
     if (!mentor?.id || isBusy) return;
+    if (!isProUser) {
+      const message = "Sending mentor requests is available on Pro plan. Redirecting to pricing...";
+      showToast(message, "info", { durationMs: 2200 });
+      nav("/pricing");
+      return;
+    }
 
     setActionLoading(true);
     setError(null);
@@ -337,12 +353,27 @@ const MentorDiscoveryPage = () => {
             onClick={loadMentor}
             disabled={isBusy}
             className={`inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
-              isBusy ? "cursor-not-allowed bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700"
+              isBusy
+                ? "cursor-not-allowed bg-gray-400"
+                : "bg-indigo-600 hover:bg-indigo-700"
             }`}
           >
             {loadingMatch ? "Finding..." : "Find Mentor"}
           </button>
         </div>
+
+        {!isProUser ? (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            Update your plan to use Find Mentor Feature.
+            <button
+              type="button"
+              onClick={() => nav("/pricing")}
+              className="ml-2 font-semibold underline underline-offset-2 hover:text-amber-900"
+            >
+              Upgrade now
+            </button>
+          </div>
+        ) : null}
 
         <div className="mt-4">
           <label className="text-xs font-medium text-muted">Interest Tags</label>
@@ -383,7 +414,7 @@ const MentorDiscoveryPage = () => {
         </section>
       ) : null}
 
-      {/* Mentor card (only when a mentor exists) */}
+
       {mentor && (
         <section className="rounded-2xl border border-base bg-surface p-6 shadow-sm">
           <div className="flex items-start gap-4">
@@ -469,14 +500,14 @@ const MentorDiscoveryPage = () => {
         </section>
       )}
 
-      {/* Loading state (only while searching) */}
+
       {loadingMatch && (
         <section className="rounded-2xl border border-base bg-surface p-6 text-center text-muted">
           Finding your best mentor...
         </section>
       )}
 
-      {/* No results (only after user searched) */}
+
       {hasSearched && !loadingMatch && !mentor && (
         <section className="rounded-2xl border border-base bg-surface p-6 text-center text-muted">
           No mentor matches are available right now.
@@ -583,7 +614,7 @@ const MentorDiscoveryPage = () => {
           <h2 className="text-lg font-semibold text-basec">Mentor Chat</h2>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[280px,1fr]">
-            {/* Connections list */}
+
             <div className="space-y-2 rounded-xl border border-base p-3">
               {acceptedConnections.map((connection) => {
                 const isActive =
@@ -614,7 +645,7 @@ const MentorDiscoveryPage = () => {
               })}
             </div>
 
-            {/* Chat panel */}
+
             <div className="rounded-xl border border-base p-3">
               {activeConnection ? (
                 <>

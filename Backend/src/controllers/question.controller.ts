@@ -2,7 +2,51 @@
 import { Response } from "express";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import type { SortOrder } from "mongoose";
+import axios from "axios";
 import Question from "../models/Question.model.js";
+import User from "../models/User.model.js";
+import WalletTransaction from "../models/WalletTransaction.model.js";
+import { creditUserWallet, debitUserWallet } from "../services/wallet.service.js";
+import { createNotification } from "../services/notification.service.js";
+
+const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
+const MIN_FAST_RESPONSE_PRICE_NPR = 10;
+
+const normalizeKhaltiSecretKey = (raw: string): string => {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  if (value.startsWith("test_secret_key_")) return value.replace("test_secret_key_", "");
+  if (value.startsWith("live_secret_key_")) return value.replace("live_secret_key_", "");
+  return value;
+};
+
+const formatKhaltiError = (payload: unknown): string => {
+  if (!payload) return "Khalti verification failed";
+  if (typeof payload === "string") return payload;
+  if (typeof payload !== "object") return "Khalti verification failed";
+
+  const data = payload as Record<string, unknown>;
+  if (typeof data.detail === "string" && data.detail.trim()) return data.detail;
+  if (typeof data.error_key === "string" && data.error_key.trim()) return data.error_key;
+
+  const first = Object.values(data).find((value) => typeof value === "string");
+  if (typeof first === "string" && first.trim()) return first;
+  return "Khalti verification failed";
+};
+
+const isActiveProPlan = (user: any): boolean => {
+  const rawPlan = String(user?.plan ?? "Free");
+  if (rawPlan !== "Pro") return false;
+  const rawExpiry = user?.planExpiresAt ? new Date(user.planExpiresAt) : null;
+  if (!rawExpiry || Number.isNaN(rawExpiry.getTime())) return true;
+  return rawExpiry.getTime() > Date.now();
+};
+
+const parsePriceNpr = (value: unknown) => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return 0;
+  return Math.floor(amount);
+};
 
 export const listQuestions = async (req: AuthedRequest, res: Response) => {
   const {
@@ -95,6 +139,8 @@ export const listQuestions = async (req: AuthedRequest, res: Response) => {
     views: q.views ?? 0,
     answersCount: q.answersCount ?? 0,
     isFastResponse: q.isFastResponse ?? false,
+    fastResponsePrice: Number((Number(q.fastResponsePricePaisa || 0) / 100).toFixed(2)),
+    fastResponseEscrowStatus: String(q.fastResponseEscrowStatus || "none"),
     hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
 
     status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
@@ -219,6 +265,8 @@ const myVote =
       views: q.views ?? 0,
       answersCount: q.answersCount ?? 0,
       isFastResponse: q.isFastResponse ?? false,
+      fastResponsePrice: Number((Number(q.fastResponsePricePaisa || 0) / 100).toFixed(2)),
+      fastResponseEscrowStatus: String(q.fastResponseEscrowStatus || "none"),
       hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
       acceptedAnswerId: q.acceptedAnswerId ?? null,
 
@@ -239,7 +287,17 @@ const myVote =
 };
 
 export const createQuestion = async (req: AuthedRequest, res: Response) => {
-  const { title, excerpt, categoryId, level, tags = [], isFastResponse = false } = req.body || {};
+  const {
+    title,
+    excerpt,
+    categoryId,
+    level,
+    tags = [],
+    isFastResponse = false,
+    fastResponsePrice = 0,
+    fastResponsePaymentMode = "",
+    fastResponseKhaltiPidx = "",
+  } = req.body || {};
 
   if (!title || title.trim().length < 10) {
     return res.status(400).json({ message: "Title must be at least 10 characters." });
@@ -250,32 +308,210 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
   if (!categoryId) return res.status(400).json({ message: "Category is required." });
   if (!level) return res.status(400).json({ message: "Level is required." });
 
-  const userId = req.user?.id; // from requireAuth middleware
+  const userId = String(req.user?.id || "").trim();
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-  const doc = await Question.create({
-    title: title.trim(),
-    excerpt: excerpt.trim(),
-    categoryId,
-    level,
-    tags: Array.isArray(tags) ? tags.slice(0, 8) : [],
-    isFastResponse: Boolean(isFastResponse),
-    authorId: userId,
-  });
+  const user = await User.findById(userId).select("plan planExpiresAt").lean();
+  if (!user) return res.status(404).json({ message: "User not found" });
 
-  return res.status(201).json({
-    message: "Question created",
-    item: {
-      id: String(doc._id),
-      authorId: String(doc.authorId),
-      title: doc.title,
-      excerpt: doc.excerpt,
-      categoryId: String(doc.categoryId),
-      level: doc.level,
-      tags: doc.tags,
-      isFastResponse: doc.isFastResponse,
-      createdAt: doc.createdAt,
-    },
-  });
+  const mode = String(fastResponsePaymentMode || "").trim().toLowerCase();
+  const isFast = Boolean(isFastResponse);
+  const isPro = isActiveProPlan(user);
+  const priceNpr = parsePriceNpr(fastResponsePrice);
+  const pricePaisa = Math.max(0, priceNpr * 100);
+  let walletDebitInfo: { amountPaisa: number; txId: string } | null = null;
+
+  let fastResponsePricePaisa = 0;
+  let fastResponseEscrowStatus: "none" | "funded" = "none";
+  let fastResponseEscrowSource: "none" | "wallet" | "khalti" | "pro" = "none";
+  let fastResponseEscrowSourceRef: string | null = null;
+
+  if (isFast) {
+    if (isPro && (!mode || mode === "pro")) {
+      fastResponseEscrowSource = "pro";
+      fastResponseEscrowStatus = "none";
+      fastResponsePricePaisa = 0;
+    } else {
+      if (priceNpr < MIN_FAST_RESPONSE_PRICE_NPR) {
+        return res.status(400).json({
+          message: `Fast response price must be at least NPR ${MIN_FAST_RESPONSE_PRICE_NPR}`,
+        });
+      }
+      if (!["wallet", "khalti"].includes(mode)) {
+        return res.status(400).json({
+          message: "Free users must choose wallet or Khalti payment for fast response",
+        });
+      }
+
+      fastResponsePricePaisa = pricePaisa;
+      fastResponseEscrowStatus = "funded";
+
+      if (mode === "wallet") {
+        const debited = await debitUserWallet({
+          userId,
+          amountPaisa: pricePaisa,
+          type: "fast_response_escrow_debit",
+          note: "Fast response escrow funded from wallet",
+          referenceId: `fast-response-${Date.now()}`,
+          metadata: { priceNpr },
+        });
+
+        if (!debited.ok) {
+          return res.status(400).json({
+            message: debited.error || "Insufficient wallet balance",
+          });
+        }
+
+        walletDebitInfo = {
+          amountPaisa: pricePaisa,
+          txId: String(debited.transactionId || ""),
+        };
+        fastResponseEscrowSource = "wallet";
+        fastResponseEscrowSourceRef = walletDebitInfo.txId || null;
+      } else if (mode === "khalti") {
+        const pidx = String(fastResponseKhaltiPidx || "").trim();
+        if (!pidx) {
+          return res.status(400).json({ message: "Khalti pidx is required for direct payment" });
+        }
+
+        const alreadyUsed = await Question.findOne({
+          isFastResponse: true,
+          fastResponseEscrowSource: "khalti",
+          fastResponseEscrowSourceRef: pidx,
+        })
+          .select("_id")
+          .lean();
+        if (alreadyUsed) {
+          return res.status(409).json({ message: "This Khalti payment reference is already used" });
+        }
+
+        const usedInWalletTopup = await WalletTransaction.findOne({
+          type: "wallet_topup",
+          status: "completed",
+          "metadata.pidx": pidx,
+        })
+          .select("_id")
+          .lean();
+        if (usedInWalletTopup) {
+          return res.status(409).json({
+            message: "This Khalti payment reference is already used",
+          });
+        }
+
+        const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
+        if (!khaltiTestSecretKey) {
+          return res.status(500).json({ message: "Khalti test secret key is missing" });
+        }
+
+        try {
+          const lookup = await axios.post(
+            KHALTI_LOOKUP_URL,
+            { pidx },
+            {
+              headers: {
+                Authorization: `Key ${khaltiTestSecretKey}`,
+                "Content-Type": "application/json",
+              },
+              timeout: 15000,
+            }
+          );
+
+          const lookupData = lookup.data as Record<string, unknown>;
+          const status = String(lookupData.status || "");
+          if (status !== "Completed") {
+            return res.status(400).json({
+              message: status ? `Payment status: ${status}` : "Payment is not completed",
+            });
+          }
+
+          const paidPaisa = Number(lookupData.total_amount || 0);
+          if (!Number.isFinite(paidPaisa) || paidPaisa < pricePaisa) {
+            return res.status(400).json({
+              message: "Paid amount is lower than selected fast response price",
+            });
+          }
+
+          fastResponseEscrowSource = "khalti";
+          fastResponseEscrowSourceRef = pidx;
+        } catch (error: unknown) {
+          if (axios.isAxiosError(error)) {
+            return res.status(502).json({
+              message:
+                formatKhaltiError(error.response?.data) ||
+                error.message ||
+                "Failed to verify Khalti payment",
+            });
+          }
+          return res.status(500).json({ message: "Failed to verify Khalti payment" });
+        }
+      }
+    }
+  }
+
+  try {
+    const doc = await Question.create({
+      title: title.trim(),
+      excerpt: excerpt.trim(),
+      categoryId,
+      level,
+      tags: Array.isArray(tags) ? tags.slice(0, 8) : [],
+      isFastResponse: isFast,
+      fastResponsePricePaisa,
+      fastResponseEscrowStatus,
+      fastResponseEscrowSource,
+      fastResponseEscrowSourceRef,
+      authorId: userId,
+    });
+
+    if (isFast && fastResponsePricePaisa > 0 && fastResponseEscrowStatus === "funded") {
+      await createNotification({
+        userId,
+        type: "system",
+        title: "Fast response question posted",
+        message: `Escrow of NPR ${(fastResponsePricePaisa / 100).toFixed(
+          2
+        )} is locked and will be paid to the accepted answer.`,
+        link: `/questions/${doc._id}`,
+        metadata: { questionId: String(doc._id), amountPaisa: fastResponsePricePaisa },
+      });
+    }
+
+    return res.status(201).json({
+      message: "Question created",
+      item: {
+        id: String(doc._id),
+        authorId: String(doc.authorId),
+        title: doc.title,
+        excerpt: doc.excerpt,
+        categoryId: String(doc.categoryId),
+        level: doc.level,
+        tags: doc.tags,
+        isFastResponse: doc.isFastResponse,
+        fastResponsePrice: Number((Number((doc as any).fastResponsePricePaisa || 0) / 100).toFixed(2)),
+        fastResponseEscrowStatus: String((doc as any).fastResponseEscrowStatus || "none"),
+        createdAt: doc.createdAt,
+      },
+    });
+  } catch {
+    if (walletDebitInfo && walletDebitInfo.amountPaisa > 0) {
+      // best-effort refund if question creation fails after wallet debit
+      await creditUserWallet({
+        userId,
+        amountPaisa: walletDebitInfo.amountPaisa,
+        type: "fast_response_escrow_refund",
+        note: "Fast response escrow refund",
+        referenceId: walletDebitInfo.txId || null,
+      }).catch(() => null);
+      await createNotification({
+        userId,
+        type: "system",
+        title: "Wallet debit rolled back",
+        message: "Fast response payment was rolled back due to a posting error.",
+        link: "/questions/ask",
+      }).catch(() => null);
+    }
+    return res.status(500).json({ message: "Failed to create question" });
+  }
 };
 
 
@@ -313,6 +549,8 @@ export const updateQuestion = async (req: AuthedRequest, res: Response) => {
       level: q.level,
       tags: q.tags ?? [],
       isFastResponse: q.isFastResponse ?? false,
+      fastResponsePrice: Number((Number((q as any).fastResponsePricePaisa || 0) / 100).toFixed(2)),
+      fastResponseEscrowStatus: String((q as any).fastResponseEscrowStatus || "none"),
       votes: q.votes ?? 0,
       views: q.views ?? 0,
       answersCount: q.answersCount ?? 0,
@@ -333,6 +571,44 @@ export const deleteQuestion = async (req: AuthedRequest, res: Response) => {
 
   if (String(q.authorId) !== String(req.user?.id)) {
     return res.status(403).json({ message: "Not allowed" });
+  }
+
+  const escrowStatus = String((q as any).fastResponseEscrowStatus || "none");
+  const escrowSource = String((q as any).fastResponseEscrowSource || "none");
+  const escrowAmountPaisa = Number((q as any).fastResponsePricePaisa || 0);
+
+  if (
+    Boolean((q as any).isFastResponse) &&
+    escrowStatus === "funded" &&
+    escrowAmountPaisa > 0 &&
+    (escrowSource === "wallet" || escrowSource === "khalti")
+  ) {
+    const refunded = await creditUserWallet({
+      userId: String(q.authorId),
+      amountPaisa: escrowAmountPaisa,
+      type: "fast_response_escrow_refund",
+      note: "Fast response escrow refunded after question deletion",
+      referenceId: `fast-response-refund-${String(q._id)}`,
+      metadata: {
+        questionId: String(q._id),
+        source: escrowSource,
+      },
+    });
+
+    if (!refunded.ok) {
+      return res
+        .status(500)
+        .json({ message: refunded.error || "Failed to refund fast response escrow" });
+    }
+
+    await createNotification({
+      userId: String(q.authorId),
+      type: "system",
+      title: "Fast response reward refunded",
+      message: `NPR ${(escrowAmountPaisa / 100).toFixed(2)} was returned to your wallet.`,
+      link: "/wallet",
+      metadata: { questionId: String(q._id), amountPaisa: escrowAmountPaisa, source: escrowSource },
+    });
   }
 
   await Question.findByIdAndDelete(id);

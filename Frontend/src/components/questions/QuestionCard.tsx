@@ -131,6 +131,9 @@ const QuestionCard = ({
           <div className="flex flex-wrap items-center gap-2">
             {question.hasVerifiedAnswer ? <Badge text="Verified Answer" tone="indigo" /> : null}
             {question.isFastResponse ? <Badge text="Fast Response" tone="yellow" /> : null}
+            {Number(question.fastResponsePrice || 0) > 0 ? (
+              <Badge text={`Reward NPR ${Number(question.fastResponsePrice || 0).toFixed(2)}`} tone="green" />
+            ) : null}
 
             <Badge text={question.level} tone="gray" />
             <Badge text={String(categoryLabel)} tone="gray" />

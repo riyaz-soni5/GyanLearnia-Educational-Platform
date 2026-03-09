@@ -12,6 +12,7 @@ import {
   FiMenu,
   FiX,
   FiBell,
+  FiCreditCard,
 } from "react-icons/fi";
 import {
   fetchNotifications,
@@ -451,6 +452,15 @@ const Header = () => {
                         Profile
                       </button>
 
+                      <button
+                        type="button"
+                        onClick={() => go("/wallet")}
+                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                      >
+                        <FiCreditCard className="h-4 w-4" />
+                        Wallet
+                      </button>
+
                       {isInstructor ? (
                         <>
                           <button
@@ -575,6 +585,18 @@ const Header = () => {
                     >
                       <FiUser className="h-4 w-4" />
                       Profile
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileOpen(false);
+                        go("/wallet");
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                    >
+                      <FiCreditCard className="h-4 w-4" />
+                      Wallet
                     </button>
 
                     {isInstructor ? (

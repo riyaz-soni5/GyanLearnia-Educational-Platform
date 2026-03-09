@@ -49,6 +49,8 @@ export const login = async (req, res) => {
                 planStatus: plan.planStatus,
                 planActivatedAt: plan.planActivatedAt,
                 planExpiresAt: plan.planExpiresAt,
+                walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
+                walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
             },
         });
     }
@@ -89,6 +91,8 @@ export const register = async (req, res) => {
                 planStatus: "Active",
                 planActivatedAt: user.planActivatedAt ?? null,
                 planExpiresAt: user.planExpiresAt ?? null,
+                walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
+                walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
             },
         });
     }

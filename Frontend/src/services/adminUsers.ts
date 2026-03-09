@@ -1,9 +1,8 @@
-// src/services/adminUsers.ts
 import { http } from "./http";
 
 export type UserRole = "student" | "instructor" | "admin";
 
-// ✅ what UI uses for filtering + role-change
+
 export type AdminRoleKey =
   | "student"
   | "admin"
@@ -18,7 +17,7 @@ export type AdminUser = {
   lastName: string;
   email: string;
 
-  // raw backend fields
+
   role: UserRole;
   isVerified: boolean;
   verificationStatus: "NotSubmitted" | "Pending" | "Rejected" | "Verified";

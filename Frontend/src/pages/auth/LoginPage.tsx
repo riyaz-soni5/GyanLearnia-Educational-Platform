@@ -1,11 +1,11 @@
-// src/pages/Login.tsx
+
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Logo from "@/assets/icon.svg";
 import { useToast } from "@/components/toast";
 import { loginApi } from "@/services/auth";
 
-// ✅ add this
+
 import { setUser } from "@/services/session";
 
 const LoginPage = () => {
@@ -14,7 +14,7 @@ const LoginPage = () => {
 
   const [emailOrUsername, setEmailOrUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true); // ✅ new
+  const [rememberMe, setRememberMe] = useState(true); 
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ const LoginPage = () => {
         rememberMe
       );
 
-      // ✅ stores role + isVerified + verificationStatus (after you add it in backend/types)
+
       setUser(data.user, rememberMe);
 
       showToast("Login successful", "success");
@@ -73,7 +73,7 @@ const LoginPage = () => {
     <div className="min-h-screen w-full grid place-items-center bg-[rgb(var(--bg))] px-4">
       <div className="w-full max-w-4xl overflow-hidden rounded-2xl border border-base bg-surface shadow-sm">
         <div className="grid md:grid-cols-12">
-          {/* Left panel */}
+
           <div className="hidden md:flex md:col-span-4 flex-col items-center justify-center gap-6 bg-gray-900 p-8 text-white">
             <div className="bg-white p-2 rounded">
               <img
@@ -85,12 +85,12 @@ const LoginPage = () => {
             </div>
           </div>
 
-          {/* Right form */}
+
           <div className="md:col-span-8 p-8 sm:p-10">
             <h1 className="text-2xl font-bold text-basec">Sign in</h1>
 
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
-              {/* Email */}
+
               <div>
                 <label className="text-xs font-medium text-muted">Email</label>
                 <input
@@ -104,7 +104,7 @@ const LoginPage = () => {
                 />
               </div>
 
-              {/* Password */}
+
               <div>
                 <label className="text-xs font-medium text-muted">Password</label>
                 <div className="relative mt-2">
@@ -128,7 +128,7 @@ const LoginPage = () => {
                 </div>
               </div>
 
-              {/* Remember me */}
+
               <div className="flex items-center justify-between">
                 <label className="inline-flex items-center gap-2 text-sm text-muted select-none">
                   <input
@@ -148,10 +148,10 @@ const LoginPage = () => {
                 </Link>
               </div>
 
-              {/* Error (in-page) */}
+
               {error && <div className="text-[12px] text-red-500 transition">*{error}</div>}
 
-              {/* Submit */}
+
               <button
                 type="submit"
                 disabled={!canSubmit || loading}

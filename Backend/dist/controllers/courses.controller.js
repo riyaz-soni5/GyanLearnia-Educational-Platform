@@ -34,15 +34,20 @@ const flattenLectures = (course) => {
     }
     return list.filter((x) => x.lectureId);
 };
+const isProgressTrackedLecture = (type) => {
+    const normalized = String(type || "").toLowerCase();
+    return normalized === "video" || normalized === "quiz";
+};
+const getProgressTrackedLectures = (course) => flattenLectures(course).filter((lecture) => isProgressTrackedLecture(lecture.type));
 const recalcCompletion = async (enrollment, course) => {
-    const allLectures = flattenLectures(course);
-    const lectureSet = new Set(allLectures.map((l) => l.lectureId));
+    const trackedLectures = getProgressTrackedLectures(course);
+    const lectureSet = new Set(trackedLectures.map((l) => l.lectureId));
     const normalizedCompleted = Array.isArray(enrollment.completedLectureIds)
         ? enrollment.completedLectureIds.filter((id) => lectureSet.has(String(id))).map(String)
         : [];
     enrollment.completedLectureIds = Array.from(new Set(normalizedCompleted));
     const completedCount = enrollment.completedLectureIds.length;
-    const totalCount = allLectures.length;
+    const totalCount = trackedLectures.length;
     const percent = totalCount > 0 ? Math.min(100, Math.round((completedCount / totalCount) * 100)) : 0;
     if (totalCount > 0 && completedCount >= totalCount) {
         if (!enrollment.completedAt)
@@ -284,12 +289,12 @@ export async function getMyCourseProgress(req, res) {
             return res.status(404).json({ message: "Course not found" });
         const enrollment = await Enrollment.findOne({ userId, courseId });
         if (!enrollment) {
-            const allLectures = flattenLectures(course);
+            const trackedLectures = getProgressTrackedLectures(course);
             return res.json({
                 item: {
                     enrolled: false,
                     completedCount: 0,
-                    totalCount: allLectures.length,
+                    totalCount: trackedLectures.length,
                     percent: 0,
                     isCompleted: false,
                     completedLectureIds: [],
@@ -336,6 +341,12 @@ export async function completeCourseLecture(req, res) {
             return res.status(404).json({ message: "Lecture not found" });
         if (lecture.type === "quiz") {
             return res.status(400).json({ message: "Quiz lectures are completed only after passing the quiz" });
+        }
+        if (lecture.type === "file") {
+            return res.status(400).json({ message: "File lectures do not require completion" });
+        }
+        if (lecture.type !== "video") {
+            return res.status(400).json({ message: "Only video lectures can be completed manually" });
         }
         const enrollment = await Enrollment.findOne({ userId, courseId });
         if (!enrollment) {

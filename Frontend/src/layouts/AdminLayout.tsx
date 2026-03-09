@@ -1,4 +1,4 @@
-// src/layouts/AdminLayout.tsx
+
 import React from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -88,12 +88,12 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const location = useLocation();
 
-  // Close drawer on route change (mobile)
+
   React.useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  // Close on Esc
+
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSidebarOpen(false);
@@ -102,7 +102,7 @@ const AdminLayout = () => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  // Prevent body scroll when drawer open
+
   React.useEffect(() => {
     if (!sidebarOpen) return;
     const prev = document.body.style.overflow;
@@ -117,7 +117,7 @@ const AdminLayout = () => {
       <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            {/* Mobile menu button */}
+
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
@@ -155,7 +155,7 @@ const AdminLayout = () => {
         </div>
       </header>
 
-      {/* Mobile drawer */}
+
       <div
         className={[
           "fixed inset-0 z-40 lg:hidden",
@@ -163,7 +163,7 @@ const AdminLayout = () => {
         ].join(" ")}
         aria-hidden={!sidebarOpen}
       >
-        {/* overlay */}
+
         <div
           onClick={() => setSidebarOpen(false)}
           className={[
@@ -172,7 +172,7 @@ const AdminLayout = () => {
           ].join(" ")}
         />
 
-        {/* panel */}
+
         <div
           className={[
             "absolute left-0 top-0 h-full w-[85%] max-w-sm bg-gray-50 border-r border-gray-200 p-4 transition-transform",
@@ -208,7 +208,7 @@ const AdminLayout = () => {
 
       <div className="flex-1">
         <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-12">
-          {/* Desktop sidebar */}
+
           <aside className="hidden lg:block lg:col-span-3">
             <div className="lg:sticky lg:top-20">
               <SidebarNav />

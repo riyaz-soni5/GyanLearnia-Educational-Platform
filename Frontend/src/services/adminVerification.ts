@@ -1,4 +1,4 @@
-// src/services/adminVerification.ts
+
 import { http } from "./http";
 
 export type VerificationStatus = "Pending" | "Verified" | "Rejected";

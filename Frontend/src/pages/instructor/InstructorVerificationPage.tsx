@@ -84,7 +84,7 @@ const FileRow = ({
   const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
   const existingUrl = existing?.id ? `${API_BASE}/api/instructor-docs/${existing.id}` : null;
 
-  // ✅ local preview for newly picked file
+
   const [localPreviewUrl, setLocalPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,7 +93,7 @@ const FileRow = ({
       return;
     }
 
-    // only create objectURL for images; for pdf we show an icon/card
+
     if (file.type.startsWith("image/")) {
       const url = URL.createObjectURL(file);
       setLocalPreviewUrl(url);
@@ -106,13 +106,13 @@ const FileRow = ({
   const hasAny = Boolean(file || existing);
   const showEmpty = !hasAny;
 
-  // Determine what we can preview
+
   const isPickedImage = Boolean(file && file.type.startsWith("image/") && localPreviewUrl);
   const isPickedPdf = Boolean(file && file.type === "application/pdf");
 
   const existingLooksPdf = Boolean(existing?.fileName?.toLowerCase().endsWith(".pdf"));
-  // For existing doc, we can't reliably know contentType from your MyDocsRes,
-  // so we infer pdf from filename; otherwise we attempt to render as image.
+
+
   const canTryExistingImage = Boolean(existingUrl && !existingLooksPdf);
 
   const fileLabel = file?.name || existing?.fileName || "Document";
@@ -139,7 +139,7 @@ const FileRow = ({
 
       </div>
 
-      {/* Upload / Preview area */}
+
       <div
         className={[
           "mt-4 rounded-xl border border-dashed p-4 transition",
@@ -162,7 +162,7 @@ const FileRow = ({
           if (f) onPick(f);
         }}
       >
-        {/* ✅ EMPTY STATE */}
+
         {showEmpty ? (
           <div className="grid place-items-center">
             <div className="flex flex-col items-center text-center">
@@ -195,10 +195,10 @@ const FileRow = ({
             </div>
           </div>
         ) : (
-          /* ✅ PREVIEW STATE (existing or selected) */
+
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              {/* Thumbnail */}
+
               <div className="h-16 w-16 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/10 dark:bg-gray-950">
                 {isPickedImage ? (
                   <img
@@ -220,7 +220,7 @@ const FileRow = ({
                     alt={fileLabel}
                     className="h-full w-full object-cover"
                     onError={(e) => {
-                      // if existing is not an image (or auth/cors), fallback icon
+
                       (e.currentTarget as HTMLImageElement).style.display = "none";
                     }}
                   />
@@ -231,7 +231,7 @@ const FileRow = ({
                 )}
               </div>
 
-              {/* Meta */}
+
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                   {fileLabel}
@@ -256,7 +256,7 @@ const FileRow = ({
               </div>
             </div>
 
-            {/* Replace button */}
+
             <div className="flex flex-wrap items-center gap-2">
               <label
                 className={[
@@ -277,7 +277,7 @@ const FileRow = ({
                 Choose file
               </label>
 
-              {/* Only show clear for newly selected file */}
+
               {file ? (
                 <button
                   type="button"
@@ -332,14 +332,14 @@ const InstructorVerificationPage = () => {
   const [submittedAt, setSubmittedAt] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
 
-  // ✅ existing docs from server (so edit doesn't "lose" them)
+
   const [existingDocs, setExistingDocs] = useState<MyDocsRes["docs"]>({
     idCard: null,
     certificate: null,
     experienceLetter: null,
   });
 
-  // ✅ edit mode (only for Rejected)
+
   const [editMode, setEditMode] = useState(false);
 
   const locked = status === "Pending" || status === "Verified";
@@ -355,7 +355,7 @@ const InstructorVerificationPage = () => {
       const res = await http<MyDocsRes>("/api/instructor-docs/me");
       setExistingDocs(res.docs);
     } catch (e: any) {
-      // not fatal
+
       setExistingDocs({ idCard: null, certificate: null, experienceLetter: null });
     }
   };
@@ -370,7 +370,7 @@ const InstructorVerificationPage = () => {
 
       if (res.status !== "Rejected") setEditMode(false);
 
-      // ✅ always refresh docs snapshot too
+
       await loadMyDocs();
     } catch (e: any) {
       showToast(e?.message || "Failed to load verification status", "error");
@@ -388,7 +388,7 @@ const InstructorVerificationPage = () => {
   useEffect(() => {
     if (!me || !isInstructor) return;
     loadStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [me?.id, isInstructor]);
 
   const validateFile = (f: File) => {
@@ -443,7 +443,7 @@ const InstructorVerificationPage = () => {
       return;
     }
 
-    // ✅ required satisfied by either "new file" OR "existing doc"
+
     if (!hasIdCard || !hasCertificate) {
       showToast("Please provide ID Card and Certificate (you can keep existing ones).", "error");
       return;
@@ -456,7 +456,7 @@ const InstructorVerificationPage = () => {
 
     setSubmitting(true);
     try {
-      // ✅ upload only what user changed
+
       const uploads: Promise<any>[] = [];
       if (idCard) uploads.push(uploadOne(idCard, "idCard"));
       if (certificate) uploads.push(uploadOne(certificate, "certificate"));
@@ -468,10 +468,10 @@ const InstructorVerificationPage = () => {
 
       showToast("Submitted successfully. Status: Pending", "success", { durationMs: 2500 });
 
-      // refresh status + doc snapshot
+
       await loadStatus();
 
-      // clear only local picked files (server docs still shown)
+
       setIdCard(null);
       setCertificate(null);
       setExperienceLetter(null);
@@ -505,7 +505,7 @@ const InstructorVerificationPage = () => {
               </div>
             </div>
 
-            {/* Status panel */}
+
             <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
@@ -563,7 +563,7 @@ const InstructorVerificationPage = () => {
               </div>
             </div>
 
-            {/* Before you submit only when form visible */}
+
             {showForm ? (
               <div className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800 dark:border-yellow-500/30 dark:bg-yellow-500/10 dark:text-yellow-200">
                 <div className="flex items-start gap-2">
@@ -581,7 +581,7 @@ const InstructorVerificationPage = () => {
             ) : null}
           </div>
 
-          {/* Body: show only when allowed */}
+
           {showForm ? (
             <div className="space-y-6">
               <Card>

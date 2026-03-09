@@ -71,6 +71,8 @@ export const login = async (req: Request, res: Response) => {
         planStatus: plan.planStatus,
         planActivatedAt: plan.planActivatedAt,
         planExpiresAt: plan.planExpiresAt,
+        walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
+        walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
       },
     });
   } catch {
@@ -117,6 +119,8 @@ export const register = async (req: Request, res: Response) => {
         planStatus: "Active",
         planActivatedAt: user.planActivatedAt ?? null,
         planExpiresAt: user.planExpiresAt ?? null,
+        walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
+        walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
       },
     });
   } catch (err) {

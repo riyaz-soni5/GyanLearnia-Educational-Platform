@@ -1,4 +1,4 @@
-// src/services/session.ts
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export type SessionUser = {
@@ -8,15 +8,17 @@ export type SessionUser = {
   firstName?: string;
   lastName?: string;
   avatarUrl?: string | null;
-  isVerified?: boolean; // ✅ needed for instructor gating
+  isVerified?: boolean; 
   verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
   currentPlan?: "Free" | "Pro";
   planStatus?: "Active" | "Expired";
   planActivatedAt?: string | null;
   planExpiresAt?: string | null;
+  walletBalancePaisa?: number;
+  walletBalance?: number;
 };
 
-// ✅ get logged user
+
 export function getUser(): SessionUser | null {
   const raw =
     localStorage.getItem("gyanlearnia_user") ||
@@ -31,13 +33,13 @@ export function getUser(): SessionUser | null {
   }
 }
 
-// ✅ check login (must have id)
+
 export function isLoggedIn() {
   const u = getUser();
   return Boolean(u?.id);
 }
 
-// ✅ store user (login)
+
 export function setUser(user: SessionUser, rememberMe: boolean) {
   const storage = rememberMe ? localStorage : sessionStorage;
   storage.setItem("gyanlearnia_user", JSON.stringify(user));
@@ -46,7 +48,7 @@ export function setUser(user: SessionUser, rememberMe: boolean) {
   }
 }
 
-// ✅ logout
+
 export async function logout() {
   localStorage.removeItem("gyanlearnia_user");
   sessionStorage.removeItem("gyanlearnia_user");
@@ -54,13 +56,13 @@ export async function logout() {
     window.dispatchEvent(new Event("gyanlearnia_user_updated"));
   }
 
-  // clear cookie on backend
+
   try {
     await fetch(`${API_BASE}/api/auth/logout`, {
       method: "POST",
       credentials: "include",
     });
   } catch {
-    // ignore network errors (still logged out on frontend)
+
   }
 }

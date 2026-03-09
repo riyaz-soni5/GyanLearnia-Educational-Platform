@@ -6,10 +6,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { FiSearch, FiEye, FiCheck, FiX, FiAward, FiBookOpen } from "react-icons/fi";
 
-// ✅ Make sure you have these service functions (file example: src/services/adminCourses.ts)
-// - listPendingCourses(): Promise<{ items: CourseApproval[] }>
-// - approveCourse(id: string): Promise<any>
-// - rejectCourse(id: string, reason: string): Promise<any>
+
 import { listPendingCourses, approveCourse, rejectCourse } from "@/services/adminCourse";
 
 type ApprovalStatus = "Pending" | "Approved" | "Rejected";
@@ -153,7 +150,7 @@ const actionBtnClass =
 const CourseApprovalsPage = () => {
   const { showToast } = useToast();
 
-  // ✅ REAL DATA (no static demo list)
+
   const [items, setItems] = useState<CourseApproval[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -167,11 +164,11 @@ const CourseApprovalsPage = () => {
   const [approveId, setApproveId] = useState<string | null>(null);
   const [approveLoading, setApproveLoading] = useState(false);
 
-  // ✅ Reject dialog state
+
   const [rejectId, setRejectId] = useState<string | null>(null);
   const [rejectLoading, setRejectLoading] = useState(false);
 
-  // ✅ Load pending courses
+
   useEffect(() => {
     let alive = true;
 
@@ -288,7 +285,7 @@ const CourseApprovalsPage = () => {
     try {
       await approveCourse(id);
       setItems((prev) => prev.filter((x) => x.id !== id));
-      showToast("Course approved ✅", "success");
+      showToast("Course approved", "success");
       if (openId === id) setOpenId(null);
     } catch (e: unknown) {
       showToast(toErrorMessage(e, "Approve failed"), "error");
@@ -298,7 +295,6 @@ const CourseApprovalsPage = () => {
     }
   };
 
-  // open dialog
   const reject = (id: string) => setRejectId(id);
 
   const priceText = (x: CourseApproval) =>
@@ -306,7 +302,7 @@ const CourseApprovalsPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <section className="rounded-2xl bg-white p-8 shadow-sm">
         <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Course Approvals</h1>
         <p className="mt-2 text-sm text-gray-600">Review course submissions and approve/reject them.</p>
@@ -365,7 +361,7 @@ const CourseApprovalsPage = () => {
         {err ? <p className="mt-3 text-sm text-red-600">{err}</p> : null}
       </section>
 
-      {/* Table */}
+
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
@@ -471,7 +467,7 @@ const CourseApprovalsPage = () => {
         </div>
       </section>
 
-      {/* Modal */}
+
       {openItem ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
@@ -643,7 +639,7 @@ const CourseApprovalsPage = () => {
         </div>
       ) : null}
 
-      {/* Reject Reason Dialog */}
+
       <RejectReasonDialog
         open={Boolean(rejectId)}
         title="Reject course?"
@@ -663,7 +659,7 @@ const CourseApprovalsPage = () => {
           try {
             await rejectCourse(rejectId, reason);
             setItems((prev) => prev.filter((x) => x.id !== rejectId));
-            showToast("Course rejected ✅", "success");
+            showToast("Course rejected", "success");
             if (openId === rejectId) setOpenId(null);
             setRejectId(null);
           } catch (e: unknown) {

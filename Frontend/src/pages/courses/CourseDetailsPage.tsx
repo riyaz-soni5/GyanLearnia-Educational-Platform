@@ -29,6 +29,12 @@ import type { CourseListItem } from "@/app/types/course.type";
 
 type LectureKind = "Video" | "Quiz" | "File";
 
+type UiLectureResource = {
+  name: string;
+  url: string;
+  sizeBytes: number;
+};
+
 type UiLecture = {
   id: string;
   title: string;
@@ -36,6 +42,8 @@ type UiLecture = {
   durationMin: number;
   isPreview: boolean;
   quizId?: string;
+  videoUrl?: string;
+  resources: UiLectureResource[];
 };
 
 type UiSection = {
@@ -86,6 +94,9 @@ type RawLecture = {
   isFreePreview?: unknown;
   isPreview?: unknown;
   quizId?: unknown;
+  videoUrl?: unknown;
+  fileUrl?: unknown;
+  resources?: unknown;
 };
 
 type RawSection = {
@@ -118,6 +129,12 @@ type RawCourse = {
   sections?: unknown;
   totalVideoSec?: unknown;
   updatedAt?: unknown;
+};
+
+type RawLectureResource = {
+  name?: unknown;
+  url?: unknown;
+  sizeBytes?: unknown;
 };
 
 const asObject = (value: unknown): Record<string, unknown> | null =>
@@ -177,14 +194,40 @@ const toUiCourse = (payload: unknown): CourseUiModel | null => {
   const sections: UiSection[] = sectionsRaw.map((s: RawSection, idx: number) => {
     const lecturesRaw: RawLecture[] = Array.isArray(s.lectures) ? (s.lectures as RawLecture[]) : [];
 
-    const lectures: UiLecture[] = lecturesRaw.map((l: RawLecture, lectureIdx: number) => ({
-      id: String(l._id ?? l.id ?? `${idx + 1}-${lectureIdx + 1}`),
-      title: String(l.title ?? "Untitled lecture"),
-      type: toLectureType(l.type),
-      durationMin: Math.max(0, Math.round(Number(l.durationSec ?? 0) / 60)),
-      isPreview: Boolean(l.isFreePreview ?? l.isPreview),
-      quizId: l.quizId ? String(l.quizId) : undefined,
-    }));
+    const lectures: UiLecture[] = lecturesRaw.map((l: RawLecture, lectureIdx: number) => {
+      const lectureResourcesRaw = Array.isArray(l.resources) ? (l.resources as RawLectureResource[]) : [];
+      const normalizedResources: UiLectureResource[] = lectureResourcesRaw
+        .map((r, resourceIdx) => {
+          const resolvedUrl = resolveAssetUrl(typeof r?.url === "string" ? r.url : "");
+          if (!resolvedUrl) return null;
+          return {
+            name: String(r?.name ?? `Resource ${resourceIdx + 1}`).trim() || `Resource ${resourceIdx + 1}`,
+            url: resolvedUrl,
+            sizeBytes: Math.max(0, Number(r?.sizeBytes ?? 0)),
+          };
+        })
+        .filter((r): r is UiLectureResource => Boolean(r));
+
+      const legacyFileUrl = resolveAssetUrl(typeof l.fileUrl === "string" ? l.fileUrl : "");
+      const resources = normalizedResources.length > 0
+        ? normalizedResources
+        : legacyFileUrl
+        ? [{ name: "Resource", url: legacyFileUrl, sizeBytes: 0 }]
+        : [];
+
+      const videoUrl = resolveAssetUrl(typeof l.videoUrl === "string" ? l.videoUrl : "");
+
+      return {
+        id: String(l._id ?? l.id ?? `${idx + 1}-${lectureIdx + 1}`),
+        title: String(l.title ?? "Untitled lecture"),
+        type: toLectureType(l.type),
+        durationMin: Math.max(0, Math.round(Number(l.durationSec ?? 0) / 60)),
+        isPreview: Boolean(l.isFreePreview ?? l.isPreview),
+        quizId: l.quizId ? String(l.quizId) : undefined,
+        videoUrl: videoUrl ?? undefined,
+        resources,
+      };
+    });
 
     return {
       id: String(s._id ?? s.id ?? idx + 1),
@@ -288,6 +331,7 @@ const CourseDetailsPage = () => {
   const [markingLectureId, setMarkingLectureId] = useState<string>("");
   const [certificateLoading, setCertificateLoading] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [contentLecture, setContentLecture] = useState<UiLecture | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -515,8 +559,12 @@ const CourseDetailsPage = () => {
 
   const openQuiz = async (lecture: UiLecture) => {
     if (!course || !lecture.quizId) return;
-    if (!(lecture.isPreview || isEnrolled)) return;
+    if (!(lecture.isPreview || isEnrolled)) {
+      setActionError("Enroll in this course to unlock this lesson.");
+      return;
+    }
 
+    setActionError("");
     setQuizOpen(true);
     setQuizLoading(true);
     setQuizTitle(lecture.title);
@@ -541,6 +589,27 @@ const CourseDetailsPage = () => {
     } finally {
       setQuizLoading(false);
     }
+  };
+
+  const openLectureContent = (lecture: UiLecture) => {
+    const canAccess = lecture.isPreview || isEnrolled;
+    if (!canAccess) {
+      setActionError("Enroll in this course to unlock this lesson.");
+      return;
+    }
+
+    if (lecture.type === "Video" && !lecture.videoUrl) {
+      setActionError("Video is not available for this lesson.");
+      return;
+    }
+
+    if (lecture.type === "File" && lecture.resources.length === 0) {
+      setActionError("No file resource is available for this lesson.");
+      return;
+    }
+
+    setActionError("");
+    setContentLecture(lecture);
   };
 
   const submitQuiz = async () => {
@@ -827,7 +896,22 @@ const CourseDetailsPage = () => {
                                 </span>
 
                                 <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-gray-900">{lecture.title}</p>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      lecture.type === "Quiz"
+                                        ? void openQuiz(lecture)
+                                        : openLectureContent(lecture)
+                                    }
+                                    className={[
+                                      "cursor-pointer truncate text-left text-sm font-semibold transition",
+                                      lecture.isPreview || isEnrolled
+                                        ? "text-indigo-700 hover:text-indigo-800 hover:underline"
+                                        : "text-gray-900 hover:underline",
+                                    ].join(" ")}
+                                  >
+                                    {lecture.title}
+                                  </button>
                                   <p className="mt-0.5 text-xs text-gray-500">{lecture.type}</p>
                                 </div>
                               </div>
@@ -844,37 +928,6 @@ const CourseDetailsPage = () => {
                                   </span>
                                 ) : null}
                                 <span>{lecture.durationMin > 0 ? `${lecture.durationMin} min` : "-"}</span>
-                                {lecture.type === "Quiz" ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => void openQuiz(lecture)}
-                                    disabled={!(lecture.isPreview || isEnrolled)}
-                                    className={[
-                                      "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition",
-                                      lecture.isPreview || isEnrolled
-                                        ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                                        : "cursor-not-allowed border border-gray-300 bg-white text-gray-400",
-                                    ].join(" ")}
-                                  >
-                                    Start Quiz
-                                  </button>
-                                ) : isEnrolled ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => void completeLecture(lecture.id)}
-                                    disabled={completedLectureSet.has(lecture.id) || markingLectureId === lecture.id}
-                                    className={[
-                                      "rounded-lg px-2.5 py-1 text-[11px] font-semibold transition",
-                                      completedLectureSet.has(lecture.id)
-                                        ? "cursor-not-allowed border border-green-200 bg-green-50 text-green-700"
-                                        : markingLectureId === lecture.id
-                                        ? "cursor-not-allowed bg-gray-400 text-white"
-                                        : "bg-gray-900 text-white hover:bg-gray-800",
-                                    ].join(" ")}
-                                  >
-                                    {markingLectureId === lecture.id ? "Saving..." : "Mark Complete"}
-                                  </button>
-                                ) : null}
                               </div>
                             </div>
                           ))}
@@ -1129,6 +1182,84 @@ const CourseDetailsPage = () => {
                   </button>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {contentLecture ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 p-4">
+              <div>
+                <p className="text-xs font-semibold text-gray-500">{contentLecture.type}</p>
+                <h3 className="text-lg font-bold text-gray-900">{contentLecture.title}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setContentLecture(null)}
+                className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
+              >
+                <FiX className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 overflow-y-auto p-4">
+              {contentLecture.type === "Video" ? (
+                contentLecture.videoUrl ? (
+                  <video
+                    src={contentLecture.videoUrl}
+                    controls
+                    controlsList="nodownload"
+                    onEnded={() => {
+                      if (!isEnrolled) return;
+                      if (completedLectureSet.has(contentLecture.id)) return;
+                      if (markingLectureId === contentLecture.id) return;
+                      void completeLecture(contentLecture.id);
+                    }}
+                    className="w-full rounded-xl border border-gray-200 bg-black"
+                  />
+                ) : (
+                  <p className="text-sm text-red-600">Video unavailable.</p>
+                )
+              ) : contentLecture.resources.length > 0 ? (
+                <div className="space-y-3">
+                  {contentLecture.resources.map((resource, idx) => (
+                    <div
+                      key={`${resource.url}-${idx}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900">{resource.name}</p>
+                        <p className="mt-1 text-xs text-gray-600">
+                          {resource.sizeBytes > 0
+                            ? `${Math.max(1, Math.round(resource.sizeBytes / 1024))} KB`
+                            : "File"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <a
+                          href={resource.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-800 hover:bg-gray-50"
+                        >
+                          Open
+                        </a>
+                        <a
+                          href={resource.url}
+                          download
+                          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                        >
+                          Download
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-red-600">No files available.</p>
+              )}
             </div>
           </div>
         </div>

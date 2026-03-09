@@ -56,6 +56,7 @@ const UserSchema = new Schema({
     },
     planActivatedAt: { type: Date, default: Date.now },
     planExpiresAt: { type: Date, default: null },
+    walletBalancePaisa: { type: Number, default: 0, min: 0 },
     points: { type: Number, default: 0 },
     acceptedAnswers: { type: Number, default: 0 },
 }, { timestamps: true });

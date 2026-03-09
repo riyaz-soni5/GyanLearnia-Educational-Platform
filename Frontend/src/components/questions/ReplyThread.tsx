@@ -420,6 +420,16 @@ export default function ReplyThread({
     );
   };
 
+  // Keep the details page clean: don't render an empty replies container.
+  if (
+    rootReplies.length === 0 &&
+    !showReplyBox &&
+    !rootHasMore &&
+    !loadingRoot
+  ) {
+    return null;
+  }
+
   return (
     <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-950">
       <div className="flex items-center justify-between">
@@ -463,13 +473,11 @@ export default function ReplyThread({
       ) : null}
 
       <div className="mt-3">
-        {rootReplies.length === 0 ? (
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            No replies yet.
-          </p>
-        ) : (
-          rootReplies.map((r) => renderReply(r, 0, null))
-        )}
+        {loadingRoot && rootReplies.length === 0 ? (
+          <p className="text-sm text-gray-600 dark:text-gray-300">Loading replies...</p>
+        ) : null}
+
+        {rootReplies.map((r) => renderReply(r, 0, null))}
 
         {rootHasMore ? (
           <button

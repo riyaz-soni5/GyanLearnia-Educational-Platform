@@ -28,7 +28,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import RichTextEditor from "@/components/RichTextEditor";
 import { useToast } from "@/components/toast";
 
-// ✅ ADDED (only)
+
 import ReplyThread from "@/components/questions/ReplyThread";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -64,14 +64,14 @@ const VoteBox = ({
   disabled,
   onUp,
   onDown,
-  bottomSlot, // ✅ new
+  bottomSlot,
 }: {
   value: number;
   myVote?: 1 | -1 | null;
   disabled?: boolean;
   onUp: () => void;
   onDown: () => void;
-  bottomSlot?: React.ReactNode; // ✅ new
+  bottomSlot?: React.ReactNode;
 }) => (
   <div className="flex flex-col items-center gap-2">
     <button
@@ -106,7 +106,6 @@ const VoteBox = ({
       <BiDownvote className="h-5 w-5" />
     </button>
 
-    {/* ✅ tick goes below downvote */}
     {bottomSlot ? <div className="pt-1">{bottomSlot}</div> : null}
   </div>
 );
@@ -237,11 +236,11 @@ const QuestionDetailsPage = () => {
   const [editAnswerText, setEditAnswerText] = useState("");
   const [savingAnswerId, setSavingAnswerId] = useState<string | null>(null);
   const [deletingAnswerId, setDeletingAnswerId] = useState<string | null>(null);
-  // ✅ NEW: inline reply composer per answer
+
   const [activeReplyBoxFor, setActiveReplyBoxFor] = useState<string | null>(null);
   const [replyDraftMap, setReplyDraftMap] = useState<Record<string, string>>({});
 
-  // ✅ NEW: force ReplyThread remount after posting
+
   const [replyThreadKey, setReplyThreadKey] = useState<Record<string, number>>({});
 
   const [recentQuestions, setRecentQuestions] = useState<Question[]>([]);
@@ -266,7 +265,7 @@ const QuestionDetailsPage = () => {
   const [posting, setPosting] = useState(false);
   const [sort, setSort] = useState<"Top" | "Newest">("Top");
 
-  // ✅ ADDED: per-answer toggle (Reddit-like)
+
   const [openReplyFor, setOpenReplyFor] = useState<Record<string, boolean>>({});
 
   type StoredUser = {
@@ -295,7 +294,7 @@ const QuestionDetailsPage = () => {
     `${me?.firstName ?? ""} ${me?.lastName ?? ""}`.trim() || me?.email || "";
   const questionVoteCacheKey = `gyanlearnia_question_vote_cache_${currentUserId || "guest"}`;
 
-  // Keep question-list vote UI synced when user votes from details.
+
   const syncQuestionVoteCache = useCallback((qid: string, myVote: 1 | -1 | null) => {
     if (!currentUserId) return;
     try {
@@ -309,7 +308,7 @@ const QuestionDetailsPage = () => {
       else next[qid] = myVote;
       sessionStorage.setItem(questionVoteCacheKey, JSON.stringify(next));
     } catch {
-      // ignore cache write failures
+
     }
   }, [currentUserId, questionVoteCacheKey]);
 
@@ -453,7 +452,7 @@ const QuestionDetailsPage = () => {
 
         setRelatedQuestions(related);
       } catch {
-        // ignore aside failures
+
       }
     })();
   }, [question]);
@@ -553,11 +552,11 @@ const QuestionDetailsPage = () => {
     try {
       await postReply(questionId, answerId, html, null);
 
-      // clear composer
+
       setReplyDraftMap((m) => ({ ...m, [answerId]: "" }));
       setActiveReplyBoxFor(null);
 
-      // force ReplyThread to reload (remount)
+
       setReplyThreadKey((m) => ({ ...m, [answerId]: (m[answerId] || 0) + 1 }));
 
       showToast("Reply posted", "success");
@@ -634,7 +633,7 @@ const QuestionDetailsPage = () => {
   try {
     await acceptAnswer(questionId, answerId);
 
-    // ✅ update UI immediately
+
     setAnswers((prev) =>
       prev.map((x: any) => ({ ...x, isVerified: x.id === answerId }))
     );
@@ -649,7 +648,7 @@ const QuestionDetailsPage = () => {
         : prev
     );
 
-    showToast("Answer marked as correct ✅", "success");
+    showToast("Answer marked as correct", "success");
   } catch (e: any) {
     showToast(e?.message || "Failed to accept answer", "error");
   }
@@ -894,6 +893,12 @@ const QuestionDetailsPage = () => {
                   {(question as any).isFastResponse ? (
                     <Badge text="Fast Response" tone="yellow" />
                   ) : null}
+                  {Number((question as any)?.fastResponsePrice || 0) > 0 ? (
+                    <Badge
+                      text={`Reward NPR ${Number((question as any).fastResponsePrice || 0).toFixed(2)}`}
+                      tone="green"
+                    />
+                  ) : null}
                   <Badge text={(question as any).level} tone="gray" />
                   <Badge text={String(categoryLabel)} tone="gray" />
 
@@ -1116,7 +1121,7 @@ const QuestionDetailsPage = () => {
                           />
                         </div>
 
-                        {/* ✅ ADDED: Reddit-like actions row (Reply / Share / Save) */}
+
                         <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-600 dark:text-gray-300">
                           <button
                             type="button"
@@ -1131,7 +1136,7 @@ const QuestionDetailsPage = () => {
                           </button>
 
                         </div>
-                        {/* ✅ Inline reply editor (opens immediately when clicking Reply) */}
+
                         {activeReplyBoxFor === a.id ? (
                           <div className="mt-3">
                             <div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
@@ -1166,10 +1171,10 @@ const QuestionDetailsPage = () => {
                           </div>
                         ) : null}
 
-                        {/* ✅ Always show replies preview (1–3) + "See more replies" (Reddit-like) */}
+
                         <div className="mt-3" id={`answer-${a.id}`}>
                           <ReplyThread
-                            key={`${a.id}-${replyThreadKey[a.id] || 0}`} // ✅ remount after posting
+                            key={`${a.id}-${replyThreadKey[a.id] || 0}`}
                             questionId={questionId}
                             answerId={a.id}
                             requireLogin={requireLoginForVote}
