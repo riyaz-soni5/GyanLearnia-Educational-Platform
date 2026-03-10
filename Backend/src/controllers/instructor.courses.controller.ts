@@ -1,6 +1,10 @@
 import { Response } from "express";
+import { Types } from "mongoose";
 import Course from "../models/Course.model.js";
 import Quiz from "../models/Quiz.model.js";
+import CoursePurchase from "../models/CoursePurchase.model.js";
+import CourseReview from "../models/CourseReview.model.js";
+import WalletTransaction from "../models/WalletTransaction.model.js";
 import { AuthedRequest } from "../middlewares/auth.middleware.js";
 
 type LessonDraft = {
@@ -751,4 +755,220 @@ export async function listInstructorCourses(req: AuthedRequest, res: Response) {
   } catch (e: any) {
     return res.status(500).json({ message: e?.message || "Failed to load instructor courses" });
   }
+}
+
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+const startOfUtcDay = (date: Date) =>
+  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+const addUtcDays = (date: Date, days: number) => {
+  const d = new Date(date);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d;
+};
+const toIsoDay = (date: Date) => date.toISOString().slice(0, 10);
+const toNpr = (paisa: number) => Number((paisa / 100).toFixed(2));
+
+export async function getInstructorAnalytics(req: AuthedRequest, res: Response) {
+  try {
+    const instructorId = req.user!.id;
+    const parsedDays = parseInt(String(req.query.days || "30"), 10);
+    const windowDays = clamp(Number.isNaN(parsedDays) ? 30 : parsedDays, 7, 90);
+    const instructorObjectId = toObjectId(instructorId);
+    if (!instructorObjectId) return res.status(400).json({ message: "Invalid instructor id" });
+
+    const todayStart = startOfUtcDay(new Date());
+    const endExclusive = addUtcDays(todayStart, 1);
+    const windowStart = addUtcDays(todayStart, -(windowDays - 1));
+
+    const instructorCourses = await Course.find({ instructorId: instructorObjectId })
+      .select("_id title status")
+      .lean();
+    const courseIds = instructorCourses.map((c: any) => c._id).filter(Boolean);
+    const publishedCourseIds = instructorCourses
+      .filter((c: any) => String(c.status || "") === "Published")
+      .map((c: any) => c._id)
+      .filter(Boolean);
+    const titleMap = new Map<string, string>(
+      instructorCourses.map((c: any) => [String(c._id), String(c.title || "Untitled Course")])
+    );
+
+    const [revenueRows, ratingRows, courseEarningsRows, recentReviews] = await Promise.all([
+      CoursePurchase.aggregate([
+        {
+          $match: {
+            instructorId: instructorObjectId,
+            status: "completed",
+            createdAt: { $gte: windowStart, $lt: endExclusive },
+          },
+        },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            revenuePaisa: { $sum: "$instructorSharePaisa" },
+            purchases: { $sum: 1 },
+          },
+        },
+      ]),
+      courseIds.length > 0
+        ? CourseReview.aggregate([
+            {
+              $match: {
+                courseId: { $in: courseIds },
+                createdAt: { $gte: windowStart, $lt: endExclusive },
+              },
+            },
+            {
+              $group: {
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                averageRating: { $avg: "$rating" },
+                reviews: { $sum: 1 },
+              },
+            },
+          ])
+        : Promise.resolve([]),
+      CoursePurchase.aggregate([
+        {
+          $match: {
+            instructorId: instructorObjectId,
+            status: "completed",
+          },
+        },
+        {
+          $group: {
+            _id: "$courseId",
+            revenuePaisa: { $sum: "$instructorSharePaisa" },
+            purchases: { $sum: 1 },
+          },
+        },
+        { $sort: { revenuePaisa: -1 } },
+        { $limit: 8 },
+      ]),
+      publishedCourseIds.length > 0
+        ? CourseReview.find({ courseId: { $in: publishedCourseIds } })
+            .populate("userId", "firstName lastName email avatarUrl")
+            .populate("courseId", "title")
+            .sort({ createdAt: -1 })
+            .select("courseId userId rating comment createdAt")
+            .lean()
+        : Promise.resolve([]),
+    ]);
+
+    const revenueMap = new Map<string, { revenuePaisa: number; purchases: number }>();
+    for (const row of revenueRows as Array<Record<string, unknown>>) {
+      const key = String(row._id || "");
+      if (!key) continue;
+      revenueMap.set(key, {
+        revenuePaisa: Number(row.revenuePaisa || 0),
+        purchases: Number(row.purchases || 0),
+      });
+    }
+
+    const ratingTrend = (ratingRows as Array<Record<string, unknown>>)
+      .map((row) => ({
+        date: String(row._id || ""),
+        averageRating: Number(Number(row.averageRating || 0).toFixed(2)),
+        reviews: Number(row.reviews || 0),
+      }))
+      .filter((item) => item.date)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const revenueTrend: Array<{ date: string; revenueNpr: number; purchases: number }> = [];
+    for (let i = 0; i < windowDays; i += 1) {
+      const date = addUtcDays(windowStart, i);
+      const key = toIsoDay(date);
+      const row = revenueMap.get(key);
+      revenueTrend.push({
+        date: key,
+        revenueNpr: toNpr(Number(row?.revenuePaisa || 0)),
+        purchases: Number(row?.purchases || 0),
+      });
+    }
+
+    const courseEarnings = (courseEarningsRows as Array<Record<string, unknown>>)
+      .map((row) => {
+        const courseId = String(row._id || "");
+        return {
+          courseId,
+          title: titleMap.get(courseId) || "Untitled Course",
+          earningsNpr: toNpr(Number(row.revenuePaisa || 0)),
+          purchases: Number(row.purchases || 0),
+        };
+      })
+      .filter((item) => item.courseId);
+
+    const publishedCourseReviews = (recentReviews as Array<Record<string, any>>).map((review) => {
+      const user = review.userId || {};
+      const course = review.courseId || {};
+      const reviewerName =
+        [String(user.firstName || "").trim(), String(user.lastName || "").trim()]
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        String(user.email || "Learner");
+      return {
+        id: String(review._id || ""),
+        courseId: String(course._id || ""),
+        courseTitle: String(course.title || "Course"),
+        rating: Number(review.rating || 0),
+        comment: String(review.comment || ""),
+        createdAt: review.createdAt || null,
+        reviewer: {
+          name: reviewerName,
+          avatarUrl: user.avatarUrl ?? null,
+        },
+      };
+    });
+
+    return res.json({
+      windowDays,
+      revenueTrend,
+      ratingTrend,
+      courseEarnings,
+      publishedCourseReviews,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ message: e?.message || "Failed to load instructor analytics" });
+  }
+}
+
+export async function getInstructorEarnings(req: AuthedRequest, res: Response) {
+  try {
+    const instructorId = req.user!.id;
+
+    const instructorObjectId = toObjectId(instructorId);
+    if (!instructorObjectId) return res.status(400).json({ message: "Invalid instructor id" });
+
+    const [agg] = await WalletTransaction.aggregate([
+      {
+        $match: {
+          userId: instructorObjectId,
+          type: "course_sale_credit",
+          status: "completed",
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalPaisa: { $sum: "$amountPaisa" },
+          payoutsCount: { $sum: 1 },
+          lastPayoutAt: { $max: "$createdAt" },
+        },
+      },
+    ]);
+
+    const totalPaisa = Number(agg?.totalPaisa || 0);
+    return res.json({
+      totalIncomePaisa: totalPaisa,
+      totalIncomeNpr: Number((totalPaisa / 100).toFixed(2)),
+      payoutsCount: Number(agg?.payoutsCount || 0),
+      lastPayoutAt: agg?.lastPayoutAt || null,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ message: e?.message || "Failed to load instructor earnings" });
+  }
+}
+
+function toObjectId(value: string) {
+  if (!Types.ObjectId.isValid(String(value))) return null;
+  return new Types.ObjectId(String(value));
 }

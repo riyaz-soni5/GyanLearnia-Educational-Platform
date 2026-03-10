@@ -6,7 +6,15 @@ import CourseSubmissionStatusCard from "@/components/instructor/CourseSubmission
 import InstructorHoursChart from "@/components/instructor/InstructorHoursChart";
 import InstructorStatCard from "@/components/instructor/InstructorStatCard";
 import InstructorStatusChart from "@/components/instructor/InstructorStatusChart";
-import { deleteCourse, listMyCourses, type MyInstructorCourse } from "@/services/instructorCourse";
+import {
+  deleteCourse,
+  getInstructorAnalytics,
+  getInstructorEarnings,
+  type InstructorAnalytics,
+  listMyCourses,
+  type InstructorEarningsSummary,
+  type MyInstructorCourse,
+} from "@/services/instructorCourse";
 import { getUser } from "@/services/session";
 import { getMyVerification, type VerificationStatus } from "@/services/instructorVerification";
 
@@ -47,6 +55,70 @@ const getInitials = (firstName?: string, lastName?: string, email?: string) => {
   return (email?.slice(0, 2) || "IN").toUpperCase();
 };
 
+const shortDate = (isoDay: string) => {
+  const d = new Date(`${isoDay}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return isoDay;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
+function RevenueTrendLineChart({ points }: { points: Array<{ date: string; value: number }> }) {
+  if (points.length === 0) return <p className="text-sm text-gray-600">No revenue trend data yet.</p>;
+
+  const width = 520;
+  const height = 200;
+  const padX = 28;
+  const padY = 20;
+  const innerW = width - padX * 2;
+  const innerH = height - padY * 2;
+  const maxValue = Math.max(...points.map((p) => p.value), 1);
+  const getX = (i: number) => (points.length === 1 ? width / 2 : padX + (i / (points.length - 1)) * innerW);
+  const getY = (value: number) => padY + (1 - value / maxValue) * innerH;
+  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${getX(i)} ${getY(p.value)}`).join(" ");
+
+  return (
+    <div className="space-y-2">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
+        {[0, 1, 2, 3, 4].map((i) => {
+          const y = padY + (i / 4) * innerH;
+          return <line key={i} x1={padX} y1={y} x2={width - padX} y2={y} stroke="#E5E7EB" strokeWidth="1" />;
+        })}
+        <path d={linePath} fill="none" stroke="#4F46E5" strokeWidth="2.5" strokeLinecap="round" />
+        {points.map((p, i) => (
+          <circle key={`${p.date}-${i}`} cx={getX(i)} cy={getY(p.value)} r="2.8" fill="#4338CA" />
+        ))}
+      </svg>
+      <div className="flex justify-between text-[11px] text-gray-500">
+        <span>{shortDate(points[0].date)}</span>
+        <span>{shortDate(points[points.length - 1].date)}</span>
+      </div>
+    </div>
+  );
+}
+
+function CourseEarningsBarChart({ items }: { items: Array<{ title: string; earningsNpr: number }> }) {
+  if (items.length === 0) return <p className="text-sm text-gray-600">No course earnings data yet.</p>;
+
+  const max = Math.max(1, ...items.map((x) => x.earningsNpr));
+  return (
+    <div className="space-y-3">
+      {items.map((item, idx) => (
+        <div key={`${item.title}-${idx}`}>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <p className="line-clamp-1 text-sm font-medium text-gray-800">{item.title}</p>
+            <span className="text-xs font-semibold text-gray-700">NPR {item.earningsNpr.toLocaleString()}</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-gray-200">
+            <div
+              className="h-2.5 rounded-full bg-indigo-600"
+              style={{ width: `${Math.max(5, (item.earningsNpr / max) * 100)}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function InstructorDashboardPage() {
   const navigate = useNavigate();
   const user = getUser();
@@ -59,6 +131,19 @@ export default function InstructorDashboardPage() {
     user?.verificationStatus ?? "NotSubmitted"
   );
   const [verificationReason, setVerificationReason] = useState<string | null>(null);
+  const [earnings, setEarnings] = useState<InstructorEarningsSummary>({
+    totalIncomePaisa: 0,
+    totalIncomeNpr: 0,
+    payoutsCount: 0,
+    lastPayoutAt: null,
+  });
+  const [analytics, setAnalytics] = useState<InstructorAnalytics>({
+    windowDays: 30,
+    revenueTrend: [],
+    ratingTrend: [],
+    courseEarnings: [],
+    publishedCourseReviews: [],
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -68,7 +153,12 @@ export default function InstructorDashboardPage() {
         setLoading(true);
         setError("");
 
-        const [coursesRes, verificationRes] = await Promise.allSettled([listMyCourses(), getMyVerification()]);
+        const [coursesRes, verificationRes, earningsRes, analyticsRes] = await Promise.allSettled([
+          listMyCourses(),
+          getMyVerification(),
+          getInstructorEarnings(),
+          getInstructorAnalytics(30),
+        ]);
 
         if (!cancelled) {
           if (coursesRes.status === "fulfilled") {
@@ -81,6 +171,14 @@ export default function InstructorDashboardPage() {
           if (verificationRes.status === "fulfilled") {
             setVerificationStatus(verificationRes.value.status);
             setVerificationReason(verificationRes.value.reason);
+          }
+
+          if (earningsRes.status === "fulfilled") {
+            setEarnings(earningsRes.value);
+          }
+
+          if (analyticsRes.status === "fulfilled") {
+            setAnalytics(analyticsRes.value);
           }
         }
       } finally {
@@ -109,27 +207,10 @@ export default function InstructorDashboardPage() {
     [courses]
   );
 
-  const topPerforming = useMemo(() => {
-    return [...courses]
-      .map((c) => ({
-        ...c,
-        score: (c.status === "Published" ? 30 : 0) + c.totalLectures * 2 + Math.round((c.totalVideoSec / 3600) * 10),
-      }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-  }, [courses]);
-
-  const income = useMemo(() => {
-    const publishedPaid = courses.filter((c) => c.status === "Published" && Number(c.priceNpr || 0) > 0);
-    const pendingPaid = courses.filter((c) => c.status !== "Published" && Number(c.priceNpr || 0) > 0);
-
-    return {
-      liveCatalogValue: publishedPaid.reduce((acc, c) => acc + Number(c.priceNpr || 0), 0),
-      pendingCatalogValue: pendingPaid.reduce((acc, c) => acc + Number(c.priceNpr || 0), 0),
-      paidPublishedCount: publishedPaid.length,
-      paidPipelineCount: pendingPaid.length,
-    };
-  }, [courses]);
+  const revenueLinePoints = useMemo(
+    () => analytics.revenueTrend.map((item) => ({ date: item.date, value: Number(item.revenueNpr || 0) })),
+    [analytics.revenueTrend]
+  );
 
   const onDeleteCourse = async (id: string, title: string) => {
     const ok = window.confirm(`Delete this course permanently?\n\n${title}`);
@@ -145,41 +226,23 @@ export default function InstructorDashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900 p-8 text-white shadow-sm">
+    <div className="mx-auto w-full max-w-7xl px-4">
+      <div className="space-y-6">
+      <section className="rounded-2xl p-8 shadow-sm">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold text-indigo-200">Instructor</p>
-            <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Dashboard</h1>
-            <p className="mt-2 text-sm text-indigo-100">Track course approval, updates, and publishing workflow.</p>
+            <p className="text-xs font-semibold text-basec">Instructor</p>
+            <h1 className="mt-2 text-2xl font-bold text-basec sm:text-3xl">Dashboard</h1>
 
-            <div className="mt-4 inline-flex items-center gap-3 rounded-2xl bg-white/10 px-4 py-2 ring-1 ring-white/20">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-white text-xs font-bold text-slate-900">
-                {getInitials(user?.firstName, user?.lastName, user?.email)}
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-white">
-                  {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "Instructor"}
-                </p>
-                <p className="text-xs text-indigo-100">{user?.email || "No email"}</p>
-              </div>
-            </div>
           </div>
 
           <div className="flex flex-wrap gap-3">
             <Link
               to="/instructor/upload-course"
-              className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-indigo-50"
+              className="inline-flex items-center gap-2 border rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 hover:bg-indigo-50"
             >
               <FiBookOpen className="h-4 w-4" />
               Upload Course
-            </Link>
-            <Link
-              to="/instructor/verify"
-              className="inline-flex items-center gap-2 rounded-lg border border-white/30 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10"
-            >
-              <FiShield className="h-4 w-4" />
-              {verificationStatus}
             </Link>
           </div>
         </div>
@@ -189,19 +252,16 @@ export default function InstructorDashboardPage() {
         <InstructorStatCard
           label="Total Courses"
           value={String(stats.total)}
-          hint="All statuses"
           icon={<FiBookOpen className="h-5 w-5" />}
         />
         <InstructorStatCard
           label="Published"
           value={String(stats.published)}
-          hint="Live on course page"
           icon={<FiCheckCircle className="h-5 w-5" />}
         />
         <InstructorStatCard
           label="Pending"
           value={String(stats.pending)}
-          hint="Waiting admin action"
           icon={<FiClock className="h-5 w-5" />}
         />
         <InstructorStatCard
@@ -211,11 +271,32 @@ export default function InstructorDashboardPage() {
           icon={<FiTrendingUp className="h-5 w-5" />}
         />
         <InstructorStatCard
-          label="Live Catalog Value"
-          value={`NPR ${income.liveCatalogValue.toLocaleString()}`}
-          hint={`${income.paidPublishedCount} paid courses published`}
+          label="Total Income"
+          value={`NPR ${earnings.totalIncomeNpr.toLocaleString()}`}
           icon={<FiTrendingUp className="h-5 w-5" />}
         />
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-12">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-6">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-base font-bold text-gray-900">Revenue Trend Line</h3>
+            <span className="text-xs text-gray-500">Last {analytics.windowDays} days</span>
+          </div>
+          <div className="mt-4">
+            <RevenueTrendLineChart points={revenueLinePoints} />
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm lg:col-span-6">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-base font-bold text-gray-900">Course Earnings Bar Chart</h3>
+            <span className="text-xs text-gray-500">Top earning courses</span>
+          </div>
+          <div className="mt-4">
+            <CourseEarningsBarChart items={analytics.courseEarnings} />
+          </div>
+        </div>
       </section>
 
       {error ? (
@@ -227,7 +308,6 @@ export default function InstructorDashboardPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900">Your Courses</h2>
-              <p className="mt-1 text-sm text-gray-600">Dynamic list from your instructor courses.</p>
             </div>
           </div>
 
@@ -236,7 +316,6 @@ export default function InstructorDashboardPage() {
           ) : courses.length === 0 ? (
             <div className="mt-4 rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4">
               <p className="text-sm font-semibold text-gray-800">No courses yet</p>
-              <p className="mt-1 text-sm text-gray-600">Upload your first course to start the approval workflow.</p>
               <Link
                 to="/instructor/upload-course"
                 className="mt-3 inline-flex rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
@@ -321,52 +400,28 @@ export default function InstructorDashboardPage() {
           <InstructorHoursChart items={courses} />
 
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="text-base font-bold text-gray-900">Most Performing Courses</h3>
-            <p className="mt-1 text-xs text-gray-500">Based on status, lesson count, and content hours.</p>
-
-            {topPerforming.length === 0 ? (
-              <p className="mt-3 text-sm text-gray-600">No course data yet.</p>
+            <h3 className="text-base font-bold text-gray-900">Published Course Reviews</h3>
+            {analytics.publishedCourseReviews.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-600">No reviews yet.</p>
             ) : (
-              <div className="mt-3 space-y-3">
-                {topPerforming.map((c, idx) => (
-                  <div key={c.id} className="rounded-xl border border-gray-200 p-3">
+              <div className="mt-3 max-h-[440px] space-y-3 overflow-y-auto pr-1">
+                {analytics.publishedCourseReviews.map((review) => (
+                  <div key={review.id} className="rounded-xl border border-gray-200 p-3">
                     <div className="flex items-start justify-between gap-2">
-                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">
-                        {idx + 1}. {c.title}
-                      </p>
-                      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200">
-                        {c.score}
-                      </span>
+                      <div className="min-w-0">
+                        <p className="line-clamp-1 text-sm font-semibold text-gray-900">{review.courseTitle}</p>
+                        <p className="mt-0.5 text-xs text-gray-500">{review.reviewer.name}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs font-semibold text-amber-600">{"★".repeat(Math.max(0, Math.min(5, Math.round(review.rating))))}</p>
+                        <p className="text-[11px] text-gray-500">{review.createdAt ? formatDate(review.createdAt) : "-"}</p>
+                      </div>
                     </div>
-                    <p className="mt-1 text-xs text-gray-600">
-                      {c.totalLectures} lessons • {Math.round((c.totalVideoSec / 3600) * 10) / 10} hrs • {statusLabel(c.status)}
-                    </p>
+                    <p className="mt-2 line-clamp-3 text-sm text-gray-700">{review.comment}</p>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h3 className="text-base font-bold text-gray-900">Income Snapshot</h3>
-            <p className="mt-1 text-xs text-gray-500">Pricing-based catalog value view.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl bg-green-50 p-3 ring-1 ring-green-200">
-                <p className="text-xs text-green-700">Live (Published)</p>
-                <p className="mt-1 text-lg font-bold text-green-800">
-                  NPR {income.liveCatalogValue.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-xl bg-amber-50 p-3 ring-1 ring-amber-200">
-                <p className="text-xs text-amber-700">Pipeline</p>
-                <p className="mt-1 text-lg font-bold text-amber-800">
-                  NPR {income.pendingCatalogValue.toLocaleString()}
-                </p>
-              </div>
-            </div>
-            <p className="mt-3 text-xs text-gray-600">
-              Paid published: {income.paidPublishedCount} • Paid in review/draft: {income.paidPipelineCount}
-            </p>
           </div>
 
           {verificationStatus === "Rejected" && verificationReason ? (
@@ -379,6 +434,7 @@ export default function InstructorDashboardPage() {
             </div>
           ) : null}
         </aside>
+      </div>
       </div>
     </div>
   );

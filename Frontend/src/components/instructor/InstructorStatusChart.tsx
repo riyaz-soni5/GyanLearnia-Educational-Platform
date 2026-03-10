@@ -19,7 +19,6 @@ export default function InstructorStatusChart({ draft, pending, published, rejec
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-base font-bold text-gray-900">Course Status</h3>
-      <p className="mt-1 text-xs text-gray-500">Distribution of your courses by status.</p>
 
       <div className="mt-4 space-y-3">
         {rows.map((row) => {

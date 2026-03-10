@@ -19,7 +19,6 @@ export default function InstructorHoursChart({ items }: Props) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-base font-bold text-gray-900">Top Content Hours</h3>
-      <p className="mt-1 text-xs text-gray-500">Your courses with the highest video duration.</p>
 
       {top.length === 0 ? (
         <p className="mt-4 text-sm text-gray-600">No course content yet.</p>
