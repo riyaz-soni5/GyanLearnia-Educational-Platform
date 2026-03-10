@@ -6,7 +6,6 @@ import {
   updateCurrentUserProfile,
   type UserProfile,
 } from "@/services/userProfile";
-import { listMyCourses } from "@/services/instructorCourse";
 import { getUser, setUser } from "@/services/session";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
@@ -30,6 +29,8 @@ const sanitizeInterests = (values: string[] | undefined): string[] => {
   });
   return Array.from(unique.values());
 };
+
+type ProfileTab = "profile" | "learning";
 
 const ProfilePage = () => {
   const nav = useNavigate();
@@ -89,14 +90,9 @@ const ProfilePage = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [instructorCourses, setInstructorCourses] = useState<
-    Array<{ status: "Draft" | "Pending" | "Published" | "Rejected" }>
-  >([]);
+  const [activeTab, setActiveTab] = useState<ProfileTab>("profile");
 
   const isInstructor = profile?.role === "instructor";
-
-  const isVerifiedInstructor =
-    profile?.role === "instructor" && profile?.verificationStatus === "Verified";
 
   useEffect(() => {
     let mounted = true;
@@ -149,32 +145,6 @@ const ProfilePage = () => {
     };
   }, [nav, showToast, resolveAssetUrl]);
 
-  useEffect(() => {
-    let mounted = true;
-
-    if (!isVerifiedInstructor) {
-      setInstructorCourses([]);
-      return () => {
-        mounted = false;
-      };
-    }
-
-    (async () => {
-      try {
-        const res = await listMyCourses();
-        if (!mounted) return;
-        setInstructorCourses(Array.isArray(res.items) ? res.items : []);
-      } catch {
-        if (!mounted) return;
-        setInstructorCourses([]);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isVerifiedInstructor]);
-
   const canSubmit = useMemo(() => {
     const validNames =
       firstName.trim().length >= 2 &&
@@ -186,12 +156,82 @@ const ProfilePage = () => {
     return validNames;
   }, [firstName, lastName, email, isInstructor]);
   const showAcademicSection = isEditing || academicBackgrounds.length > 0;
-  const instructorMetrics = useMemo(() => {
-    const totalCourses = instructorCourses.length;
-    const publishedCourses = instructorCourses.filter((c) => c.status === "Published").length;
-    const pendingCourses = instructorCourses.filter((c) => c.status === "Pending").length;
-    return { totalCourses, publishedCourses, pendingCourses };
-  }, [instructorCourses]);
+  const learningOverview = useMemo(() => {
+    const stats = profile?.stats;
+    if (!stats) return null;
+
+    const enrolledCount = Math.max(0, Number(stats.enrolledCoursesCount ?? 0));
+    const completedCount = Math.max(0, Number(stats.completedCoursesCount ?? 0));
+    const safeCompletedCount =
+      enrolledCount > 0 ? Math.min(completedCount, enrolledCount) : completedCount;
+    const completionPercent =
+      enrolledCount > 0 ? Math.round((safeCompletedCount / enrolledCount) * 100) : 0;
+
+    const completedIdSet = new Set(stats.completedCourses.map((course) => course.id));
+    const progressItems = stats.enrolledCourses.map((course) => {
+      const done = completedIdSet.has(course.id);
+      return {
+        id: course.id,
+        title: course.title,
+        progress: done ? 100 : 40,
+        status: done ? "Completed" : "In progress",
+      };
+    });
+
+    const points = Math.max(0, Number(stats.points ?? 0));
+    const nextBadgeTarget =
+      points < 100 ? 100 : points < 500 ? 500 : points < 1000 ? 1000 : null;
+    const pointsToNextBadge =
+      nextBadgeTarget === null ? 0 : Math.max(0, nextBadgeTarget - points);
+
+    const timelineSource =
+      Array.isArray(stats.pointsTimeline) && stats.pointsTimeline.length > 0
+        ? stats.pointsTimeline
+        : [{ label: "Current", date: new Date().toISOString(), points }];
+    const timelineWithStart = [
+      { label: "Start", date: timelineSource[0].date, points: 0 },
+      ...timelineSource.map((item) => ({
+        label: item.label,
+        date: item.date,
+        points: Math.max(0, Number(item.points ?? 0)),
+      })),
+    ];
+    const dedupedTimeline = timelineWithStart.filter((item, idx, arr) => {
+      if (idx === 0) return true;
+      const prev = arr[idx - 1];
+      return !(prev.label === item.label && prev.points === item.points);
+    });
+    const pointsTimeline = dedupedTimeline;
+    const chartWidth = 560;
+    const chartHeight = 190;
+    const paddingX = 28;
+    const paddingY = 22;
+    const maxPointValue = Math.max(1, ...pointsTimeline.map((item) => item.points));
+    const chartPoints = pointsTimeline.map((item, index) => {
+      const x =
+        paddingX +
+        (index * (chartWidth - paddingX * 2)) / Math.max(1, pointsTimeline.length - 1);
+      const y =
+        chartHeight -
+        paddingY -
+        (item.points / maxPointValue) * (chartHeight - paddingY * 2);
+      return { ...item, x, y };
+    });
+    const pointsPolyline = chartPoints.map((point) => `${point.x},${point.y}`).join(" ");
+
+    return {
+      completionPercent,
+      progressItems,
+      points,
+      nextBadgeTarget,
+      pointsToNextBadge,
+      chartWidth,
+      chartHeight,
+      maxPointValue,
+      chartPoints,
+      pointsPolyline,
+    };
+  }, [profile?.stats]);
 
   const formatShortDate = (value?: string | null) => {
     if (!value) return "Not set";
@@ -386,9 +426,35 @@ const ProfilePage = () => {
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <section className="rounded-2xl bg-surface px-6 py-6 sm:px-8 sm:py-7">
+        <div className="mb-5 inline-flex w-full max-w-sm rounded-full border border-base bg-[rgb(var(--bg))] p-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`flex-1 cursor-pointer rounded-full px-3 py-2 text-sm font-semibold transition ${
+              activeTab === "profile"
+                ? "bg-white text-basec shadow-sm ring-1 ring-base dark:bg-slate-800"
+                : "text-muted hover:text-basec"
+            }`}
+          >
+            Profile Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("learning")}
+            className={`flex-1 cursor-pointer rounded-full px-3 py-2 text-sm font-semibold transition ${
+              activeTab === "learning"
+                ? "bg-white text-basec shadow-sm ring-1 ring-base dark:bg-slate-800"
+                : "text-muted hover:text-basec"
+            }`}
+          >
+            Learning Overview
+          </button>
+        </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-basec">Profile Settings</h1>
+            <h1 className="text-2xl font-bold text-basec">
+              {activeTab === "profile" ? "Profile Settings" : "Learning Overview"}
+            </h1>
           </div>
           {profile ? (
             <div className="flex flex-wrap items-center gap-2">
@@ -407,25 +473,28 @@ const ProfilePage = () => {
                     : "Instructor"}
                 </span>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isEditing) {
-                    resetToProfile();
-                  }
-                  setIsEditing((v) => !v);
-                }}
-                className="ml-auto inline-flex items-center justify-center rounded-lg border border-base px-3 py-1.5 text-xs font-semibold text-basec hover:bg-[rgb(var(--bg))]"
-              >
-                {isEditing ? "Cancel editing" : "Edit profile"}
-              </button>
+              {activeTab === "profile" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isEditing) {
+                      resetToProfile();
+                    }
+                    setIsEditing((v) => !v);
+                  }}
+                  className="ml-auto inline-flex cursor-pointer items-center justify-center rounded-lg border border-base px-3 py-1.5 text-xs font-semibold text-basec hover:bg-[rgb(var(--bg))]"
+                >
+                  {isEditing ? "Cancel editing" : "Edit profile"}
+                </button>
+              )}
             </div>
           ) : null}
         </div>
       </section>
 
-      <section className="rounded-2xl bg-surface px-6 py-6 shadow-sm sm:px-8 sm:py-7">
-        <form className="space-y-5" onSubmit={onSubmit}>
+      {activeTab === "profile" && (
+        <section className="rounded-2xl bg-surface px-6 py-6 shadow-sm sm:px-8 sm:py-7">
+          <form className="space-y-5" onSubmit={onSubmit}>
           <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
             <div className="flex flex-col items-center">
               {avatarPreview ? (
@@ -465,7 +534,7 @@ const ProfilePage = () => {
                   {avatarPreview && (
                     <button
                       type="button"
-                      className="text-xs text-red-500 hover:text-red-600"
+                      className="cursor-pointer text-xs text-red-500 hover:text-red-600"
                       onClick={() => {
                         setAvatarFile(null);
                         setAvatarPreview(null);
@@ -618,7 +687,7 @@ const ProfilePage = () => {
                           <button
                             type="button"
                             onClick={() => removeInterest(interest)}
-                            className="text-indigo-500 hover:text-red-600"
+                            className="cursor-pointer text-indigo-500 hover:text-red-600"
                             disabled={loading || saving}
                           >
                             ×
@@ -763,7 +832,7 @@ const ProfilePage = () => {
                         </label>
                         <button
                           type="button"
-                          className="text-[11px] text-red-500 hover:text-red-600"
+                          className="cursor-pointer text-[11px] text-red-500 hover:text-red-600"
                           onClick={() =>
                             setAcademicBackgrounds((prev) =>
                               prev.filter((_, i) => i !== idx)
@@ -792,7 +861,7 @@ const ProfilePage = () => {
                 {isEditing && (
                   <button
                     type="button"
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700"
+                    className="cursor-pointer text-xs font-semibold text-indigo-600 hover:text-indigo-700"
                     onClick={() =>
                       setAcademicBackgrounds((prev) => [
                         ...prev,
@@ -817,11 +886,11 @@ const ProfilePage = () => {
           <div
             className={[
               "text-[12px] transition",
-              error ? "text-red-500" : "text-transparent",
+              error ? "text-red-500" : "hidden",
             ].join(" ")}
             aria-live="polite"
           >
-            *{error ?? "\u00A0"}
+            {error ? `*${error}` : null}
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -832,43 +901,156 @@ const ProfilePage = () => {
                 className={`inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
                   !canSubmit || saving || loading
                     ? "bg-gray-400 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700"
+                    : "cursor-pointer bg-indigo-600 hover:bg-indigo-700"
                 }`}
               >
                 {saving ? "Saving changes..." : "Save changes"}
               </button>
             )}
           </div>
+
+          <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+            <p className="text-xs font-medium text-muted">Plan status</p>
+            <p className="mt-1 text-base font-semibold text-basec">
+              {profile?.currentPlan ?? "Free"}
+            </p>
+            {profile?.planExpiresAt ? (
+              <p className="mt-1 text-xs text-muted">
+                Expires on {new Date(profile.planExpiresAt).toLocaleDateString()}
+              </p>
+            ) : null}
+          </div>
         </form>
       </section>
+      )}
 
-      {(profile?.stats || isVerifiedInstructor) && (
+      {activeTab === "learning" && (
         <section className="rounded-2xl bg-surface px-6 py-6 shadow-sm sm:px-8 sm:py-7">
-          <h2 className="text-lg font-semibold text-basec">
-            {isVerifiedInstructor ? "Teaching overview" : "Learning overview"}
-          </h2>
+          <h2 className="text-lg font-semibold text-basec">Learning overview</h2>
 
-          {isVerifiedInstructor ? (
-            <div className="mt-5 grid gap-4 sm:grid-cols-4">
-              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-                <p className="text-xs font-medium text-muted">Total courses</p>
-                <p className="mt-1 text-2xl font-bold text-basec">{instructorMetrics.totalCourses}</p>
-              </div>
-              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-                <p className="text-xs font-medium text-muted">Published courses</p>
-                <p className="mt-1 text-2xl font-bold text-basec">{instructorMetrics.publishedCourses}</p>
-              </div>
-              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-                <p className="text-xs font-medium text-muted">Pending courses</p>
-                <p className="mt-1 text-2xl font-bold text-basec">{instructorMetrics.pendingCourses}</p>
-              </div>
-              <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-                <p className="text-xs font-medium text-muted">Points</p>
-                <p className="mt-1 text-2xl font-bold text-basec">{profile?.stats?.points ?? 0}</p>
-              </div>
-            </div>
-          ) : profile?.stats ? (
+          {learningOverview && profile?.stats ? (
             <>
+              <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                  <p className="text-xs font-medium text-muted">Progress</p>
+                  <div className="mt-3 flex items-center justify-center">
+                    <div className="relative h-32 w-32">
+                      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r="44"
+                          fill="none"
+                          stroke="rgb(226 232 240)"
+                          strokeWidth="10"
+                        />
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r="44"
+                          fill="none"
+                          stroke="rgb(79 70 229)"
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          strokeDasharray={`${2 * Math.PI * 44}`}
+                          strokeDashoffset={`${2 * Math.PI * 44 * (1 - learningOverview.completionPercent / 100)}`}
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <p className="text-2xl font-bold text-basec">{learningOverview.completionPercent}%</p>
+                        <p className="text-[11px] text-muted">Completed</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4 lg:col-span-2">
+                  <p className="text-xs font-medium text-muted">Points over time</p>
+                  <div className="mt-3 overflow-x-auto">
+                    <svg
+                      viewBox={`0 0 ${learningOverview.chartWidth} ${learningOverview.chartHeight}`}
+                      className="h-48 w-full min-w-[420px]"
+                    >
+                      {[0, 25, 50, 75, 100].map((tick) => {
+                        const y =
+                          learningOverview.chartHeight -
+                          22 -
+                          (tick / 100) * (learningOverview.chartHeight - 44);
+                        return (
+                          <line
+                            key={tick}
+                            x1="28"
+                            y1={y}
+                            x2={learningOverview.chartWidth - 28}
+                            y2={y}
+                            stroke="rgb(226 232 240)"
+                            strokeWidth="1"
+                          />
+                        );
+                      })}
+                      <polyline
+                        fill="none"
+                        stroke="rgb(79 70 229)"
+                        strokeWidth="3"
+                        points={learningOverview.pointsPolyline}
+                      />
+                      {learningOverview.chartPoints.map((point) => (
+                        <g key={`${point.label}-${point.date}`}>
+                          <circle cx={point.x} cy={point.y} r="4" fill="rgb(79 70 229)" />
+                          <text
+                            x={point.x}
+                            y={learningOverview.chartHeight - 6}
+                            textAnchor="middle"
+                            className="fill-gray-500 text-[10px]"
+                          >
+                            {point.label}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+                    <span>Total points: {learningOverview.points}</span>
+                    <span>
+                      {learningOverview.nextBadgeTarget
+                        ? `${learningOverview.pointsToNextBadge} to next badge (${learningOverview.nextBadgeTarget})`
+                        : "Top badge tier reached"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-muted">Course progress bars</p>
+                  <span className="text-[11px] text-muted">
+                    {learningOverview.progressItems.length} enrolled
+                  </span>
+                </div>
+                {learningOverview.progressItems.length > 0 ? (
+                  <div className="mt-3 space-y-3">
+                    {learningOverview.progressItems.slice(0, 6).map((item) => (
+                      <div key={item.id}>
+                        <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                          <p className="line-clamp-1 font-medium text-basec">{item.title}</p>
+                          <span className={item.progress === 100 ? "text-emerald-600" : "text-amber-600"}>
+                            {item.status}
+                          </span>
+                        </div>
+                        <div className="h-2.5 w-full rounded-full bg-gray-200">
+                          <div
+                            className={`h-2.5 rounded-full ${item.progress === 100 ? "bg-emerald-500" : "bg-amber-500"}`}
+                            style={{ width: `${item.progress}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-sm text-muted">Enroll in a course to see progress bars.</p>
+                )}
+              </div>
+
               <div className="mt-5 grid gap-4 sm:grid-cols-5">
                 <div className="rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
                   <p className="text-xs font-medium text-muted">Enrolled courses</p>
@@ -959,19 +1141,10 @@ const ProfilePage = () => {
                 </div>
               )}
             </>
-          ) : null}
+          ) : (
+            <p className="mt-4 text-sm text-muted">No learning activity available yet.</p>
+          )}
 
-          <div className="mt-5 rounded-xl border border-base bg-[rgb(var(--bg))] p-4">
-            <p className="text-xs font-medium text-muted">Plan status</p>
-            <p className="mt-1 text-base font-semibold text-basec">
-              {profile?.currentPlan ?? "Free"}
-            </p>
-            {profile?.planExpiresAt ? (
-              <p className="mt-1 text-xs text-muted">
-                Expires on {new Date(profile.planExpiresAt).toLocaleDateString()}
-              </p>
-            ) : null}
-          </div>
         </section>
       )}
       <ConfirmDialog

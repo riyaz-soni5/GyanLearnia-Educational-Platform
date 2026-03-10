@@ -37,6 +37,7 @@ export type UserProfile = {
     badge: string;
     enrolledCourses: Array<{ id: string; title: string; thumbnailUrl?: string | null }>;
     completedCourses: Array<{ id: string; title: string; thumbnailUrl?: string | null }>;
+    pointsTimeline?: Array<{ label: string; date: string; points: number }>;
   };
 };
 
