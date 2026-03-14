@@ -25,6 +25,19 @@ const getRankIcon = (idx: number) => {
   return <FiStar className="text-gray-400" />;
 };
 
+const getRankRowClass = (idx: number) => {
+  if (idx === 0) {
+    return "border-yellow-200 bg-yellow-50 dark:border-yellow-500/30 dark:bg-yellow-500/10";
+  }
+  if (idx === 1) {
+    return "border-slate-200 bg-slate-50 dark:border-slate-500/30 dark:bg-slate-500/10";
+  }
+  if (idx === 2) {
+    return "border-orange-300 bg-orange-100/70 dark:border-orange-500/30 dark:bg-orange-500/10";
+  }
+  return "border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5";
+};
+
 const roleStyles: Record<string, string> = {
   Instructor:
     "bg-indigo-50 text-indigo-700 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-300 dark:ring-indigo-500/20",
@@ -99,7 +112,7 @@ const Leaderboard = () => {
           {displayItems.map((u, idx) => (
             <div
               key={u.id}
-              className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 transition hover:shadow-sm dark:border-white/10 dark:bg-white/5"
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 transition hover:shadow-sm ${getRankRowClass(idx)}`}
             >
               {/* Left */}
               <div className="flex items-center gap-3 min-w-0">

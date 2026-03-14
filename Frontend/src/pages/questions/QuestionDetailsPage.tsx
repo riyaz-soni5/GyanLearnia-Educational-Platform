@@ -79,7 +79,7 @@ const VoteBox = ({
       onClick={onUp}
       disabled={disabled}
       className={[
-        "rounded-lg border p-2",
+        "cursor-pointer rounded-lg border p-2",
         disabled ? "opacity-50 cursor-not-allowed" : "",
         myVote === 1
           ? "bg-indigo-600 text-white border-indigo-600"
@@ -96,7 +96,7 @@ const VoteBox = ({
       onClick={onDown}
       disabled={disabled}
       className={[
-        "rounded-lg border p-2",
+        "cursor-pointer rounded-lg border p-2",
         disabled ? "opacity-50 cursor-not-allowed" : "",
         myVote === -1
           ? "bg-red-600 text-white border-red-600"
@@ -760,7 +760,14 @@ const QuestionDetailsPage = () => {
             onConfirm={onDelete}
           />
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
+          <section
+            className={[
+              "rounded-2xl border p-6 shadow-sm dark:shadow-none",
+              (question as any)?.isFastResponse
+                ? "border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-white dark:border-amber-500/30 dark:bg-[linear-gradient(135deg,rgba(245,158,11,0.14),rgba(234,179,8,0.08),rgba(17,24,39,0.92))]"
+                : "border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900",
+            ].join(" ")}
+          >
             {isOwner ? (
               <div className="flex flex-wrap items-center justify-end gap-3">
                 {!isEditing ? (
@@ -772,7 +779,7 @@ const QuestionDetailsPage = () => {
                         setEditExcerpt((question as any)?.excerpt ?? "");
                         setIsEditing(true);
                       }}
-                      className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 hover:shadow dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 hover:shadow dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
                     >
                       <FiEdit2 className="h-4 w-4" />
                       Edit
@@ -786,7 +793,7 @@ const QuestionDetailsPage = () => {
                         "inline-flex items-center justify-center rounded-xl px-3 py-2.5 shadow-sm transition",
                         deleting || saving
                           ? "cursor-not-allowed bg-gray-200 text-gray-400 dark:bg-white/5"
-                          : "bg-red-50 text-red-600 hover:bg-red-100 hover:shadow dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20",
+                          : "cursor-pointer bg-red-50 text-red-600 hover:bg-red-100 hover:shadow dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20",
                       ].join(" ")}
                     >
                       <FiTrash2 className="h-5 w-5" />
@@ -798,7 +805,7 @@ const QuestionDetailsPage = () => {
                       type="button"
                       onClick={cancelEdit}
                       disabled={saving || deleting}
-                      className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 hover:shadow dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition hover:bg-gray-50 hover:shadow dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
                     >
                       <FiX className="h-4 w-4" />
                       Cancel
@@ -812,7 +819,7 @@ const QuestionDetailsPage = () => {
                         "inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition",
                         saving || deleting
                           ? "bg-gray-400 cursor-not-allowed"
-                          : "bg-indigo-600 hover:bg-indigo-700 hover:shadow",
+                          : "cursor-pointer bg-indigo-600 hover:bg-indigo-700 hover:shadow",
                       ].join(" ")}
                     >
                       <FiSave className="h-4 w-4" />
@@ -887,12 +894,6 @@ const QuestionDetailsPage = () => {
                 )}
 
                 <div className="flex flex-wrap items-center gap-2 mt-2">
-                  {(question as any).hasVerifiedAnswer ? (
-                    <Badge text="Verified Answer" tone="indigo" />
-                  ) : null}
-                  {(question as any).isFastResponse ? (
-                    <Badge text="Fast Response" tone="yellow" />
-                  ) : null}
                   {Number((question as any)?.fastResponsePrice || 0) > 0 ? (
                     <Badge
                       text={`Reward NPR ${Number((question as any).fastResponsePrice || 0).toFixed(2)}`}
@@ -1075,7 +1076,7 @@ const QuestionDetailsPage = () => {
                                 "rounded-lg border p-2",
                                 a.isVerified
                                   ? "bg-green-50 text-green-700 border-green-200 cursor-default dark:bg-green-500/10 dark:text-green-300 dark:border-green-500/20"
-                                  : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-white/10 dark:hover:bg-white/5",
+                                  : "cursor-pointer bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-950 dark:text-gray-200 dark:border-white/10 dark:hover:bg-white/5",
                               ].join(" ")}
                               title={a.isVerified ? "Already marked correct" : "Mark as correct"}
                             >
@@ -1130,7 +1131,7 @@ const QuestionDetailsPage = () => {
                               setActiveReplyBoxFor((prev) => (prev === a.id ? null : a.id));
                               // keep draft as-is if user reopens
                             }}
-                            className="font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+                            className="cursor-pointer font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
                           >
                             Reply
                           </button>
@@ -1154,7 +1155,7 @@ const QuestionDetailsPage = () => {
                                   setActiveReplyBoxFor(null);
                                   setReplyDraftMap((m) => ({ ...m, [a.id]: "" }));
                                 }}
-                                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+                                className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
                               >
                                 Cancel
                               </button>
@@ -1163,7 +1164,7 @@ const QuestionDetailsPage = () => {
                                 type="button"
                                 onClick={() => postRootReplyToAnswer(a.id)}
                                 disabled={stripHtml(replyDraftMap[a.id] || "").length < 3}
-                                className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                                className="cursor-pointer rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
                               >
                                 Reply
                               </button>
@@ -1236,7 +1237,7 @@ const QuestionDetailsPage = () => {
                               <button
                                 type="button"
                                 onClick={cancelAnswerEdit}
-                                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+                                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
                               >
                                 <FiX className="h-4 w-4" />
                                 Cancel
@@ -1249,7 +1250,7 @@ const QuestionDetailsPage = () => {
                                   savingAnswerId === myAnswer.id ||
                                   stripHtml(editAnswerText).length < 10
                                 }
-                                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
+                                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
                               >
                                 <FiSave className="h-4 w-4" />
                                 {savingAnswerId === myAnswer.id
@@ -1277,7 +1278,7 @@ const QuestionDetailsPage = () => {
                               <button
                                 type="button"
                                 onClick={() => startAnswerEdit(myAnswer)}
-                                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+                                className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 shadow-sm hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
                               >
                                 <FiEdit2 className="h-4 w-4" />
                                 Edit
@@ -1303,7 +1304,7 @@ const QuestionDetailsPage = () => {
                                   }
                                 }}
                                 disabled={deletingAnswerId === myAnswer.id}
-                                className="inline-flex items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+                                className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
                               >
                                 <FiTrash2 className="h-4 w-4" />
                                 {deletingAnswerId === myAnswer.id
@@ -1339,7 +1340,7 @@ const QuestionDetailsPage = () => {
                         "rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
                         posting || stripHtml(draft).length < 10
                           ? "bg-gray-400 cursor-not-allowed"
-                          : "bg-indigo-600 hover:bg-indigo-700",
+                          : "cursor-pointer bg-indigo-600 hover:bg-indigo-700",
                       ].join(" ")}
                     >
                       {posting ? "Posting..." : "Post Answer"}

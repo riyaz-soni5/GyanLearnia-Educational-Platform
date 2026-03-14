@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import type { Question } from "@/app/types/question.types";
 import { BiUpvote } from "react-icons/bi";
 import { FaRegCommentDots } from "react-icons/fa";
-import { FiEye, FiBookmark, FiShare2 } from "react-icons/fi";
+import { FiEye, FiShare2 } from "react-icons/fi";
+import { useToast } from "@/components/toast";
 
 const formatDateOnly = (iso?: string) => {
   if (!iso) return "";
@@ -83,10 +84,12 @@ const QuestionCard = ({
   isUpvoteLoading?: boolean;
 }) => {
   const nav = useNavigate();
+  const { showToast } = useToast();
   const isUpvoted = question.myVote === 1;
 
   const answered = question.status === "Answered";
   const categoryLabel = (question as any).categoryName || question.subject || "Category";
+  const isFastResponse = Boolean(question.isFastResponse);
 
   const authorName =
     (question as any).author && (question as any).author !== "Unknown"
@@ -99,15 +102,24 @@ const QuestionCard = ({
 
   const onShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    const url = `${window.location.origin}/questions/${question.id}`;
     try {
-      const url = `${window.location.origin}/questions/${question.id}`;
-      if (navigator.share) {
-        await navigator.share({ title: question.title, url });
-      } else if (navigator.clipboard) {
+      if (navigator.clipboard) {
         await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
       }
+      showToast("Question link copied", "success");
     } catch {
-      // ignore
+      showToast("Failed to copy question link", "error");
     }
   };
 
@@ -122,15 +134,17 @@ const QuestionCard = ({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") openDetails();
       }}
-      className="cursor-pointer rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-200
-                 sm:p-5 dark:border-white/10 dark:bg-gray-900 dark:shadow-none dark:hover:ring-1 dark:hover:ring-white/10 dark:focus:ring-indigo-500/30"
+      className={[
+        "cursor-pointer rounded-2xl border p-4 shadow-sm transition hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-200 sm:p-5 dark:shadow-none dark:hover:ring-1 dark:hover:ring-white/10 dark:focus:ring-indigo-500/30",
+        isFastResponse
+          ? "border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50 to-white dark:border-amber-500/30 dark:bg-[linear-gradient(135deg,rgba(245,158,11,0.14),rgba(234,179,8,0.08),rgba(17,24,39,0.92))]"
+          : "border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900",
+      ].join(" ")}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
         {/* Content */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {question.hasVerifiedAnswer ? <Badge text="Verified Answer" tone="indigo" /> : null}
-            {question.isFastResponse ? <Badge text="Fast Response" tone="yellow" /> : null}
             {Number(question.fastResponsePrice || 0) > 0 ? (
               <Badge text={`Reward NPR ${Number(question.fastResponsePrice || 0).toFixed(2)}`} tone="green" />
             ) : null}
@@ -199,7 +213,7 @@ const QuestionCard = ({
             }}
             disabled={isUpvoteLoading}
             className={[
-              "inline-flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition",
+              "inline-flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 transition",
               isUpvoteLoading ? "cursor-not-allowed opacity-50" : "",
               isUpvoted
                 ? "bg-indigo-600 text-white"
@@ -214,7 +228,7 @@ const QuestionCard = ({
           <Link
             to={`/questions/${question.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
+            className="inline-flex cursor-pointer items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
             title="Open to answer"
           >
             <FaRegCommentDots className="h-4 w-4" />
@@ -230,18 +244,8 @@ const QuestionCard = ({
         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 sm:gap-4 dark:text-gray-300">
           <button
             type="button"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
-            title="Save (static)"
-          >
-            <FiBookmark className="h-4 w-4" />
-            Save
-          </button>
-
-          <button
-            type="button"
             onClick={onShare}
-            className="inline-flex items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
+            className="inline-flex cursor-pointer items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
             title="Share"
           >
             <FiShare2 className="h-4 w-4" />
