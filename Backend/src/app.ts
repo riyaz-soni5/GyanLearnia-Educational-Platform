@@ -18,6 +18,7 @@ import mentorDiscoveryRoutes from "./routes/mentor.discovery.route.js";
 import khaltiPaymentRoutes from "./routes/payment.khalti.route.js";
 import notificationRoutes from "./routes/notification.route.js";
 import walletRoutes from "./routes/wallet.route.js";
+import contactSubmissionRoutes from "./routes/contactSubmission.route.js";
 
 const app = express();
 
@@ -47,6 +48,7 @@ app.use("/api/mentors", mentorDiscoveryRoutes);
 app.use("/api/payment", khaltiPaymentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/wallet", walletRoutes);
+app.use("/api", contactSubmissionRoutes);
 
 
 export default app;

@@ -240,18 +240,10 @@ export default function ManageUsersPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl bg-white p-8 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              Manage Users
-            </h1>
-          </div>
-        </div>
-
+      <section className="rounded-2xl bg-white p-6 shadow-sm dark:bg-gray-900 dark:shadow-none">
         <div className="mt-6 grid gap-4 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <label className="text-xs font-semibold text-gray-700">Search</label>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Search</label>
             <div className="mt-2 relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <FiSearch className="h-4 w-4" />
@@ -260,17 +252,17 @@ export default function ManageUsersPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name or email..."
-                className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
               />
             </div>
           </div>
 
           <div className="lg:col-span-4">
-            <label className="text-xs font-semibold text-gray-700">Role</label>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Role</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as AdminRoleFilter)}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
             >
               <option value="All">All</option>
               <option value="student">Student</option>
@@ -282,29 +274,29 @@ export default function ManageUsersPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-300">
             {loading ? (
               "Loading..."
             ) : (
               <>
                 Showing{" "}
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-gray-900 dark:text-white">
                   {showingFrom}-{showingTo}
                 </span>{" "}
-                of <span className="font-semibold text-gray-900">{total}</span>
+                of <span className="font-semibold text-gray-900 dark:text-white">{total}</span>
               </>
             )}
           </p>
 
-          {err ? <p className="text-sm font-semibold text-red-700">{err}</p> : null}
+          {err ? <p className="text-sm font-semibold text-red-700 dark:text-red-300">{err}</p> : null}
         </div>
       </section>
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="text-xs font-semibold text-gray-500">
-              <tr className="border-b border-gray-200">
+            <thead className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+              <tr className="border-b border-gray-200 dark:border-white/10">
                 <th className="py-3 pr-4">User</th>
                 <th className="py-3 pr-4">Role</th>
                 <th className="py-3 pr-4">Joined</th>
@@ -312,10 +304,10 @@ export default function ManageUsersPage() {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-white/10">
               {!loading && displayRows.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-10 text-center text-sm text-gray-600">
+                  <td colSpan={4} className="py-10 text-center text-sm text-gray-600 dark:text-gray-300">
                     No users found.
                   </td>
                 </tr>
@@ -325,7 +317,6 @@ export default function ManageUsersPage() {
                 const fullName = `${u.firstName} ${u.lastName}`.trim();
                 const currentKey = getRoleKey(u);
                 const pickedKey = rolePick[u.id] ?? currentKey;
-                const isAdmin = currentKey === "admin";
                 const saving = Boolean(roleSaving[u.id]);
 
                 return (
@@ -337,10 +328,10 @@ export default function ManageUsersPage() {
                         </span>
 
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-gray-900">
+                          <p className="truncate font-semibold text-gray-900 dark:text-white">
                             {fullName || "(No name)"}
                           </p>
-                          <p className="mt-1 text-xs text-gray-500">{u.email}</p>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{u.email}</p>
 
                         </div>
                       </div>
@@ -350,7 +341,7 @@ export default function ManageUsersPage() {
                       <Badge text={roleLabel(currentKey)} tone={roleToneByKey(currentKey)} />
                     </td>
 
-                    <td className="py-4 pr-4 text-gray-700">{formatDate(u.joinedAt)}</td>
+                    <td className="py-4 pr-4 text-gray-700 dark:text-gray-300">{formatDate(u.joinedAt)}</td>
 
                     <td className="py-4 text-right">
                       <div className="inline-flex flex-wrap justify-end gap-2">
@@ -362,9 +353,9 @@ export default function ManageUsersPage() {
                             setRolePick((p) => ({ ...p, [u.id]: next }));
                             void handleRoleChange(u, next);
                           }}
-                          disabled={isAdmin || saving}
-                          className="h-10 rounded-lg border border-gray-300 bg-white px-2 text-sm disabled:opacity-60"
-                          title={isAdmin ? "Admin protected" : saving ? "Updating..." : "Change role"}
+                          disabled={saving}
+                          className="h-10 cursor-pointer rounded-lg border border-gray-300 bg-white px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:bg-gray-950 dark:text-white"
+                          title={saving ? "Updating..." : "Change role"}
                         >
                           <option value="student">Student</option>
                           <option value="verified_instructor">Verified Instructor</option>
@@ -374,17 +365,15 @@ export default function ManageUsersPage() {
 
                         <button
                           type="button"
-                          className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                          className="inline-flex h-10 items-center gap-2 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60 dark:border-white/10 dark:text-red-300 dark:hover:bg-red-500/10"
                           onClick={() => openDeleteConfirm(u)}
-                          disabled={isAdmin || confirmLoading}
-                          title={isAdmin ? "Admin protected" : "Delete user"}
+                          disabled={confirmLoading}
+                          title="Delete user"
                         >
                           <FiTrash2 className="h-4 w-4" />
                           Delete
                         </button>
                       </div>
-
-                      {isAdmin ? <p className="mt-2 text-xs text-gray-500">Admin protected</p> : null}
                     </td>
                   </tr>
                 );
@@ -394,9 +383,9 @@ export default function ManageUsersPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-gray-600">
-            Page <span className="font-semibold text-gray-900">{page}</span> of{" "}
-            <span className="font-semibold text-gray-900">{totalPages}</span>
+          <p className="text-xs text-gray-600 dark:text-gray-300">
+            Page <span className="font-semibold text-gray-900 dark:text-white">{page}</span> of{" "}
+            <span className="font-semibold text-gray-900 dark:text-white">{totalPages}</span>
           </p>
 
           <div className="inline-flex gap-2">
@@ -404,7 +393,7 @@ export default function ManageUsersPage() {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1 || loading}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              className="cursor-pointer rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
             >
               Prev
             </button>
@@ -413,7 +402,7 @@ export default function ManageUsersPage() {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages || loading}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              className="cursor-pointer rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
             >
               Next
             </button>

@@ -8,7 +8,7 @@ import {
   FiLogOut,
   FiChevronDown,
   FiShield,
-  FiUploadCloud,
+  FiGrid,
   FiMenu,
   FiX,
   FiBell,
@@ -289,7 +289,7 @@ const Header = () => {
               type="button"
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800"
+              className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800"
             >
               {theme === "dark" ? <FiSun className="h-4 w-4" /> : <FiMoon className="h-4 w-4" />}
             </button>
@@ -298,7 +298,7 @@ const Header = () => {
               type="button"
               onClick={() => setMobileOpen((s) => !s)}
               aria-label="Toggle mobile menu"
-              className="inline-flex items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800 md:hidden"
+              className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-gray-200 p-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:text-gray-200 dark:hover:bg-gray-800 md:hidden"
             >
               {mobileOpen ? <FiX className="h-4 w-4" /> : <FiMenu className="h-4 w-4" />}
             </button>
@@ -325,7 +325,7 @@ const Header = () => {
                   <button
                     type="button"
                     onClick={toggleNotificationPanel}
-                    className="relative inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                    className="relative inline-flex cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
                     aria-label="Open notifications"
                   >
                     <FiBell className="h-5 w-5" />
@@ -344,7 +344,7 @@ const Header = () => {
                           <button
                             type="button"
                             onClick={() => void markAllAsRead()}
-                            className="text-xs font-medium text-indigo-600 hover:text-indigo-700"
+                            className="cursor-pointer text-xs font-medium text-indigo-600 hover:text-indigo-700"
                           >
                             Mark all as read
                           </button>
@@ -360,7 +360,7 @@ const Header = () => {
                               key={item.id}
                               type="button"
                               onClick={() => void openNotification(item)}
-                              className={`w-full border-b border-base px-4 py-3 text-left last:border-b-0 hover:bg-[rgb(var(--bg))]
+                              className={`w-full cursor-pointer border-b border-base px-4 py-3 text-left last:border-b-0 hover:bg-[rgb(var(--bg))]
                                 ${item.isRead ? "" : "bg-indigo-50/70 dark:bg-indigo-950/20"}`}
                             >
                               <div className="flex items-start justify-between gap-3">
@@ -392,7 +392,7 @@ const Header = () => {
                       setNotificationOpen(false);
                       setOpen((s) => !s);
                     }}
-                    className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-2 text-gray-700 hover:bg-gray-100 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800"
                     aria-label="Open profile menu"
                   >
                     {avatarUrl ? (
@@ -446,7 +446,7 @@ const Header = () => {
                       <button
                         type="button"
                         onClick={() => go("/profile")}
-                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                       >
                         <FiUser className="h-4 w-4" />
                         Profile
@@ -455,7 +455,7 @@ const Header = () => {
                       <button
                         type="button"
                         onClick={() => go("/wallet")}
-                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                       >
                         <FiCreditCard className="h-4 w-4" />
                         Wallet
@@ -468,19 +468,10 @@ const Header = () => {
                             onClick={() =>
                               go(instructorVerified ? "/instructor/dashboard" : "/instructor/verify")
                             }
-                            className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                            className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                           >
-                            <FiShield className="h-4 w-4" />
+                            <FiGrid className="h-4 w-4" />
                             {instructorVerified ? "Instructor Dashboard" : "Verify Instructor"}
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => go("/instructor/upload-course")}
-                            className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
-                          >
-                            <FiUploadCloud className="h-4 w-4" />
-                            Upload Course
                           </button>
                         </>
                       ) : null}
@@ -489,7 +480,7 @@ const Header = () => {
                         <button
                           type="button"
                           onClick={() => go("/admin")}
-                          className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                          className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                         >
                           <FiShield className="h-4 w-4" />
                           Admin Dashboard
@@ -501,7 +492,7 @@ const Header = () => {
                       <button
                         type="button"
                         onClick={logout}
-                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                       >
                         <FiLogOut className="h-4 w-4" />
                         Logout
@@ -581,7 +572,7 @@ const Header = () => {
                         setMobileOpen(false);
                         go("/profile");
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                      className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                     >
                       <FiUser className="h-4 w-4" />
                       Profile
@@ -593,7 +584,7 @@ const Header = () => {
                         setMobileOpen(false);
                         go("/wallet");
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                      className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                     >
                       <FiCreditCard className="h-4 w-4" />
                       Wallet
@@ -607,21 +598,10 @@ const Header = () => {
                             setMobileOpen(false);
                             go(instructorVerified ? "/instructor/dashboard" : "/instructor/verify");
                           }}
-                          className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                          className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                         >
-                          <FiShield className="h-4 w-4" />
+                          <FiGrid className="h-4 w-4" />
                           {instructorVerified ? "Instructor Dashboard" : "Verify Instructor"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMobileOpen(false);
-                            go("/instructor/upload-course");
-                          }}
-                          className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
-                        >
-                          <FiUploadCloud className="h-4 w-4" />
-                          Upload Course
                         </button>
                       </>
                     ) : null}
@@ -633,7 +613,7 @@ const Header = () => {
                           setMobileOpen(false);
                           go("/admin");
                         }}
-                        className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                       >
                         <FiShield className="h-4 w-4" />
                         Admin Dashboard
@@ -648,7 +628,7 @@ const Header = () => {
                         setMobileOpen(false);
                         logout();
                       }}
-                      className="flex w-full items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
+                      className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-sm text-basec hover:bg-[rgb(var(--bg))]"
                     >
                       <FiLogOut className="h-4 w-4" />
                       Logout

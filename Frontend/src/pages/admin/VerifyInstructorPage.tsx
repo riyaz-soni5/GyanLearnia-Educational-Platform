@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FiSearch, FiEye, FiCheckCircle, FiXCircle } from "react-icons/fi";
 
 import VerificationInstructorModal from "@/components/admin/VerificationInstructorModal";
+import AdminPagination from "@/components/admin/AdminPagination";
 import {
   type AdminVerificationItem,
   type VerificationStatus,
@@ -20,6 +21,8 @@ const VerifyInstructorsPage = () => {
 
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<VerificationStatus | "All">("All");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const [openId, setOpenId] = useState<string | null>(null);
   const openItem = useMemo(() => items.find((x) => x.id === openId) ?? null, [items, openId]);
@@ -65,6 +68,20 @@ const VerifyInstructorsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    setPage(1);
+  }, [query, status]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const paginatedItems = useMemo(
+    () => items.slice((page - 1) * pageSize, page * pageSize),
+    [items, page]
+  );
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
   const onSearch = async () => {
     await load({ q: query, status });
   };
@@ -104,12 +121,10 @@ const VerifyInstructorsPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="rounded-2xl bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Verify Instructors</h1>
-
+      <section className="rounded-2xl bg-white p-6 shadow-sm dark:bg-gray-900 dark:shadow-none">
         <div className="mt-6 grid gap-4 lg:grid-cols-12">
           <div className="lg:col-span-8">
-            <label className="text-xs font-semibold text-gray-700">Search</label>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Search</label>
             <div className="mt-2 relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <FiSearch className="h-4 w-4" />
@@ -121,7 +136,7 @@ const VerifyInstructorsPage = () => {
                   if (e.key === "Enter") onSearch();
                 }}
                 placeholder="Search by name, email, expertise..."
-                className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
               />
             </div>
 
@@ -129,18 +144,18 @@ const VerifyInstructorsPage = () => {
               type="button"
               onClick={onSearch}
               disabled={loading}
-              className="mt-3 inline-flex items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60"
+              className="mt-3 inline-flex items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60 dark:bg-indigo-600 dark:hover:bg-indigo-500"
             >
               Search
             </button>
           </div>
 
           <div className="lg:col-span-4">
-            <label className="text-xs font-semibold text-gray-700">Status</label>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Status</label>
             <select
               value={status}
               onChange={(e) => onChangeStatus(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
               disabled={loading}
             >
               <option value="All">All</option>
@@ -151,26 +166,26 @@ const VerifyInstructorsPage = () => {
           </div>
         </div>
 
-        <p className="mt-4 text-sm text-gray-600">
-          Showing <span className="font-semibold text-gray-900">{items.length}</span> request(s)
+        <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+          Showing <span className="font-semibold text-gray-900 dark:text-white">{items.length}</span> request(s)
         </p>
 
         {err ? (
-          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
             {err}
           </div>
         ) : null}
       </section>
 
       {/* Table */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
         {loading ? (
-          <div className="py-10 text-center text-sm text-gray-600">Loading...</div>
+          <div className="py-10 text-center text-sm text-gray-600 dark:text-gray-300">Loading...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="text-xs font-semibold text-gray-500">
-                <tr className="border-b border-gray-200">
+              <thead className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                <tr className="border-b border-gray-200 dark:border-white/10">
                   <th className="py-3 pr-4">Instructor</th>
                   <th className="py-3 pr-4">Expertise</th>
                   <th className="py-3 pr-4">Submitted</th>
@@ -180,14 +195,14 @@ const VerifyInstructorsPage = () => {
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-gray-100">
-                {items.map((x) => (
+              <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+                {paginatedItems.map((x) => (
                   <tr key={x.id} className="align-top">
                     <td className="py-4 pr-4">
-                      <p className="font-semibold text-gray-900">{x.fullName}</p>
-                      <p className="mt-1 text-xs text-gray-500">{x.email}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{x.fullName}</p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{x.email}</p>
                       {x.institute ? (
-                        <p className="mt-1 text-xs text-gray-600">{x.institute}</p>
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{x.institute}</p>
                       ) : null}
                     </td>
 
@@ -202,19 +217,19 @@ const VerifyInstructorsPage = () => {
                           </span>
                         ))}
                         {x.expertise?.length > 4 ? (
-                          <span className="rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                          <span className="rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
                             +{x.expertise.length - 4}
                           </span>
                         ) : null}
                       </div>
                     </td>
 
-                    <td className="py-4 pr-4 text-gray-700">
+                    <td className="py-4 pr-4 text-gray-700 dark:text-gray-300">
                       {new Date(x.submittedAt).toLocaleDateString()}
                     </td>
 
                     <td className="py-4 pr-4">
-                      <div className="flex flex-col gap-1 text-xs text-gray-700">
+                      <div className="flex flex-col gap-1 text-xs text-gray-700 dark:text-gray-300">
                         <span>{x.docs.idCard ? "✅" : "❌"} ID Card</span>
                         <span>{x.docs.certificate ? "✅" : "❌"} Certificate</span>
                         <span>{x.docs.experienceLetter ? "✅" : "❌"} Experience</span>
@@ -229,7 +244,7 @@ const VerifyInstructorsPage = () => {
                       <div className="inline-flex flex-wrap justify-end gap-2">
                         <button
                           type="button"
-                          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5"
                           onClick={() => setOpenId(x.id)}
                         >
                           <FiEye className="h-4 w-4" />
@@ -243,7 +258,7 @@ const VerifyInstructorsPage = () => {
 
                 {!items.length ? (
                   <tr>
-                    <td colSpan={6} className="py-10 text-center text-sm text-gray-600">
+                    <td colSpan={6} className="py-10 text-center text-sm text-gray-600 dark:text-gray-300">
                       No verification requests found.
                     </td>
                   </tr>
@@ -252,6 +267,8 @@ const VerifyInstructorsPage = () => {
             </table>
           </div>
         )}
+
+        {!loading ? <AdminPagination page={page} totalPages={totalPages} onPageChange={setPage} /> : null}
       </section>
 
       {/* Modal */}

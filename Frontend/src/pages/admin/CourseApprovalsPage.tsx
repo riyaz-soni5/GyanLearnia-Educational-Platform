@@ -2,14 +2,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import RejectReasonDialog from "@/components/admin/RejectReasonDialog";
+import AdminPagination from "@/components/admin/AdminPagination";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { FiSearch, FiEye, FiCheck, FiX, FiAward, FiBookOpen } from "react-icons/fi";
 
 
-import { listPendingCourses, approveCourse, rejectCourse } from "@/services/adminCourse";
+import { listAdminCourses, approveCourse, rejectCourse } from "@/services/adminCourse";
 
-type ApprovalStatus = "Pending" | "Approved" | "Rejected";
+type ApprovalStatus = "Pending" | "Published" | "Rejected";
 
 type CourseApproval = {
   id: string;
@@ -135,11 +136,11 @@ const Badge = ({
 };
 
 const toneForStatus = (s: ApprovalStatus) =>
-  s === "Approved" ? "green" : s === "Rejected" ? "red" : "yellow";
+  s === "Published" ? "green" : s === "Rejected" ? "red" : "yellow";
 
 const CheckRow = ({ label, ok }: { label: string; ok: boolean }) => (
-  <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
-    <p className="text-sm font-semibold text-gray-900">{label}</p>
+  <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 ring-1 ring-gray-200 dark:bg-white/5 dark:ring-white/10">
+    <p className="text-sm font-semibold text-gray-900 dark:text-white">{label}</p>
     <Badge text={ok ? "OK" : "Missing"} tone={ok ? "green" : "red"} />
   </div>
 );
@@ -158,6 +159,8 @@ const CourseApprovalsPage = () => {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ApprovalStatus | "All">("All");
   const [type, setType] = useState<CourseApproval["type"] | "All">("All");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   const [openId, setOpenId] = useState<string | null>(null);
   const openItem = useMemo(() => items.find((x) => x.id === openId) ?? null, [items, openId]);
@@ -176,7 +179,7 @@ const CourseApprovalsPage = () => {
       setLoading(true);
       setErr(null);
       try {
-        const res = await listPendingCourses();
+        const res = await listAdminCourses("All");
         if (!alive) return;
         setItems(
         res.items.map((c: RawPendingCourse) => {
@@ -280,12 +283,36 @@ const CourseApprovalsPage = () => {
     });
   }, [items, query, status, type]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [query, status, type]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginatedCourses = useMemo(
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page]
+  );
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
   const approve = async (id: string) => {
     setApproveLoading(true);
     try {
       await approveCourse(id);
-      setItems((prev) => prev.filter((x) => x.id !== id));
-      showToast("Course approved", "success");
+      setItems((prev) =>
+        prev.map((x) =>
+          x.id === id
+            ? {
+                ...x,
+                status: "Published",
+                notes: undefined,
+              }
+            : x
+        )
+      );
+      showToast("Course published", "success");
       if (openId === id) setOpenId(null);
     } catch (e: unknown) {
       showToast(toErrorMessage(e, "Approve failed"), "error");
@@ -303,13 +330,10 @@ const CourseApprovalsPage = () => {
   return (
     <div className="space-y-6">
 
-      <section className="rounded-2xl bg-white p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Course Approvals</h1>
-        <p className="mt-2 text-sm text-gray-600">Review course submissions and approve/reject them.</p>
-
+      <section className="rounded-2xl bg-white p-6 shadow-sm dark:bg-gray-900 dark:shadow-none">
         <div className="mt-6 grid gap-4 lg:grid-cols-12">
           <div className="lg:col-span-6">
-            <label className="text-xs font-semibold text-gray-700">Search</label>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Search</label>
             <div className="mt-2 relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                 <Icon.Search className="h-4 w-4" />
@@ -318,17 +342,17 @@ const CourseApprovalsPage = () => {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search course title, level, instructor..."
-                className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-lg border border-gray-300 pl-10 pr-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
               />
             </div>
           </div>
 
           <div className="lg:col-span-3">
-            <label className="text-xs font-semibold text-gray-700">Type</label>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Type</label>
             <select
               value={type}
               onChange={(e) => setType(e.target.value as CourseApproval["type"] | "All")}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
             >
               <option value="All">All</option>
               <option value="Academic">Academic</option>
@@ -339,34 +363,34 @@ const CourseApprovalsPage = () => {
           </div>
 
           <div className="lg:col-span-3">
-            <label className="text-xs font-semibold text-gray-700">Status</label>
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Status</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as ApprovalStatus | "All")}
-              className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
             >
               <option value="All">All</option>
               <option value="Pending">Pending</option>
-              <option value="Approved">Approved</option>
+              <option value="Published">Published</option>
               <option value="Rejected">Rejected</option>
             </select>
           </div>
         </div>
 
-        <p className="mt-4 text-sm text-gray-600">
-          Showing <span className="font-semibold text-gray-900">{filtered.length}</span> course(s)
+        <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+          Showing <span className="font-semibold text-gray-900 dark:text-white">{filtered.length}</span> course(s)
         </p>
 
-        {loading ? <p className="mt-3 text-sm text-gray-500">Loading...</p> : null}
-        {err ? <p className="mt-3 text-sm text-red-600">{err}</p> : null}
+        {loading ? <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">Loading...</p> : null}
+        {err ? <p className="mt-3 text-sm text-red-600 dark:text-red-300">{err}</p> : null}
       </section>
 
 
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="text-xs font-semibold text-gray-500">
-              <tr className="border-b border-gray-200">
+            <thead className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+              <tr className="border-b border-gray-200 dark:border-white/10">
                 <th className="py-3 pr-4">Course</th>
                 <th className="py-3 pr-4">Instructor</th>
                 <th className="py-3 pr-4">Type/Level</th>
@@ -377,50 +401,50 @@ const CourseApprovalsPage = () => {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map((x) => (
+            <tbody className="divide-y divide-gray-100 dark:divide-white/10">
+              {paginatedCourses.map((x) => (
                 <tr key={x.id} className="align-top">
                   <td className="py-4 pr-4">
-                    <p className="font-semibold text-gray-900">{x.title}</p>
-                    <p className="mt-1 text-xs text-gray-600 line-clamp-2">{x.subtitle}</p>
-                    <p className="mt-2 text-xs text-gray-500">Submitted {new Date(x.submittedAt).toLocaleDateString()}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{x.title}</p>
+                    <p className="mt-1 text-xs text-gray-600 line-clamp-2 dark:text-gray-300">{x.subtitle}</p>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Submitted {new Date(x.submittedAt).toLocaleDateString()}</p>
                   </td>
 
                   <td className="py-4 pr-4">
                     <div className="space-y-1">
-                      <p className="font-semibold text-gray-900">{x.instructorName}</p>
-                      <p className="text-xs text-gray-500">{x.instructorEmail}</p>
+                      <p className="font-semibold text-gray-900 dark:text-white">{x.instructorName}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{x.instructorEmail}</p>
                     </div>
                   </td>
 
                   <td className="py-4 pr-4">
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                      <span className="rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
                         {x.type}
                       </span>
-                      <span className="rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200">
+                      <span className="rounded-full bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-300 dark:ring-white/10">
                         {x.type === "Academic" ? x.level : "N/A"}
                       </span>
                     </div>
                   </td>
 
-                  <td className="py-4 pr-4 text-gray-700">
+                  <td className="py-4 pr-4 text-gray-700 dark:text-gray-300">
                     {x.lessonsCount} lessons
-                    <p className="mt-1 text-xs text-gray-500">{x.hours} hrs</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{x.hours} hrs</p>
                   </td>
 
-                  <td className="py-4 pr-4 font-semibold text-gray-900">{priceText(x)}</td>
+                  <td className="py-4 pr-4 font-semibold text-gray-900 dark:text-white">{priceText(x)}</td>
 
                   <td className="py-4 pr-4">
                     <Badge text={x.status} tone={toneForStatus(x.status)} />
-                    {x.notes ? <p className="mt-2 text-xs text-gray-600">{x.notes}</p> : null}
+                    {x.notes ? <p className="mt-2 text-xs text-gray-600 dark:text-gray-300">{x.notes}</p> : null}
                   </td>
 
                   <td className="py-4 text-right">
                     <div className="flex flex-col items-end gap-2">
                       <button
                         type="button"
-                        className={`${actionBtnClass} border border-gray-300 text-gray-800 hover:bg-gray-50`}
+                        className={`${actionBtnClass} cursor-pointer border border-gray-300 text-gray-800 hover:bg-gray-50 dark:border-white/10 dark:text-gray-200 dark:hover:bg-white/5`}
                         onClick={() => setOpenId(x.id)}
                       >
                         <Icon.Eye className="h-4 w-4" />
@@ -431,7 +455,7 @@ const CourseApprovalsPage = () => {
                         <>
                           <button
                             type="button"
-                            className={`${actionBtnClass} bg-indigo-600 text-white hover:bg-indigo-700`}
+                            className={`${actionBtnClass} cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700`}
                             onClick={() => setApproveId(x.id)}
                           >
                             <Icon.Check className="h-4 w-4" />
@@ -440,7 +464,7 @@ const CourseApprovalsPage = () => {
 
                           <button
                             type="button"
-                            className={`${actionBtnClass} border border-gray-300 text-red-700 hover:bg-red-50`}
+                            className={`${actionBtnClass} cursor-pointer border border-gray-300 text-red-700 hover:bg-red-50 dark:border-white/10 dark:text-red-300 dark:hover:bg-red-500/10`}
                             onClick={() => reject(x.id)}
                           >
                             <Icon.X className="h-4 w-4" />
@@ -448,7 +472,7 @@ const CourseApprovalsPage = () => {
                           </button>
                         </>
                       ) : (
-                        <span className="text-xs text-gray-500">No actions</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">No actions</span>
                       )}
                     </div>
                   </td>
@@ -457,7 +481,7 @@ const CourseApprovalsPage = () => {
 
               {!filtered.length ? (
                 <tr>
-                  <td colSpan={7} className="py-10 text-center text-sm text-gray-600">
+                  <td colSpan={7} className="py-10 text-center text-sm text-gray-600 dark:text-gray-300">
                     No course submissions found.
                   </td>
                 </tr>
@@ -465,17 +489,19 @@ const CourseApprovalsPage = () => {
             </tbody>
           </table>
         </div>
+
+        {!loading ? <AdminPagination page={page} totalPages={totalPages} onPageChange={setPage} /> : null}
       </section>
 
 
       {openItem ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-4 sm:p-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl dark:bg-gray-900">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 p-4 sm:p-6 dark:border-white/10">
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-gray-500">Course Review</p>
-                <h3 className="mt-1 truncate text-xl font-bold text-gray-900">{openItem.title}</h3>
-                <p className="mt-1 text-sm text-gray-600">{openItem.subtitle}</p>
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Course Review</p>
+                <h3 className="mt-1 truncate text-xl font-bold text-gray-900 dark:text-white">{openItem.title}</h3>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{openItem.subtitle}</p>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge text={openItem.type} tone="gray" />
@@ -487,7 +513,7 @@ const CourseApprovalsPage = () => {
               <button
                 type="button"
                 onClick={() => setOpenId(null)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
                 aria-label="Close modal"
                 title="Close"
               >
@@ -499,31 +525,31 @@ const CourseApprovalsPage = () => {
               <div className="grid gap-6 lg:grid-cols-12">
                 <div className="space-y-6 lg:col-span-8">
                   {openItem.thumbnailUrl ? (
-                    <div className="overflow-hidden rounded-2xl border border-gray-200">
+                    <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-white/10">
                       <img src={openItem.thumbnailUrl} alt={openItem.title} className="h-56 w-full object-cover sm:h-72" />
                     </div>
                   ) : null}
 
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <p className="text-sm font-bold text-gray-900">Description</p>
-                    <p className="mt-2 whitespace-pre-line text-sm text-gray-700">
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-950 dark:shadow-none">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">Description</p>
+                    <p className="mt-2 whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">
                       {openItem.description?.trim() || "No description provided."}
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <p className="text-sm font-bold text-gray-900">Curriculum</p>
+                  <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-950 dark:shadow-none">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">Curriculum</p>
                     {openItem.sections.length ? (
                       <div className="mt-3 space-y-3">
                         {openItem.sections.map((s, i) => (
-                          <div key={s.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3">
-                            <p className="text-sm font-semibold text-gray-900">
+                          <div key={s.id} className="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
+                            <p className="text-sm font-semibold text-gray-900 dark:text-white">
                               Section {i + 1}: {s.title}
                             </p>
-                            <p className="mt-1 text-xs text-gray-600">{s.lectures.length} lectures</p>
+                            <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">{s.lectures.length} lectures</p>
                             <div className="mt-2 space-y-2">
                               {s.lectures.map((l) => (
-                                <div key={l.id} className="flex items-center justify-between gap-2 text-xs text-gray-700">
+                                <div key={l.id} className="flex items-center justify-between gap-2 text-xs text-gray-700 dark:text-gray-300">
                                   <span className="truncate">
                                     {l.title} ({l.type})
                                     {l.isFreePreview ? " • Preview" : ""}
@@ -536,66 +562,66 @@ const CourseApprovalsPage = () => {
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-2 text-sm text-gray-600">No curriculum found.</p>
+                      <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">No curriculum found.</p>
                     )}
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <p className="text-sm font-bold text-gray-900">Outcomes</p>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-950 dark:shadow-none">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">Outcomes</p>
                       {openItem.outcomes.length ? (
-                        <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                        <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
                           {openItem.outcomes.map((o, idx) => (
                             <li key={`${o}-${idx}`}>• {o}</li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-2 text-sm text-gray-600">No outcomes listed.</p>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">No outcomes listed.</p>
                       )}
                     </div>
 
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <p className="text-sm font-bold text-gray-900">Requirements</p>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-950 dark:shadow-none">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">Requirements</p>
                       {openItem.requirements.length ? (
-                        <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                        <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
                           {openItem.requirements.map((r, idx) => (
                             <li key={`${r}-${idx}`}>• {r}</li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-2 text-sm text-gray-600">No requirements listed.</p>
+                        <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">No requirements listed.</p>
                       )}
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-4 lg:col-span-4">
-                  <div className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200">
-                    <p className="text-sm font-bold text-gray-900">Instructor</p>
+                  <div className="rounded-2xl bg-gray-50 p-4 ring-1 ring-gray-200 dark:bg-white/5 dark:ring-white/10">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">Instructor</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900">{openItem.instructorName}</p>
-                      <span className="text-sm text-gray-600">{openItem.instructorEmail}</span>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{openItem.instructorName}</p>
+                      <span className="text-sm text-gray-600 dark:text-gray-300">{openItem.instructorEmail}</span>
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">Submitted: {new Date(openItem.submittedAt).toLocaleDateString()}</p>
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Submitted: {new Date(openItem.submittedAt).toLocaleDateString()}</p>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs font-semibold text-gray-500">Lessons</p>
-                      <p className="mt-2 text-xl font-bold text-gray-900">{openItem.lessonsCount}</p>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-950 dark:shadow-none">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Lessons</p>
+                      <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">{openItem.lessonsCount}</p>
                     </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs font-semibold text-gray-500">Hours</p>
-                      <p className="mt-2 text-xl font-bold text-gray-900">{openItem.hours}</p>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-950 dark:shadow-none">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Hours</p>
+                      <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">{openItem.hours}</p>
                     </div>
-                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs font-semibold text-gray-500">Price</p>
-                      <p className="mt-2 text-xl font-bold text-gray-900">{priceText(openItem)}</p>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-gray-950 dark:shadow-none">
+                      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">Price</p>
+                      <p className="mt-2 text-xl font-bold text-gray-900 dark:text-white">{priceText(openItem)}</p>
                     </div>
                   </div>
 
                   <div>
-                    <p className="text-sm font-bold text-gray-900">Checklist</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">Checklist</p>
                     <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
                       <CheckRow label="Thumbnail" ok={openItem.checklist.hasThumbnail} />
                       <CheckRow label="Course Outline" ok={openItem.checklist.hasOutline} />
@@ -607,12 +633,12 @@ const CourseApprovalsPage = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 p-4 sm:p-6">
+            <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 p-4 sm:p-6 dark:border-white/10">
               {openItem.status === "Pending" ? (
                 <>
                   <button
                     type="button"
-                    className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
+                    className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 dark:border-white/10 dark:text-red-300 dark:hover:bg-red-500/10"
                     onClick={() => reject(openItem.id)}
                   >
                     Reject
@@ -628,7 +654,7 @@ const CourseApprovalsPage = () => {
               ) : (
                 <button
                   type="button"
-                  className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+                    className="rounded-lg bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
                   onClick={() => setOpenId(null)}
                 >
                   Done
@@ -658,7 +684,17 @@ const CourseApprovalsPage = () => {
           setRejectLoading(true);
           try {
             await rejectCourse(rejectId, reason);
-            setItems((prev) => prev.filter((x) => x.id !== rejectId));
+            setItems((prev) =>
+              prev.map((x) =>
+                x.id === rejectId
+                  ? {
+                      ...x,
+                      status: "Rejected",
+                      notes: reason,
+                    }
+                  : x
+              )
+            );
             showToast("Course rejected", "success");
             if (openId === rejectId) setOpenId(null);
             setRejectId(null);

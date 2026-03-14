@@ -1,6 +1,13 @@
 import { http } from "./http";
 import type { AdminCourseRow } from "@/app/types/course.type";
 
+export async function listAdminCourses(status?: "All" | "Draft" | "Pending" | "Published" | "Rejected") {
+  const qs = new URLSearchParams();
+  if (status) qs.set("status", status);
+  const tail = qs.toString() ? `?${qs.toString()}` : "";
+  return http<{ items: AdminCourseRow[] }>(`/api/admin/courses${tail}`);
+}
+
 export async function listPendingCourses() {
   return http<{ items: AdminCourseRow[] }>(`/api/admin/courses/pending`);
 }

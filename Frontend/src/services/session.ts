@@ -41,6 +41,9 @@ export function isLoggedIn() {
 
 
 export function setUser(user: SessionUser, rememberMe: boolean) {
+  // Ensure only one storage source is active at a time.
+  localStorage.removeItem("gyanlearnia_user");
+  sessionStorage.removeItem("gyanlearnia_user");
   const storage = rememberMe ? localStorage : sessionStorage;
   storage.setItem("gyanlearnia_user", JSON.stringify(user));
   if (typeof window !== "undefined") {

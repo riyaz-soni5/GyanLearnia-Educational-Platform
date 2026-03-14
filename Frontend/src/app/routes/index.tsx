@@ -27,7 +27,6 @@ import VerifyInstructorsPage from "@/pages/admin/VerifyInstructorPage";
 import CourseApprovalsPage from "@/pages/admin/CourseApprovalsPage";
 import ManageUsersPage from "@/pages/admin/ManageUserPage";
 import ReportsPage from "@/pages/admin/ReportsPage";
-import SettingsPage from "@/pages/admin/SettingsPage";
 import AskQuestionPage from "@/pages/questions/AskQuestionPage";
 import InstructorVerificationPage from "@/pages/instructor/InstructorVerificationPage";
 
@@ -109,7 +108,6 @@ export const router = createBrowserRouter([
       { path: "course-approvals", element: <CourseApprovalsPage /> },
       { path: "users", element: <ManageUsersPage /> },
       { path: "reports", element: <ReportsPage /> },
-      { path: "settings", element: <SettingsPage /> },
     ],
   },
 ]);

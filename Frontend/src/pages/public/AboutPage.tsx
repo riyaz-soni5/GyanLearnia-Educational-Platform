@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   FiCheckCircle,
   FiLinkedin,
@@ -8,6 +8,9 @@ import {
 } from "react-icons/fi";
 import { FaFacebookF, FaGoogle, FaInstagram, FaTwitter } from "react-icons/fa";
 import FounderImg from "@/assets/FounderImg.png";
+import { useToast } from "@/components/toast";
+import { fetchCurrentUserProfile } from "@/services/userProfile";
+import { submitContactSubmission } from "@/services/contactSubmission";
 
 const storySteps = [
   {
@@ -111,6 +114,60 @@ const Reveal = ({
 };
 
 const AboutPage = () => {
+  const { showToast } = useToast();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      try {
+        const profile = await fetchCurrentUserProfile();
+        if (!active) return;
+        setFirstName(profile.firstName ?? "");
+        setLastName(profile.lastName ?? "");
+        setEmail(profile.email ?? "");
+      } catch {
+        // Guest users can still submit the form.
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!firstName.trim() || !lastName.trim() || !email.trim() || !phone.trim() || !message.trim()) {
+      showToast("Please fill in all contact form fields.", "error");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await submitContactSubmission({
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        message: message.trim(),
+      });
+      setPhone("");
+      setMessage("");
+      showToast("Your message has been sent successfully.", "success");
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : "Failed to submit contact form.", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="space-y-10">
       <section className="relative -mx-4 overflow-hidden sm:-mx-6 lg:-mx-8">
@@ -269,9 +326,7 @@ const AboutPage = () => {
 
                   <form
                     className="mt-8 space-y-4"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                    }}
+                    onSubmit={handleSubmit}
                   >
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
@@ -282,6 +337,8 @@ const AboutPage = () => {
                           id="firstName"
                           name="firstName"
                           type="text"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
                           placeholder="Please enter first name..."
                           className="mt-2 w-full rounded-lg border border-base bg-surface px-4 py-3 text-sm text-basec placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none"
                         />
@@ -294,6 +351,8 @@ const AboutPage = () => {
                           id="lastName"
                           name="lastName"
                           type="text"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
                           placeholder="Please enter last name..."
                           className="mt-2 w-full rounded-lg border border-base bg-surface px-4 py-3 text-sm text-basec placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none"
                         />
@@ -309,6 +368,8 @@ const AboutPage = () => {
                           id="email"
                           name="email"
                           type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
                           placeholder="Please enter email..."
                           className="mt-2 w-full rounded-lg border border-base bg-surface px-4 py-3 text-sm text-basec placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none"
                         />
@@ -321,6 +382,8 @@ const AboutPage = () => {
                           id="phone"
                           name="phone"
                           type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
                           placeholder="Please enter phone number..."
                           className="mt-2 w-full rounded-lg border border-base bg-surface px-4 py-3 text-sm text-basec placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none"
                         />
@@ -335,6 +398,8 @@ const AboutPage = () => {
                         id="message"
                         name="message"
                         rows={5}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
                         placeholder="Please enter query..."
                         className="mt-2 w-full resize-y rounded-lg border border-base bg-surface px-4 py-3 text-sm text-basec placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none"
                       />
@@ -342,9 +407,10 @@ const AboutPage = () => {
 
                     <button
                       type="submit"
+                      disabled={submitting}
                       className="mt-2 w-full rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700"
                     >
-                      Submit
+                      {submitting ? "Submitting..." : "Submit"}
                     </button>
                   </form>
                 </div>
