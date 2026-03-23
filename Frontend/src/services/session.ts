@@ -1,5 +1,8 @@
+import { fetchCurrentUserProfile } from "./userProfile";
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const STORAGE_KEY = "gyanlearnia_user";
+let restoringUserPromise: Promise<SessionUser | null> | null = null;
 
 export type SessionUser = {
   id: string;
@@ -34,22 +37,67 @@ export function isLoggedIn() {
   return Boolean(getUser()?.id);
 }
 
-export function setUser(user: SessionUser, rememberMe: boolean) {
-  localStorage.removeItem(STORAGE_KEY);
-  sessionStorage.removeItem(STORAGE_KEY);
-  const storage = rememberMe ? localStorage : sessionStorage;
-  storage.setItem(STORAGE_KEY, JSON.stringify(user));
+function dispatchUserUpdated() {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("gyanlearnia_user_updated"));
   }
 }
 
+function storeUserInSession(user: SessionUser) {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+  dispatchUserUpdated();
+}
+
+export function setUser(user: SessionUser, rememberMe: boolean) {
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
+  const storage = rememberMe ? localStorage : sessionStorage;
+  storage.setItem(STORAGE_KEY, JSON.stringify(user));
+  dispatchUserUpdated();
+}
+
+export async function ensureSessionUser(): Promise<SessionUser | null> {
+  const existing = getUser();
+  if (existing?.id) return existing;
+
+  if (restoringUserPromise) return restoringUserPromise;
+
+  restoringUserPromise = (async () => {
+    try {
+      const profile = await fetchCurrentUserProfile();
+      const restoredUser: SessionUser = {
+        id: profile.id,
+        role: profile.role,
+        email: profile.email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        avatarUrl: profile.avatarUrl ?? null,
+        isVerified: profile.isVerified,
+        verificationStatus: profile.verificationStatus,
+        currentPlan: profile.currentPlan,
+        planStatus: profile.planStatus,
+        planActivatedAt: profile.planActivatedAt ?? null,
+        planExpiresAt: profile.planExpiresAt ?? null,
+        walletBalancePaisa: profile.walletBalancePaisa,
+        walletBalance: profile.walletBalance,
+      };
+
+      storeUserInSession(restoredUser);
+      return restoredUser;
+    } catch {
+      return null;
+    } finally {
+      restoringUserPromise = null;
+    }
+  })();
+
+  return restoringUserPromise;
+}
+
 export async function logout() {
   localStorage.removeItem(STORAGE_KEY);
   sessionStorage.removeItem(STORAGE_KEY);
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("gyanlearnia_user_updated"));
-  }
+  dispatchUserUpdated();
 
   try {
     await fetch(`${API_BASE}/api/auth/logout`, {

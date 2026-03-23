@@ -369,25 +369,24 @@ const CourseLearnPage = () => {
     const courseUrl = `${window.location.origin}/courses/${course.id}`;
 
     try {
-      if (navigator.share) {
-        await navigator.share({
-          title: course.title,
-          text: `Check out this course: ${course.title}`,
-          url: courseUrl,
-        });
-        return;
-      }
-
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(courseUrl);
         setShareCopied(true);
         return;
       }
 
-      throw new Error("Sharing is not supported in this browser.");
+      const textarea = document.createElement("textarea");
+      textarea.value = courseUrl;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "absolute";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setShareCopied(true);
     } catch (e: unknown) {
-      const message = parseApiError(e, "Failed to share course link");
-      if (message.toLowerCase().includes("abort")) return;
+      const message = parseApiError(e, "Failed to copy course link");
       setActionError(message);
     }
   };

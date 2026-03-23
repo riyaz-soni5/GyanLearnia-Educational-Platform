@@ -2,7 +2,7 @@ import { createBrowserRouter, redirect } from "react-router-dom";
 import AdminLayout from "@/layouts/AdminLayout";
 import AuthLayout from "@/layouts/AuthLayout";
 import MainLayout from "@/layouts/MainLayout";
-import { getUser, isLoggedIn } from "@/services/session";
+import { ensureSessionUser, getUser, isLoggedIn } from "@/services/session";
 import AdminDashboardPage from "@/pages/admin/Dashboard";
 import CourseApprovalsPage from "@/pages/admin/CourseApprovalsPage";
 import ManageUsersPage from "@/pages/admin/ManageUserPage";
@@ -28,18 +28,22 @@ import QuestionsPage from "@/pages/questions/QuestionPage";
 
 type UserRole = "student" | "instructor" | "admin";
 
-const redirectIfLoggedIn = () => {
+const redirectIfLoggedIn = async () => {
   if (isLoggedIn()) return redirect("/courses");
+  const user = await ensureSessionUser();
+  if (user?.id) return redirect("/courses");
   return null;
 };
 
-const requireAuth = () => {
-  if (!isLoggedIn()) return redirect("/login");
+const requireAuth = async () => {
+  if (isLoggedIn()) return null;
+  const user = await ensureSessionUser();
+  if (!user?.id) return redirect("/login");
   return null;
 };
 
-const requireRole = (...roles: UserRole[]) => {
-  const user = getUser();
+const requireRole = async (...roles: UserRole[]) => {
+  const user = getUser() || (await ensureSessionUser());
   if (!user) return redirect("/login");
   if (!roles.includes(user.role)) return redirect("/");
   return null;
