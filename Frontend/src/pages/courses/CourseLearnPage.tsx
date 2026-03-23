@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { BiUpvote } from "react-icons/bi";
 import {
   FiAward,
   FiCheckCircle,
@@ -22,8 +23,20 @@ import {
   type CourseReview,
 } from "@/app/api/courses.api";
 import type { Question } from "@/app/types/question.types";
+import ReplyThread from "@/components/questions/ReplyThread";
+import { useToast } from "@/components/toast";
 import { fetchCategories, type CategoryDTO } from "@/services/category";
-import { createQuestion, fetchQuestions } from "@/services/questions";
+import { getUser } from "@/services/session";
+import {
+  createQuestion,
+  fetchAnswers,
+  fetchQuestions,
+  postAnswer,
+  postReply,
+  upvoteAnswer,
+  upvoteQuestion,
+  type AnswerDTO,
+} from "@/services/questions";
 import {
   type CourseListResponse,
   type CourseUiModel,
@@ -34,12 +47,14 @@ import {
   formatMin,
   parseApiError,
   pickInitialCourseLecture,
+  resolveAssetUrl,
   toCourseRows,
   toUiCourse,
 } from "./courseShared";
 import Logo from "@/assets/icon.svg";
 
 type LearnTab = "overview" | "qa" | "reviews";
+type QaQuestion = Question & { myVote?: 1 | -1 | null };
 
 const lessonIcon = (type: LectureKind) => {
   if (type === "Video") return <FiPlayCircle className="h-4 w-4" />;
@@ -94,9 +109,66 @@ const formatInstructorCreatedDate = (value?: string | null) => {
   });
 };
 
+const normalizeCategoryKey = (value?: string | null) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const escapeHtml = (value: string) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const toCommentHtml = (value: string) => escapeHtml(value).replace(/\r?\n/g, "<br />");
+
+const getInitials = (name?: string) => {
+  const safe = String(name || "").trim();
+  if (!safe) return "?";
+  const parts = safe.split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const second = parts[1]?.[0] ?? "";
+  return (first + second).toUpperCase() || first.toUpperCase() || "?";
+};
+
+const QaUpvoteButton = ({
+  votes,
+  active,
+  disabled,
+  onClick,
+}: {
+  votes: number;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className={[
+      "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition",
+      disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+      active
+        ? "bg-indigo-600 text-white"
+        : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10",
+    ].join(" ")}
+  >
+    <BiUpvote className="h-4 w-4" />
+    <span>{votes}</span>
+  </button>
+);
+
 const CourseLearnPage = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const [course, setCourse] = useState<CourseUiModel | null>(null);
   const [loading, setLoading] = useState(true);
@@ -119,10 +191,20 @@ const CourseLearnPage = () => {
   const [categories, setCategories] = useState<CategoryDTO[]>([]);
   const [instructorCourses, setInstructorCourses] = useState<RelatedCourse[]>([]);
   const [instructorCoursesLoading, setInstructorCoursesLoading] = useState(false);
-  const [qaQuestions, setQaQuestions] = useState<Question[]>([]);
+  const [qaQuestions, setQaQuestions] = useState<QaQuestion[]>([]);
   const [qaLoading, setQaLoading] = useState(false);
   const [qaError, setQaError] = useState("");
-  const [questionTitle, setQuestionTitle] = useState("");
+  const [qaOpenQuestions, setQaOpenQuestions] = useState<Record<string, boolean>>({});
+  const [qaAnswersByQuestion, setQaAnswersByQuestion] = useState<Record<string, AnswerDTO[]>>({});
+  const [qaAnswersLoading, setQaAnswersLoading] = useState<Record<string, boolean>>({});
+  const [qaAnswerDrafts, setQaAnswerDrafts] = useState<Record<string, string>>({});
+  const [qaAnswerSubmitting, setQaAnswerSubmitting] = useState<Record<string, boolean>>({});
+  const [qaQuestionVotingIds, setQaQuestionVotingIds] = useState<Set<string>>(new Set());
+  const [qaAnswerVotingIds, setQaAnswerVotingIds] = useState<Set<string>>(new Set());
+  const [qaActiveReplyBoxFor, setQaActiveReplyBoxFor] = useState<string | null>(null);
+  const [qaReplyDraftMap, setQaReplyDraftMap] = useState<Record<string, string>>({});
+  const [qaReplySubmittingIds, setQaReplySubmittingIds] = useState<Record<string, boolean>>({});
+  const [qaReplyThreadKey, setQaReplyThreadKey] = useState<Record<string, number>>({});
   const [questionBody, setQuestionBody] = useState("");
   const [questionSubmitting, setQuestionSubmitting] = useState(false);
   const [reviews, setReviews] = useState<CourseReview[]>([]);
@@ -134,6 +216,13 @@ const CourseLearnPage = () => {
   const [reviewComment, setReviewComment] = useState("");
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const progressMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const tab = String(new URLSearchParams(location.search).get("tab") || "").trim().toLowerCase();
+    if (tab === "overview" || tab === "qa" || tab === "reviews") {
+      setActiveTab(tab as LearnTab);
+    }
+  }, [location.search]);
 
   const loadProgress = async (courseId: string) => {
     try {
@@ -214,17 +303,44 @@ const CourseLearnPage = () => {
   const progressCompletedCount = progress?.completedCount ?? 0;
   const progressTotalCount = progress?.totalCount ?? 0;
   const progressPercent = progress?.percent ?? 0;
+  const currentUser = getUser();
+  const currentUserId = currentUser?.id ?? "";
   const courseDiscussionTag = useMemo(
     () => (course?.id ? `course:${course.id}` : ""),
     [course?.id]
   );
   const discussionCategory = useMemo(() => {
-    if (!course) return null;
-    const normalizedCourseCategory = course.category.trim().toLowerCase();
-    return (
-      categories.find((category) => category.name.trim().toLowerCase() === normalizedCourseCategory) ??
-      null
-    );
+    if (!categories.length) return null;
+
+    const courseKeys = [
+      course?.category,
+      course?.title,
+      ...(course?.tags ?? []),
+    ]
+      .map((value) => normalizeCategoryKey(value))
+      .filter(Boolean);
+
+    const exactMatch = categories.find((category) => {
+      const nameKey = normalizeCategoryKey(category.name);
+      const slugKey = normalizeCategoryKey(category.slug);
+      return courseKeys.some((key) => key === nameKey || key === slugKey);
+    });
+    if (exactMatch) return exactMatch;
+
+    const partialMatch = categories.find((category) => {
+      const nameKey = normalizeCategoryKey(category.name);
+      const slugKey = normalizeCategoryKey(category.slug);
+      return courseKeys.some(
+        (key) =>
+          key.includes(nameKey) ||
+          nameKey.includes(key) ||
+          key.includes(slugKey) ||
+          slugKey.includes(key)
+      );
+    });
+    if (partialMatch) return partialMatch;
+
+    return categories[0] ?? null;
   }, [categories, course]);
   const sortedReviews = useMemo(
     () =>
@@ -330,18 +446,23 @@ const CourseLearnPage = () => {
   }, []);
 
   const loadCourseQuestions = async () => {
-    if (!courseDiscussionTag) return;
+    if (!course?.id) return;
 
     try {
       setQaLoading(true);
       setQaError("");
-      const res = await fetchQuestions({ q: courseDiscussionTag, limit: 20 });
-      const filtered = Array.isArray(res.items)
-        ? res.items.filter((question) =>
-            Array.isArray(question.tags) && question.tags.some((tag) => tag === courseDiscussionTag)
-          )
-        : [];
-      setQaQuestions(filtered);
+      const res = await fetchQuestions({ scope: "course", courseId: course.id, limit: 20 });
+      const filtered = Array.isArray(res.items) ? res.items : [];
+      setQaQuestions((prev) => {
+        const prevMap = new Map(prev.map((question) => [question.id, question]));
+        return filtered.map((question) => ({
+          ...question,
+          myVote:
+            (question as QaQuestion).myVote ??
+            prevMap.get(question.id)?.myVote ??
+            null,
+        }));
+      });
     } catch (e: unknown) {
       setQaQuestions([]);
       setQaError(parseApiError(e, "Failed to load course questions"));
@@ -351,9 +472,191 @@ const CourseLearnPage = () => {
   };
 
   useEffect(() => {
-    if (activeTab !== "qa" || !courseDiscussionTag) return;
+    if (activeTab !== "qa" || !course?.id) return;
     void loadCourseQuestions();
-  }, [activeTab, courseDiscussionTag]);
+  }, [activeTab, course?.id]);
+
+  useEffect(() => {
+    if (activeTab !== "qa") return;
+    qaQuestions.forEach((question) => {
+      if (question.answersCount > 0) {
+        void loadQaAnswers(question.id);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, qaQuestions]);
+
+  const requireQaUser = () => {
+    if (currentUserId) return true;
+    navigate("/login", { state: { from: window.location.pathname } });
+    return false;
+  };
+
+  const setQaQuestionVotingState = (questionId: string, isVoting: boolean) => {
+    setQaQuestionVotingIds((prev) => {
+      const next = new Set(prev);
+      if (isVoting) next.add(questionId);
+      else next.delete(questionId);
+      return next;
+    });
+  };
+
+  const setQaAnswerVotingState = (answerId: string, isVoting: boolean) => {
+    setQaAnswerVotingIds((prev) => {
+      const next = new Set(prev);
+      if (isVoting) next.add(answerId);
+      else next.delete(answerId);
+      return next;
+    });
+  };
+
+  const loadQaAnswers = async (questionId: string, force = false) => {
+    if (!force && Object.prototype.hasOwnProperty.call(qaAnswersByQuestion, questionId)) return;
+
+    try {
+      setQaAnswersLoading((prev) => ({ ...prev, [questionId]: true }));
+      const res = await fetchAnswers(questionId);
+      setQaAnswersByQuestion((prev) => ({
+        ...prev,
+        [questionId]: Array.isArray(res.items) ? res.items : [],
+      }));
+    } catch (e: unknown) {
+      showToast(parseApiError(e, "Failed to load replies"), "error", { durationMs: 3000 });
+    } finally {
+      setQaAnswersLoading((prev) => ({ ...prev, [questionId]: false }));
+    }
+  };
+
+  const toggleQaQuestionThread = (questionId: string) => {
+    setQaOpenQuestions((prev) => {
+      const nextOpen = !prev[questionId];
+      if (nextOpen) void loadQaAnswers(questionId);
+      return { ...prev, [questionId]: nextOpen };
+    });
+  };
+
+  const upvoteQaQuestion = async (questionId: string) => {
+    if (!requireQaUser()) return;
+    if (qaQuestionVotingIds.has(questionId)) return;
+
+    try {
+      setQaQuestionVotingState(questionId, true);
+      const res = await upvoteQuestion(questionId);
+      setQaQuestions((prev) =>
+        prev.map((question) =>
+          question.id === questionId
+            ? { ...question, votes: res.votes, myVote: res.myVote }
+            : question
+        )
+      );
+    } catch (e: unknown) {
+      showToast(parseApiError(e, "Failed to upvote question"), "error", { durationMs: 3000 });
+    } finally {
+      setQaQuestionVotingState(questionId, false);
+    }
+  };
+
+  const postQaAnswer = async (question: QaQuestion) => {
+    if (!requireQaUser()) return;
+
+    const draft = qaAnswerDrafts[question.id] || "";
+    const plain = draft.replace(/\s+/g, " ").trim();
+    if (plain.length < 3) {
+      showToast("Reply is too short.", "error", { durationMs: 2500 });
+      return;
+    }
+
+    try {
+      setQaAnswerSubmitting((prev) => ({ ...prev, [question.id]: true }));
+      const content = toCommentHtml(draft);
+      const res = await postAnswer(question.id, content);
+      const created = res.answer;
+      const fallbackName =
+        `${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`.trim() ||
+        currentUser?.email ||
+        "You";
+      const normalizedAnswer: AnswerDTO = {
+        ...created,
+        questionId: created?.questionId || question.id,
+        content: created?.content || content,
+        votes: Number(created?.votes ?? 0),
+        createdAt: created?.createdAt || new Date().toISOString(),
+        author: created?.author || fallbackName,
+        authorAvatarUrl: created?.authorAvatarUrl ?? currentUser?.avatarUrl ?? null,
+        authorType: created?.authorType ?? (currentUser?.role === "instructor" ? "Instructor" : "Student"),
+      };
+
+      setQaAnswersByQuestion((prev) => ({
+        ...prev,
+        [question.id]: [normalizedAnswer, ...(prev[question.id] || [])],
+      }));
+      setQaQuestions((prev) =>
+        prev.map((item) =>
+          item.id === question.id
+            ? {
+                ...item,
+                answersCount: item.answersCount + 1,
+                status: "Answered",
+              }
+            : item
+        )
+      );
+      setQaAnswerDrafts((prev) => ({ ...prev, [question.id]: "" }));
+      setQaOpenQuestions((prev) => ({ ...prev, [question.id]: true }));
+      showToast("Reply posted", "success");
+    } catch (e: unknown) {
+      showToast(parseApiError(e, "Failed to post reply"), "error", { durationMs: 3000 });
+    } finally {
+      setQaAnswerSubmitting((prev) => ({ ...prev, [question.id]: false }));
+    }
+  };
+
+  const upvoteQaAnswer = async (questionId: string, answerId: string) => {
+    if (!requireQaUser()) return;
+    if (qaAnswerVotingIds.has(answerId)) return;
+
+    try {
+      setQaAnswerVotingState(answerId, true);
+      const res = await upvoteAnswer(questionId, answerId);
+      setQaAnswersByQuestion((prev) => ({
+        ...prev,
+        [questionId]: (prev[questionId] || []).map((answer) =>
+          answer.id === answerId
+            ? { ...answer, votes: res.votes, myVote: res.myVote }
+            : answer
+        ),
+      }));
+    } catch (e: unknown) {
+      showToast(parseApiError(e, "Failed to upvote reply"), "error", { durationMs: 3000 });
+    } finally {
+      setQaAnswerVotingState(answerId, false);
+    }
+  };
+
+  const postQaReplyToAnswer = async (questionId: string, answerId: string) => {
+    if (!requireQaUser()) return;
+
+    const draft = qaReplyDraftMap[answerId] || "";
+    const plain = draft.replace(/\s+/g, " ").trim();
+    if (plain.length < 3) {
+      showToast("Reply is too short.", "error", { durationMs: 2500 });
+      return;
+    }
+
+    try {
+      setQaReplySubmittingIds((prev) => ({ ...prev, [answerId]: true }));
+      const content = toCommentHtml(draft);
+      await postReply(questionId, answerId, content, null);
+      setQaReplyDraftMap((prev) => ({ ...prev, [answerId]: "" }));
+      setQaActiveReplyBoxFor(null);
+      setQaReplyThreadKey((prev) => ({ ...prev, [answerId]: (prev[answerId] || 0) + 1 }));
+      showToast("Reply posted", "success");
+    } catch (e: unknown) {
+      showToast(parseApiError(e, "Failed to post reply"), "error", { durationMs: 3000 });
+    } finally {
+      setQaReplySubmittingIds((prev) => ({ ...prev, [answerId]: false }));
+    }
+  };
 
   const loadReviews = async (courseId: string) => {
     try {
@@ -444,33 +747,39 @@ const CourseLearnPage = () => {
   };
 
   const submitCourseQuestion = async () => {
-    if (!course || !discussionCategory || !courseDiscussionTag) return;
-
-    const title = questionTitle.trim();
-    const excerpt = questionBody.trim();
-
-    if (title.length < 6) {
-      setActionError("Question title must be at least 6 characters.");
+    if (!requireQaUser()) return;
+    if (!course || !discussionCategory || !courseDiscussionTag) {
+      showToast("Question posting is temporarily unavailable.", "error", { durationMs: 3000 });
       return;
     }
 
-    if (excerpt.length < 12) {
-      setActionError("Question details must be at least 12 characters.");
+    const excerpt = questionBody.trim();
+
+    if (excerpt.length < 20) {
+      showToast("Your question should be at least 20 characters.", "error", { durationMs: 3000 });
       return;
     }
 
     try {
       setQuestionSubmitting(true);
       setActionError("");
+      const compact = excerpt.replace(/\s+/g, " ").trim();
+      const title = compact.length > 80 ? `${compact.slice(0, 77)}...` : compact;
+      const tags = Array.from(
+        new Set([courseDiscussionTag, course.title, course.category, ...(course.tags || [])].filter(Boolean))
+      ).slice(0, 8);
+
       await createQuestion({
         title,
         excerpt,
         categoryId: discussionCategory.id,
         level: course.level,
-        tags: [courseDiscussionTag, course.title, course.category].filter(Boolean),
+        tags,
+        scope: "course",
+        courseId: course.id,
       });
-      setQuestionTitle("");
       setQuestionBody("");
+      showToast("Question posted", "success");
       await loadCourseQuestions();
     } catch (e: unknown) {
       setActionError(parseApiError(e, "Failed to post question"));
@@ -691,6 +1000,11 @@ const CourseLearnPage = () => {
 
   const myReview = reviews.find((review) => review.isMine);
   const canSubmitReview = Boolean(progress?.isCompleted) && !myReview;
+  const currentUserName =
+    `${currentUser?.firstName ?? ""} ${currentUser?.lastName ?? ""}`.trim() ||
+    currentUser?.email ||
+    "You";
+  const currentUserAvatarUrl = resolveAssetUrl(currentUser?.avatarUrl ?? null);
 
   return (
     <div className="min-h-screen bg-[rgb(var(--bg))] text-[rgb(var(--text))]">
@@ -1161,54 +1475,58 @@ const CourseLearnPage = () => {
                 ) : activeTab === "qa" ? (
                   <div className="space-y-6">
                     <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-slate-950/50">
-                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Course Q&A</h3>
-                      <p className="mt-2 text-sm text-gray-600 dark:text-slate-300">
-                        Ask course-specific questions here. Learners can open the discussion thread and reply from the Q&A system.
-                      </p>
+                      <div className="flex flex-wrap items-start justify-end gap-3">
+                        <p className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 dark:bg-white/5 dark:text-slate-300">
+                          {qaQuestions.length} comment{qaQuestions.length === 1 ? "" : "s"}
+                        </p>
+                      </div>
 
-                      {discussionCategory ? (
-                        <div className="mt-5 grid gap-4">
-                          <div>
-                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">
-                              Question title
-                            </label>
-                            <input
-                              value={questionTitle}
-                              onChange={(e) => setQuestionTitle(e.target.value)}
-                              placeholder="What do you need help understanding?"
-                              className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
-                            />
+                      <div className="mt-6 flex items-start gap-4">
+                        {currentUserAvatarUrl ? (
+                          <img
+                            src={currentUserAvatarUrl}
+                            alt={currentUserName}
+                            className="h-10 w-10 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"
+                          />
+                        ) : (
+                          <div className="grid h-10 w-10 place-items-center rounded-full bg-gray-100 text-xs font-bold text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10">
+                            {getInitials(currentUserName)}
                           </div>
+                        )}
 
-                          <div>
-                            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">
-                              Details
-                            </label>
-                            <textarea
-                              value={questionBody}
-                              onChange={(e) => setQuestionBody(e.target.value)}
-                              rows={4}
-                              placeholder="Describe the lesson, concept, or problem you need help with."
-                              className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
-                            />
-                          </div>
+                        <div className="min-w-0 flex-1">
+                          <textarea
+                            value={questionBody}
+                            onChange={(e) => setQuestionBody(e.target.value)}
+                            rows={3}
+                            placeholder="Add a question or comment about this course..."
+                            className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                          />
 
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => void submitCourseQuestion()}
-                              disabled={questionSubmitting}
-                              className="cursor-pointer rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
-                            >
-                              {questionSubmitting ? "Posting..." : "Ask Question"}
-                            </button>
+                          <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
+                            <div className="flex items-center gap-2">
+                              {questionBody.trim() ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setQuestionBody("")}
+                                  className="cursor-pointer rounded-full px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-white/5"
+                                >
+                                  Cancel
+                                </button>
+                              ) : null}
+
+                              <button
+                                type="button"
+                                onClick={() => void submitCourseQuestion()}
+                                disabled={questionSubmitting || !discussionCategory}
+                                className="cursor-pointer rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                              >
+                                {questionSubmitting ? "Posting..." : "Post"}
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      ) : (
-                        <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-                          Question posting is unavailable until a matching category is configured for this course.
-                        </p>
-                      )}
+                      </div>
                     </div>
 
                     {qaLoading ? (
@@ -1218,56 +1536,243 @@ const CourseLearnPage = () => {
                         {qaError}
                       </p>
                     ) : qaQuestions.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-gray-300 p-6 text-sm text-gray-600 dark:border-white/10 dark:text-slate-300">
-                        No course questions yet. Ask the first one.
+                      <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-600 dark:border-white/10 dark:bg-slate-950/50 dark:text-slate-300">
+                        No comments yet. Start the discussion.
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {qaQuestions.map((question) => (
-                          <div key={question.id} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-slate-950/50">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <Link
-                                  to={`/questions/${question.id}`}
-                                  className="text-base font-semibold text-gray-900 hover:text-indigo-700 dark:text-white dark:hover:text-indigo-300"
-                                >
-                                  {question.title}
-                                </Link>
-                                <p className="mt-2 line-clamp-3 text-sm text-gray-600 dark:text-slate-300">
-                                  {question.excerpt}
-                                </p>
-                              </div>
-                              <div className="shrink-0 text-right text-xs text-gray-500 dark:text-slate-400">
-                                <p>{question.answersCount} answers</p>
-                                <p className="mt-1">{new Date(question.createdAt).toLocaleDateString()}</p>
-                              </div>
-                            </div>
+                      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/10 dark:bg-slate-950/50">
+                        <div className="divide-y divide-gray-200 dark:divide-white/10">
+                          {qaQuestions.map((question) => {
+                            const isReplyBoxOpen = Boolean(qaOpenQuestions[question.id]);
+                            const answers = qaAnswersByQuestion[question.id] ?? [];
+                            const answersLoading = Boolean(qaAnswersLoading[question.id]);
+                            const questionAvatarUrl = resolveAssetUrl(question.authorAvatarUrl);
 
-                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
-                                <span>Asked by {question.author}</span>
-                                {question.tags
-                                  .filter((tag) => tag !== courseDiscussionTag)
-                                  .slice(0, 3)
-                                  .map((tag) => (
-                                    <span
-                                      key={tag}
-                                      className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700 dark:bg-white/5 dark:text-slate-300"
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
-                              </div>
+                            return (
+                              <div key={question.id} className="px-5 py-6">
+                                <div className="flex items-start gap-4">
+                                  {questionAvatarUrl ? (
+                                    <img
+                                      src={questionAvatarUrl}
+                                      alt={question.author || "Question author"}
+                                      className="h-10 w-10 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"
+                                    />
+                                  ) : (
+                                    <div className="grid h-10 w-10 place-items-center rounded-full bg-gray-100 text-xs font-bold text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10">
+                                      {getInitials(question.author)}
+                                    </div>
+                                  )}
 
-                              <Link
-                                to={`/questions/${question.id}`}
-                                className="text-sm font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
-                              >
-                                Open thread
-                              </Link>
-                            </div>
-                          </div>
-                        ))}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                                      <span className="font-semibold text-gray-900 dark:text-white">
+                                        {question.author || "Anonymous"}
+                                      </span>
+                                      <span>•</span>
+                                      <span>
+                                        {formatReviewTimeAgo(question.createdAt) ||
+                                          new Date(question.createdAt).toLocaleDateString()}
+                                      </span>
+                                    </div>
+
+                                    <p className="mt-2 whitespace-pre-line text-sm leading-7 text-gray-700 dark:text-slate-200">
+                                      {question.excerpt || question.title}
+                                    </p>
+
+                                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                                      <QaUpvoteButton
+                                        votes={question.votes}
+                                        active={question.myVote === 1}
+                                        disabled={qaQuestionVotingIds.has(question.id)}
+                                        onClick={() => void upvoteQaQuestion(question.id)}
+                                      />
+
+                                      <button
+                                        type="button"
+                                        onClick={() => toggleQaQuestionThread(question.id)}
+                                        className="text-sm font-semibold text-gray-600 hover:text-indigo-700 dark:text-slate-300 dark:hover:text-indigo-300"
+                                      >
+                                        {isReplyBoxOpen ? "Cancel" : "Reply"}
+                                      </button>
+
+                                      <span className="text-xs text-gray-500 dark:text-slate-400">
+                                        {question.answersCount} repl{question.answersCount === 1 ? "y" : "ies"}
+                                      </span>
+                                    </div>
+
+                                    {isReplyBoxOpen || answersLoading || answers.length > 0 ? (
+                                      <div className="mt-4 space-y-4 border-l border-gray-200 pl-4 dark:border-white/10">
+                                        {isReplyBoxOpen ? (
+                                          <div className="flex items-start gap-3">
+                                            {currentUserAvatarUrl ? (
+                                              <img
+                                                src={currentUserAvatarUrl}
+                                                alt={currentUserName}
+                                                className="h-8 w-8 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"
+                                              />
+                                            ) : (
+                                              <div className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10">
+                                                {getInitials(currentUserName)}
+                                              </div>
+                                            )}
+
+                                            <div className="min-w-0 flex-1">
+                                              <textarea
+                                                value={qaAnswerDrafts[question.id] || ""}
+                                                onChange={(e) =>
+                                                  setQaAnswerDrafts((prev) => ({
+                                                    ...prev,
+                                                    [question.id]: e.target.value,
+                                                  }))
+                                                }
+                                                rows={3}
+                                                placeholder="Write a reply..."
+                                                className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                                              />
+
+                                              <div className="mt-2 flex justify-end">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => void postQaAnswer(question)}
+                                                  disabled={Boolean(qaAnswerSubmitting[question.id])}
+                                                  className="cursor-pointer rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                                                >
+                                                  {qaAnswerSubmitting[question.id] ? "Posting..." : "Reply"}
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ) : null}
+
+                                        {answersLoading ? (
+                                          <p className="text-sm text-gray-600 dark:text-slate-300">Loading replies...</p>
+                                        ) : answers.length === 0 ? null : (
+                                          <div className="space-y-4">
+                                            {answers.map((answer) => {
+                                              const answerAvatarUrl = resolveAssetUrl(answer.authorAvatarUrl);
+
+                                              return (
+                                                <div key={answer.id} className="flex items-start gap-3">
+                                                  {answerAvatarUrl ? (
+                                                    <img
+                                                      src={answerAvatarUrl}
+                                                      alt={answer.author || "Reply author"}
+                                                      className="h-8 w-8 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"
+                                                    />
+                                                  ) : (
+                                                    <div className="grid h-8 w-8 place-items-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-700 ring-1 ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10">
+                                                      {getInitials(answer.author)}
+                                                    </div>
+                                                  )}
+
+                                                  <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                                                      <span className="font-semibold text-gray-900 dark:text-white">
+                                                        {answer.author || "Anonymous"}
+                                                      </span>
+                                                      <span>•</span>
+                                                      <span>
+                                                        {formatReviewTimeAgo(answer.createdAt) ||
+                                                          new Date(answer.createdAt).toLocaleDateString()}
+                                                      </span>
+                                                    </div>
+
+                                                    <div
+                                                      className="mt-2 break-words text-sm leading-7 text-gray-700 dark:text-slate-200"
+                                                      style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                                                      dangerouslySetInnerHTML={{ __html: answer.content ?? "" }}
+                                                    />
+
+                                                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                                                      <QaUpvoteButton
+                                                        votes={answer.votes}
+                                                        active={answer.myVote === 1}
+                                                        disabled={qaAnswerVotingIds.has(answer.id)}
+                                                        onClick={() => void upvoteQaAnswer(question.id, answer.id)}
+                                                      />
+
+                                                      <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                          if (!requireQaUser()) return;
+                                                          setQaActiveReplyBoxFor((prev) =>
+                                                            prev === answer.id ? null : answer.id
+                                                          );
+                                                        }}
+                                                        className="text-sm font-semibold text-gray-600 hover:text-indigo-700 dark:text-slate-300 dark:hover:text-indigo-300"
+                                                      >
+                                                        Reply
+                                                      </button>
+                                                    </div>
+
+                                                    {qaActiveReplyBoxFor === answer.id ? (
+                                                      <div className="mt-3">
+                                                        <textarea
+                                                          value={qaReplyDraftMap[answer.id] || ""}
+                                                          onChange={(e) =>
+                                                            setQaReplyDraftMap((prev) => ({
+                                                              ...prev,
+                                                              [answer.id]: e.target.value,
+                                                            }))
+                                                          }
+                                                          rows={3}
+                                                          placeholder="Write a reply..."
+                                                          className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
+                                                        />
+
+                                                        <div className="mt-2 flex items-center gap-2">
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                              setQaActiveReplyBoxFor(null);
+                                                              setQaReplyDraftMap((prev) => ({
+                                                                ...prev,
+                                                                [answer.id]: "",
+                                                              }));
+                                                            }}
+                                                            className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-slate-950 dark:text-gray-200 dark:hover:bg-white/5"
+                                                          >
+                                                            Cancel
+                                                          </button>
+
+                                                          <button
+                                                            type="button"
+                                                            onClick={() => void postQaReplyToAnswer(question.id, answer.id)}
+                                                            disabled={Boolean(qaReplySubmittingIds[answer.id])}
+                                                            className="cursor-pointer rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+                                                          >
+                                                            {qaReplySubmittingIds[answer.id] ? "Posting..." : "Reply"}
+                                                          </button>
+                                                        </div>
+                                                      </div>
+                                                    ) : null}
+
+                                                    <div className="mt-3" id={`learn-answer-${answer.id}`}>
+                                                      <ReplyThread
+                                                        key={`${answer.id}-${qaReplyThreadKey[answer.id] || 0}`}
+                                                        questionId={question.id}
+                                                        answerId={answer.id}
+                                                        requireLogin={requireQaUser}
+                                                        upvoteOnly
+                                                        plainText
+                                                        embedded
+                                                        hideTopReplyButton
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1384,10 +1889,6 @@ const CourseLearnPage = () => {
                             {reviewSubmitting ? "Submitting..." : "Submit Review"}
                           </button>
                         </div>
-                      </div>
-                    ) : myReview ? (
-                      <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 dark:border-green-500/20 dark:bg-green-500/10 dark:text-green-200">
-                        You have already submitted a review for this course.
                       </div>
                     ) : !progress?.isCompleted ? (
                       <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">

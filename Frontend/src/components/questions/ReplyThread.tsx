@@ -20,6 +20,21 @@ const stripHtml = (html: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const normalizePlainText = (value: string) =>
+  String(value || "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const escapeHtml = (value: string) =>
+  String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const toPlainTextHtml = (value: string) => escapeHtml(value).replace(/\r?\n/g, "<br />");
+
 const timeAgo = (iso?: string) => {
   if (!iso) return "";
   const t = Date.parse(iso);
@@ -65,12 +80,14 @@ const VoteInline = ({
   onUp,
   onDown,
   disabled,
+  upvoteOnly = false,
 }: {
   votes: number;
   myVote?: 1 | -1 | null;
   onUp: () => void;
   onDown: () => void;
   disabled?: boolean;
+  upvoteOnly?: boolean;
 }) => {
   return (
     <div className="inline-flex items-center gap-2">
@@ -93,20 +110,22 @@ const VoteInline = ({
         {votes}
       </span>
 
-      <button
-        type="button"
-        onClick={onDown}
-        disabled={disabled}
-        className={[
-          "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs",
-          disabled ? "opacity-50 cursor-not-allowed" : "",
-          myVote === -1
-            ? "bg-red-600 text-white border-red-600"
-            : "bg-white text-gray-700 border-gray-200",
-        ].join(" ")}
-      >
-        <BiDownvote className="h-4 w-4" />
-      </button>
+      {!upvoteOnly ? (
+        <button
+          type="button"
+          onClick={onDown}
+          disabled={disabled}
+          className={[
+            "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs",
+            disabled ? "opacity-50 cursor-not-allowed" : "",
+            myVote === -1
+              ? "bg-red-600 text-white border-red-600"
+              : "bg-white text-gray-700 border-gray-200",
+          ].join(" ")}
+        >
+          <BiDownvote className="h-4 w-4" />
+        </button>
+      ) : null}
     </div>
   );
 };
@@ -125,17 +144,29 @@ export default function ReplyThread({
   questionId,
   answerId,
   requireLogin,
+  upvoteOnly = false,
+  forceVisible = false,
+  defaultReplyBoxOpen = false,
+  plainText = false,
+  embedded = false,
+  hideTopReplyButton = false,
 }: {
   questionId: string;
   answerId: string;
   requireLogin: () => boolean;
+  upvoteOnly?: boolean;
+  forceVisible?: boolean;
+  defaultReplyBoxOpen?: boolean;
+  plainText?: boolean;
+  embedded?: boolean;
+  hideTopReplyButton?: boolean;
 }) {
   const { showToast } = useToast();
   const [rootReplies, setRootReplies] = useState<ReplyDTO[]>([]);
   const [rootCursor, setRootCursor] = useState<string | null>(null);
   const [rootHasMore, setRootHasMore] = useState(false);
   const [loadingRoot, setLoadingRoot] = useState(false);
-  const [showReplyBox, setShowReplyBox] = useState(false);
+  const [showReplyBox, setShowReplyBox] = useState(Boolean(defaultReplyBoxOpen));
   const [draft, setDraft] = useState("");
   const [activeReplyTo, setActiveReplyTo] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
@@ -143,6 +174,11 @@ export default function ReplyThread({
   const [childCursorMap, setChildCursorMap] = useState<Record<string, string | null>>({});
   const [childHasMoreMap, setChildHasMoreMap] = useState<Record<string, boolean>>({});
   const [loadingChild, setLoadingChild] = useState<Record<string, boolean>>({});
+
+  const getDraftLength = (value: string) =>
+    plainText ? normalizePlainText(value).length : stripHtml(value).length;
+
+  const getDraftContent = (value: string) => (plainText ? toPlainTextHtml(value) : value);
 
   const loadRoot = async (reset = false) => {
     setLoadingRoot(true);
@@ -200,14 +236,27 @@ export default function ReplyThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionId, answerId]);
 
+  useEffect(() => {
+    if (defaultReplyBoxOpen) setShowReplyBox(true);
+  }, [defaultReplyBoxOpen]);
+
+  useEffect(() => {
+    rootReplies.forEach((reply) => {
+      if (Object.prototype.hasOwnProperty.call(childrenMap, reply.id)) return;
+      if (loadingChild[reply.id]) return;
+      void loadChildren(reply.id, true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [childrenMap, loadingChild, rootReplies]);
+
   const postRootReply = async () => {
     if (!requireLogin()) return;
 
-    const plain = stripHtml(draft);
-    if (plain.length < 3) return showToast("Reply is too short.", "error");
+    const draftLength = getDraftLength(draft);
+    if (draftLength < 3) return showToast("Reply is too short.", "error");
 
     try {
-      const r = await postReply(questionId, answerId, draft, null);
+      const r = await postReply(questionId, answerId, getDraftContent(draft), null);
       setRootReplies((prev) => [r.item, ...prev]);
       setDraft("");
       setShowReplyBox(false);
@@ -220,11 +269,16 @@ export default function ReplyThread({
   const postChildReply = async (parentReplyId: string) => {
     if (!requireLogin()) return;
 
-    const plain = stripHtml(replyDraft);
-    if (plain.length < 3) return showToast("Reply is too short.", "error");
+    const draftLength = getDraftLength(replyDraft);
+    if (draftLength < 3) return showToast("Reply is too short.", "error");
 
     try {
-      const r = await postReply(questionId, answerId, replyDraft, parentReplyId);
+      const r = await postReply(
+        questionId,
+        answerId,
+        getDraftContent(replyDraft),
+        parentReplyId
+      );
 
       // make sure children are visible
       setChildrenMap((m) => ({
@@ -311,13 +365,21 @@ export default function ReplyThread({
               <span>{timeAgo(r.createdAt)}</span>
             </div>
 
-            <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
+            {plainText ? (
               <div
-                className="ql-editor break-words whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200"
+                className="mt-2 break-words whitespace-pre-wrap text-sm leading-7 text-gray-700 dark:text-gray-200"
                 style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
                 dangerouslySetInnerHTML={{ __html: r.content ?? "" }}
               />
-            </div>
+            ) : (
+              <div className="mt-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
+                <div
+                  className="ql-editor break-words whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-200"
+                  style={{ overflowWrap: "anywhere", wordBreak: "break-word" }}
+                  dangerouslySetInnerHTML={{ __html: r.content ?? "" }}
+                />
+              </div>
+            )}
 
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <VoteInline
@@ -325,6 +387,7 @@ export default function ReplyThread({
                 myVote={r.myVote ?? null}
                 onUp={() => voteOnReply(r.id, "up", parentReplyId)}
                 onDown={() => voteOnReply(r.id, "down", parentReplyId)}
+                upvoteOnly={upvoteOnly}
               />
 
               <button
@@ -333,33 +396,32 @@ export default function ReplyThread({
                   if (!requireLogin()) return;
                   setActiveReplyTo((prev) => (prev === r.id ? null : r.id));
                   setReplyDraft("");
-                  if (!childrenMap[r.id]) loadChildren(r.id, true);
                 }}
                 className="text-xs font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
               >
                 Reply
               </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!childrenMap[r.id]) loadChildren(r.id, true);
-                }}
-                className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
-              >
-                {children.length > 0 ? `View replies (${children.length})` : "View replies"}
-              </button>
             </div>
 
             {activeReplyTo === r.id ? (
               <div className="mt-3">
-                <div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
-                  <RichTextEditor
+                {plainText ? (
+                  <textarea
                     value={replyDraft}
-                    onChange={setReplyDraft}
+                    onChange={(e) => setReplyDraft(e.target.value)}
+                    rows={3}
                     placeholder="Write a reply..."
+                    className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
                   />
-                </div>
+                ) : (
+                  <div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
+                    <RichTextEditor
+                      value={replyDraft}
+                      onChange={setReplyDraft}
+                      placeholder="Write a reply..."
+                    />
+                  </div>
+                )}
 
                 <div className="mt-2 flex items-center gap-2">
                   <button
@@ -376,13 +438,17 @@ export default function ReplyThread({
                   <button
                     type="button"
                     onClick={() => postChildReply(r.id)}
-                    disabled={stripHtml(replyDraft).length < 3}
+                    disabled={getDraftLength(replyDraft) < 3}
                     className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
                   >
                     Reply
                   </button>
                 </div>
               </div>
+            ) : null}
+
+            {isLoading && !Object.prototype.hasOwnProperty.call(childrenMap, r.id) ? (
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Loading replies...</p>
             ) : null}
 
             {children.length > 0 ? (
@@ -395,7 +461,7 @@ export default function ReplyThread({
                     disabled={isLoading}
                     className="mt-3 text-xs font-semibold text-indigo-700 hover:text-indigo-800 disabled:opacity-50 dark:text-indigo-300 dark:hover:text-indigo-200"
                   >
-                    {isLoading ? "Loading..." : "See more replies"}
+                    {isLoading ? "Loading..." : "Show more replies"}
                   </button>
                 ) : null}
               </div>
@@ -406,44 +472,77 @@ export default function ReplyThread({
     );
   };
 
-  if (rootReplies.length === 0 && !showReplyBox && !rootHasMore && !loadingRoot) {
+  if (!forceVisible && rootReplies.length === 0 && !showReplyBox && !rootHasMore && !loadingRoot) {
     return null;
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-950">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-gray-900 dark:text-white">
-          Replies
-        </p>
+    <div
+      className={
+        embedded
+          ? "mt-3"
+          : "mt-4 rounded-xl border border-gray-200 bg-white p-4 dark:border-white/10 dark:bg-gray-950"
+      }
+    >
+      {!embedded ? (
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white">Replies</p>
 
-        <button
-          type="button"
-          onClick={() => {
-            if (!requireLogin()) return;
-            setShowReplyBox((s) => !s);
-          }}
-          className="text-xs font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
-        >
-          {showReplyBox ? "Cancel" : "Reply"}
-        </button>
-      </div>
+          {!hideTopReplyButton ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!requireLogin()) return;
+                setShowReplyBox((s) => !s);
+              }}
+              className="text-xs font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+            >
+              {showReplyBox ? "Cancel" : "Reply"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {embedded && !hideTopReplyButton ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              if (!requireLogin()) return;
+              setShowReplyBox((s) => !s);
+            }}
+            className="text-xs font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
+          >
+            {showReplyBox ? "Cancel" : "Reply"}
+          </button>
+        </div>
+      ) : null}
 
       {showReplyBox ? (
         <div className="mt-3">
-          <div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
-            <RichTextEditor
+          {plainText ? (
+            <textarea
               value={draft}
-              onChange={setDraft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={3}
               placeholder="Write a reply..."
+              className="w-full rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none dark:border-white/10 dark:bg-slate-900 dark:text-white"
             />
-          </div>
+          ) : (
+            <div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
+              <RichTextEditor
+                value={draft}
+                onChange={setDraft}
+                placeholder="Write a reply..."
+              />
+            </div>
+          )}
 
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"
               onClick={postRootReply}
-              disabled={stripHtml(draft).length < 3}
+              disabled={getDraftLength(draft) < 3}
               className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
             >
               Post Reply
@@ -466,7 +565,7 @@ export default function ReplyThread({
             disabled={loadingRoot}
             className="mt-4 text-xs font-semibold text-indigo-700 hover:text-indigo-800 disabled:opacity-50 dark:text-indigo-300 dark:hover:text-indigo-200"
           >
-            {loadingRoot ? "Loading..." : "See more replies"}
+            {loadingRoot ? "Loading..." : "Show more replies"}
           </button>
         ) : null}
       </div>

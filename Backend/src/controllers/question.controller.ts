@@ -1,10 +1,12 @@
 import { Response } from "express";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
-import type { SortOrder } from "mongoose";
+import { Types, type SortOrder } from "mongoose";
 import axios from "axios";
 import Question from "../models/Question.model.js";
 import User from "../models/User.model.js";
 import WalletTransaction from "../models/WalletTransaction.model.js";
+import Course from "../models/Course.model.js";
+import Enrollment from "../models/Enrollment.model.js";
 import { creditUserWallet, debitUserWallet } from "../services/wallet.service.js";
 import { createNotification } from "../services/notification.service.js";
 
@@ -47,6 +49,18 @@ const parsePriceNpr = (value: unknown) => {
   return Math.floor(amount);
 };
 
+const normalizeQuestionScope = (value: unknown): "global" | "course" =>
+  String(value || "").trim().toLowerCase() === "course" ? "course" : "global";
+
+const getQuestionLink = (questionId: string, scope?: unknown, courseId?: unknown) => {
+  const normalizedScope = normalizeQuestionScope(scope);
+  const normalizedCourseId = String(courseId || "").trim();
+  if (normalizedScope === "course" && normalizedCourseId) {
+    return `/courses/${normalizedCourseId}/learn?tab=qa`;
+  }
+  return `/questions/${questionId}`;
+};
+
 export const listQuestions = async (req: AuthedRequest, res: Response) => {
   const {
     q = "",
@@ -57,10 +71,36 @@ export const listQuestions = async (req: AuthedRequest, res: Response) => {
     status = "All",
     page = "1",
     limit = "10",
+    scope = "global",
+    courseId = "",
   } = req.query;
 
   const searchText = String(q || query).trim();
+  const normalizedScope = normalizeQuestionScope(scope);
+  const normalizedCourseId = String(courseId || "").trim();
   const filter: any = {};
+
+  filter.scope = normalizedScope === "course" ? "course" : { $ne: "course" };
+
+  if (normalizedScope === "course") {
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+    if (!normalizedCourseId || !Types.ObjectId.isValid(normalizedCourseId)) {
+      return res.status(400).json({ message: "Valid courseId is required for course discussions." });
+    }
+
+    const enrollment = await Enrollment.findOne({
+      userId: String(req.user.id),
+      courseId: normalizedCourseId,
+    })
+      .select("_id")
+      .lean();
+
+    if (!enrollment) {
+      return res.status(403).json({ message: "Enroll in this course to view its discussion." });
+    }
+
+    filter.courseId = normalizedCourseId;
+  }
 
   if (searchText) {
     const searchRegex = new RegExp(searchText, "i");
@@ -127,6 +167,8 @@ export const listQuestions = async (req: AuthedRequest, res: Response) => {
       categoryName: q.categoryId?.name,
       level: q.level,
       tags: q.tags ?? [],
+      scope: normalizeQuestionScope(q.scope),
+      courseId: q.courseId ? String(q.courseId) : undefined,
       votes: q.votes ?? 0,
       myVote,
       views: q.views ?? 0,
@@ -236,6 +278,8 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
 
       level: q.level,
       tags: q.tags ?? [],
+      scope: normalizeQuestionScope((q as any).scope),
+      courseId: (q as any).courseId ? String((q as any).courseId) : undefined,
 
       votes: q.votes ?? 0,
       myVote,
@@ -274,6 +318,8 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
     fastResponsePrice = 0,
     fastResponsePaymentMode = "",
     fastResponseKhaltiPidx = "",
+    scope = "global",
+    courseId = "",
   } = req.body || {};
 
   if (!title || title.trim().length < 10) {
@@ -291,8 +337,30 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
   const user = await User.findById(userId).select("plan planExpiresAt").lean();
   if (!user) return res.status(404).json({ message: "User not found" });
 
+  const normalizedScope = normalizeQuestionScope(scope);
+  const normalizedCourseId = String(courseId || "").trim();
+
+  if (normalizedScope === "course") {
+    if (!normalizedCourseId || !Types.ObjectId.isValid(normalizedCourseId)) {
+      return res.status(400).json({ message: "Valid courseId is required." });
+    }
+
+    const course = await Course.findById(normalizedCourseId).select("_id").lean();
+    if (!course) return res.status(404).json({ message: "Course not found" });
+
+    const enrollment = await Enrollment.findOne({ userId, courseId: normalizedCourseId })
+      .select("_id")
+      .lean();
+    if (!enrollment) {
+      return res.status(403).json({ message: "Enroll in this course to join its discussion." });
+    }
+  }
+
   const mode = String(fastResponsePaymentMode || "").trim().toLowerCase();
   const isFast = Boolean(isFastResponse);
+  if (normalizedScope === "course" && isFast) {
+    return res.status(400).json({ message: "Fast response is only available for public questions." });
+  }
   const isPro = isActiveProPlan(user);
   const priceNpr = parsePriceNpr(fastResponsePrice);
   const pricePaisa = Math.max(0, priceNpr * 100);
@@ -432,6 +500,8 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
       categoryId,
       level,
       tags: Array.isArray(tags) ? tags.slice(0, 8) : [],
+      scope: normalizedScope,
+      courseId: normalizedScope === "course" ? normalizedCourseId : null,
       isFastResponse: isFast,
       fastResponsePricePaisa,
       fastResponseEscrowStatus,
@@ -448,7 +518,7 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
         message: `Escrow of NPR ${(fastResponsePricePaisa / 100).toFixed(
           2
         )} is locked and will be paid to the accepted answer.`,
-        link: `/questions/${doc._id}`,
+        link: getQuestionLink(String(doc._id), normalizedScope, normalizedCourseId),
         metadata: { questionId: String(doc._id), amountPaisa: fastResponsePricePaisa },
       });
     }
@@ -463,6 +533,8 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
         categoryId: String(doc.categoryId),
         level: doc.level,
         tags: doc.tags,
+        scope: normalizeQuestionScope((doc as any).scope),
+        courseId: (doc as any).courseId ? String((doc as any).courseId) : undefined,
         isFastResponse: doc.isFastResponse,
         fastResponsePrice: Number((Number((doc as any).fastResponsePricePaisa || 0) / 100).toFixed(2)),
         fastResponseEscrowStatus: String((doc as any).fastResponseEscrowStatus || "none"),

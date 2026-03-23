@@ -6,6 +6,8 @@ export type Question = {
   excerpt: string;
   categoryId?: string;
   categoryName?: string;
+  scope?: "global" | "course";
+  courseId?: string;
   subject?: string;
   level: string;
   tags: string[];

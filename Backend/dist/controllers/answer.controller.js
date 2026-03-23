@@ -12,6 +12,14 @@ const toPlainText = (html) => String(html ?? "")
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+const getQuestionLink = (question, questionId) => {
+    const scope = String(question?.scope || "global").trim().toLowerCase();
+    const courseId = String(question?.courseId || "").trim();
+    if (scope === "course" && courseId) {
+        return `/courses/${courseId}/learn?tab=qa`;
+    }
+    return `/questions/${questionId}`;
+};
 export const listAnswers = async (req, res) => {
     try {
         const { id: questionId } = req.params;
@@ -84,7 +92,7 @@ export const postAnswer = async (req, res) => {
                 type: "question_answered",
                 title: "New answer on your question",
                 message: preview || "Someone answered your question.",
-                link: `/questions/${questionId}`,
+                link: getQuestionLink(q, questionId),
                 metadata: { questionId, answerId: String(answer._id) },
             });
         }
@@ -204,7 +212,7 @@ export const acceptAnswer = async (req, res) => {
                     type: "system",
                     title: "Fast response reward received",
                     message: `You received NPR ${(payoutPaisa / 100).toFixed(2)} for accepted answer.`,
-                    link: `/questions/${questionId}`,
+                    link: getQuestionLink(q, questionId),
                     metadata: { questionId, answerId: String(ans._id), payoutPaisa, feePaisa },
                 });
             }

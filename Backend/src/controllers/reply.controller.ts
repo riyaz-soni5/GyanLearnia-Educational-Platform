@@ -2,6 +2,7 @@ import { Response } from "express";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import Reply from "../models/Reply.model.js";
 import Answer from "../models/Answer.model.js";
+import Question from "../models/Question.model.js";
 import User from "../models/User.model.js";
 import { createNotification } from "../services/notification.service.js";
 
@@ -19,6 +20,15 @@ const toPlainText = (html: string) =>
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+const getQuestionLink = (question: any, questionId: string) => {
+  const scope = String(question?.scope || "global").trim().toLowerCase();
+  const courseId = String(question?.courseId || "").trim();
+  if (scope === "course" && courseId) {
+    return `/courses/${courseId}/learn?tab=qa`;
+  }
+  return `/questions/${questionId}`;
+};
 
 export const listReplies = async (req: AuthedRequest, res: Response) => {
   try {
@@ -103,6 +113,7 @@ export const postReply = async (req: AuthedRequest, res: Response) => {
 
     const answer = await Answer.findOne({ _id: answerId, questionId }).lean();
     if (!answer) return res.status(404).json({ message: "Answer not found" });
+    const question = await Question.findById(questionId).select("scope courseId").lean();
 
     let parentReplyAuthorId = "";
 
@@ -140,7 +151,7 @@ export const postReply = async (req: AuthedRequest, res: Response) => {
         type: isReplyThreadNotification ? "reply_replied" : "answer_replied",
         title: isReplyThreadNotification ? "New reply to your reply" : "New reply to your answer",
         message: preview,
-        link: `/questions/${questionId}`,
+        link: getQuestionLink(question, questionId),
         metadata: {
           questionId,
           answerId,

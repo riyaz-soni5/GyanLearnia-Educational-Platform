@@ -20,6 +20,8 @@ export type CreateQuestionPayload = {
   categoryId: string;
   level: string;
   tags: string[];
+  scope?: "global" | "course";
+  courseId?: string;
   isFastResponse?: boolean;
   fastResponsePrice?: number;
   fastResponsePaymentMode?: "pro" | "wallet" | "khalti";
@@ -80,6 +82,8 @@ export async function fetchQuestions(params?: {
   level?: string;
   sort?: string;
   status?: string;
+  scope?: "global" | "course";
+  courseId?: string;
   page?: number;
   limit?: number;
 }) {

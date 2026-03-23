@@ -10,6 +10,8 @@ const QuestionSchema = new Schema({
     level: { type: String, required: true },
     tags: [{ type: String }],
     authorId: { type: Types.ObjectId, ref: "User", required: true },
+    scope: { type: String, enum: ["global", "course"], default: "global" },
+    courseId: { type: Types.ObjectId, ref: "Course", default: null },
     views: { type: Number, default: 0 },
     viewedBy: [{ type: Types.ObjectId, ref: "User" }],
     viewedKeys: [{ type: String }],
@@ -37,4 +39,5 @@ const QuestionSchema = new Schema({
     fastResponseReleasedAt: { type: Date, default: null },
 }, { timestamps: true });
 QuestionSchema.index({ _id: 1, "voters.userId": 1 });
+QuestionSchema.index({ scope: 1, courseId: 1, createdAt: -1 });
 export default model("Question", QuestionSchema);
