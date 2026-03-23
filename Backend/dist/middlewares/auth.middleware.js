@@ -1,10 +1,13 @@
 import jwt from "jsonwebtoken";
+function getToken(req) {
+    const cookieToken = req.cookies?.access_token;
+    const authHeader = req.headers.authorization;
+    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+    return cookieToken || bearerToken;
+}
 export function requireAuth(req, res, next) {
     try {
-        const cookieToken = req.cookies?.access_token;
-        const header = req.headers.authorization;
-        const bearerToken = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
-        const token = cookieToken || bearerToken;
+        const token = getToken(req);
         if (!token)
             return res.status(401).json({ message: "Unauthorized" });
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -25,20 +28,16 @@ export function requireRole(...roles) {
         next();
     };
 }
-// auth.middleware.ts
 export function optionalAuth(req, _res, next) {
     try {
-        const cookieToken = req.cookies?.access_token;
-        const header = req.headers.authorization;
-        const bearerToken = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
-        const token = cookieToken || bearerToken;
+        const token = getToken(req);
         if (!token)
-            return next(); // ✅ guest allowed
+            return next();
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         req.user = decoded;
         return next();
     }
     catch {
-        return next(); // ✅ invalid token → treat as guest
+        return next();
     }
 }

@@ -4,7 +4,7 @@ const CertificateSchema = new Schema({
     courseId: { type: Types.ObjectId, ref: "Course", required: true },
     issuedAt: { type: Date, default: Date.now },
     certNo: { type: String, required: true, unique: true },
-    pdfUrl: { type: String, default: null }, // later if you generate PDFs
+    pdfUrl: { type: String, default: null },
 }, { timestamps: true });
 CertificateSchema.index({ userId: 1, courseId: 1 }, { unique: true });
 export default model("Certificate", CertificateSchema);

@@ -36,13 +36,13 @@ export async function markNotificationRead(req, res) {
         const userId = String(req.user?.id || "").trim();
         if (!userId)
             return res.status(401).json({ message: "Unauthorized" });
-        const id = String(req.params.id || "").trim();
-        if (!id)
+        const notificationId = String(req.params.id || "").trim();
+        if (!notificationId)
             return res.status(400).json({ message: "Notification id is required" });
-        if (!mongoose.Types.ObjectId.isValid(id)) {
+        if (!mongoose.Types.ObjectId.isValid(notificationId)) {
             return res.status(400).json({ message: "Invalid notification id" });
         }
-        await Notification.findOneAndUpdate({ _id: id, userId }, { $set: { isRead: true, readAt: new Date() } }, { new: true });
+        await Notification.findOneAndUpdate({ _id: notificationId, userId }, { $set: { isRead: true, readAt: new Date() } }, { new: true });
         const unreadCount = await Notification.countDocuments({ userId, isRead: false });
         return res.json({ message: "Notification marked as read", unreadCount });
     }

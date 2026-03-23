@@ -608,11 +608,11 @@ export async function getConnectionMessages(req, res) {
             if (!Number.isNaN(parsed.getTime()))
                 beforeDate = parsed;
         }
-        const query = { roomId: room._id };
+        const messageFilter = { roomId: room._id };
         if (beforeDate)
-            query.createdAt = { $lt: beforeDate };
+            messageFilter.createdAt = { $lt: beforeDate };
         const limit = 50;
-        const messages = (await PrivateChatMessage.find(query)
+        const messages = (await PrivateChatMessage.find(messageFilter)
             .sort({ createdAt: -1 })
             .limit(limit)
             .lean());

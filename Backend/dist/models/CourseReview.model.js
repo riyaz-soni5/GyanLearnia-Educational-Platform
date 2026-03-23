@@ -1,4 +1,4 @@
-import { Schema, Types, model } from "mongoose";
+import { Schema, model, Types } from "mongoose";
 const CourseReviewSchema = new Schema({
     courseId: { type: Types.ObjectId, ref: "Course", required: true },
     userId: { type: Types.ObjectId, ref: "User", required: true },

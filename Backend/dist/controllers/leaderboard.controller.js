@@ -2,7 +2,6 @@ import User from "../models/User.model.js";
 import Answer from "../models/Answer.model.js";
 export const getLeaderboard = async (_req, res) => {
     try {
-        // answers count per user
         const answersAgg = await Answer.aggregate([
             { $group: { _id: "$authorId", answers: { $sum: 1 } } },
         ]);

@@ -5,39 +5,39 @@ async function buildAdminCourseRows(filter) {
         .select("title subtitle description outcomes requirements thumbnailUrl sections category level language price currency status instructorId totalLectures totalVideoSec createdAt rejectionReason")
         .sort({ createdAt: -1 })
         .lean();
-    const instructorIds = items.map((x) => x.instructorId);
+    const instructorIds = items.map((item) => item.instructorId);
     const instructors = await User.find({ _id: { $in: instructorIds } })
         .select("firstName lastName email")
         .lean();
-    const map = new Map();
-    instructors.forEach((u) => map.set(String(u._id), u));
-    return items.map((c) => {
-        const u = map.get(String(c.instructorId));
-        const name = u ? `${u.firstName} ${u.lastName}`.trim() : "Instructor";
+    const instructorMap = new Map();
+    instructors.forEach((user) => instructorMap.set(String(user._id), user));
+    return items.map((course) => {
+        const instructor = instructorMap.get(String(course.instructorId));
+        const name = instructor ? `${instructor.firstName} ${instructor.lastName}`.trim() : "Instructor";
         return {
-            id: String(c._id),
-            title: c.title,
-            subtitle: c.subtitle,
-            category: c.category,
-            level: c.level,
-            language: c.language,
-            price: c.price,
-            currency: c.currency,
-            status: c.status,
-            description: c.description,
-            outcomes: Array.isArray(c.outcomes) ? c.outcomes : [],
-            requirements: Array.isArray(c.requirements) ? c.requirements : [],
-            thumbnailUrl: c.thumbnailUrl ?? null,
-            sections: Array.isArray(c.sections) ? c.sections : [],
-            rejectionReason: c.rejectionReason ?? null,
+            id: String(course._id),
+            title: course.title,
+            subtitle: course.subtitle,
+            category: course.category,
+            level: course.level,
+            language: course.language,
+            price: course.price,
+            currency: course.currency,
+            status: course.status,
+            description: course.description,
+            outcomes: Array.isArray(course.outcomes) ? course.outcomes : [],
+            requirements: Array.isArray(course.requirements) ? course.requirements : [],
+            thumbnailUrl: course.thumbnailUrl ?? null,
+            sections: Array.isArray(course.sections) ? course.sections : [],
+            rejectionReason: course.rejectionReason ?? null,
             instructor: {
-                id: String(c.instructorId),
+                id: String(course.instructorId),
                 name,
-                email: u?.email || "",
+                email: instructor?.email || "",
             },
-            totalLectures: c.totalLectures || 0,
-            totalVideoSec: c.totalVideoSec || 0,
-            createdAt: c.createdAt,
+            totalLectures: course.totalLectures || 0,
+            totalVideoSec: course.totalVideoSec || 0,
+            createdAt: course.createdAt,
         };
     });
 }
@@ -48,17 +48,21 @@ export async function listAdminCourses(req, res) {
         const items = await buildAdminCourseRows(filter);
         return res.json({ items });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load courses" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load courses",
+        });
     }
 }
-export async function listPendingCourses(req, res) {
+export async function listPendingCourses(_req, res) {
     try {
         const items = await buildAdminCourseRows({ status: "Pending" });
         return res.json({ items });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load pending courses" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load pending courses",
+        });
     }
 }
 export async function approveCourse(req, res) {

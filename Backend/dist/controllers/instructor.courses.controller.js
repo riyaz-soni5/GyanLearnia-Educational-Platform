@@ -427,17 +427,21 @@ export async function createInstructorCourse(req, res) {
                 message: "Submitted for admin approval",
             });
         }
-        catch (e) {
+        catch (error) {
             if (createdQuizIds.length > 0) {
                 await Quiz.deleteMany({ _id: { $in: createdQuizIds } });
             }
             await Course.findByIdAndDelete(course._id);
-            throw e;
+            throw error;
         }
     }
-    catch (e) {
-        const message = e instanceof DraftValidationError ? e.message : e?.message || "Failed to create course";
-        const statusCode = e instanceof DraftValidationError ? 400 : 500;
+    catch (error) {
+        const message = error instanceof DraftValidationError
+            ? error.message
+            : error instanceof Error
+                ? error.message
+                : "Failed to create course";
+        const statusCode = error instanceof DraftValidationError ? 400 : 500;
         return res.status(statusCode).json({ message });
     }
 }
@@ -490,16 +494,20 @@ export async function resubmitInstructorCourse(req, res) {
                 message: "Course updated and resubmitted for admin approval",
             });
         }
-        catch (e) {
+        catch (error) {
             if (createdQuizIds.length > 0) {
                 await Quiz.deleteMany({ _id: { $in: createdQuizIds }, courseId: course._id, instructorId });
             }
-            throw e;
+            throw error;
         }
     }
-    catch (e) {
-        const message = e instanceof DraftValidationError ? e.message : e?.message || "Failed to resubmit course";
-        const statusCode = e instanceof DraftValidationError ? 400 : 500;
+    catch (error) {
+        const message = error instanceof DraftValidationError
+            ? error.message
+            : error instanceof Error
+                ? error.message
+                : "Failed to resubmit course";
+        const statusCode = error instanceof DraftValidationError ? 400 : 500;
         return res.status(statusCode).json({ message });
     }
 }
@@ -522,8 +530,10 @@ export async function getInstructorCourseById(req, res) {
             },
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load course" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load course",
+        });
     }
 }
 export async function deleteInstructorCourse(req, res) {
@@ -540,8 +550,10 @@ export async function deleteInstructorCourse(req, res) {
         await Course.deleteOne({ _id: id, instructorId });
         return res.json({ message: "Course deleted successfully" });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to delete course" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to delete course",
+        });
     }
 }
 export async function listInstructorCourses(req, res) {
@@ -565,8 +577,10 @@ export async function listInstructorCourses(req, res) {
             })),
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load instructor courses" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load instructor courses",
+        });
     }
 }
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -727,8 +741,10 @@ export async function getInstructorAnalytics(req, res) {
             publishedCourseReviews,
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load instructor analytics" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load instructor analytics",
+        });
     }
 }
 export async function getInstructorEarnings(req, res) {
@@ -762,8 +778,10 @@ export async function getInstructorEarnings(req, res) {
             lastPayoutAt: agg?.lastPayoutAt || null,
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load instructor earnings" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load instructor earnings",
+        });
     }
 }
 function toObjectId(value) {

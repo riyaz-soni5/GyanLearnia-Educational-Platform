@@ -2,7 +2,6 @@ import Reply from "../models/Reply.model.js";
 import Answer from "../models/Answer.model.js";
 import User from "../models/User.model.js";
 import { createNotification } from "../services/notification.service.js";
-// helper: apply vote switch / toggle (same as your Answer logic)
 const applyVote = (existing, next) => {
     if (existing === next)
         return { newValue: null, delta: -next };
@@ -17,25 +16,21 @@ const toPlainText = (html) => String(html ?? "")
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
-// GET /api/questions/:id/answers/:answerId/replies?parentId=&limit=5&cursor=ISO_DATE
 export const listReplies = async (req, res) => {
     try {
         const { id: questionId, answerId } = req.params;
-        // parentId can be "null", "" or missing => root replies
         const parentIdRaw = req.query.parentId ?? "";
         const parentReplyId = parentIdRaw && parentIdRaw !== "null" ? parentIdRaw : null;
         const limit = Math.min(Math.max(Number(req.query.limit || 5), 1), 20);
         const cursor = String(req.query.cursor || "").trim();
         const cursorDate = cursor ? new Date(cursor) : null;
-        // verify answer exists (prevents leaking)
-        const ans = await Answer.findOne({ _id: answerId, questionId }).lean();
-        if (!ans)
+        const answer = await Answer.findOne({ _id: answerId, questionId }).lean();
+        if (!answer)
             return res.status(404).json({ message: "Answer not found" });
         const filter = { questionId, answerId, parentReplyId };
         if (cursorDate && !Number.isNaN(cursorDate.getTime())) {
             filter.createdAt = { $lt: cursorDate };
         }
-        // fetch limit+1 to detect hasMore
         const rows = await Reply.find(filter)
             .sort({ createdAt: -1 })
             .limit(limit + 1)
@@ -47,25 +42,23 @@ export const listReplies = async (req, res) => {
             ? new Date(slice[slice.length - 1].createdAt).toISOString()
             : null;
         const meId = req.user?.id ? String(req.user.id) : null;
-        const items = slice.map((r) => {
-            const myVote = meId
-                ? (r.voters?.find((v) => String(v.userId) === meId)?.value ?? null)
-                : null;
-            const authorObj = r.authorId;
+        const items = slice.map((reply) => {
+            const myVote = meId ? (reply.voters?.find((v) => String(v.userId) === meId)?.value ?? null) : null;
+            const authorObj = reply.authorId;
             const author = authorObj
                 ? `${authorObj.firstName ?? ""} ${authorObj.lastName ?? ""}`.trim() ||
                     authorObj.email
                 : "Unknown";
             return {
-                id: String(r._id),
-                questionId: String(r.questionId),
-                answerId: String(r.answerId),
-                parentReplyId: r.parentReplyId ? String(r.parentReplyId) : null,
-                content: r.content,
-                votes: r.votes ?? 0,
+                id: String(reply._id),
+                questionId: String(reply.questionId),
+                answerId: String(reply.answerId),
+                parentReplyId: reply.parentReplyId ? String(reply.parentReplyId) : null,
+                content: reply.content,
+                votes: reply.votes ?? 0,
                 myVote,
-                createdAt: r.createdAt,
-                updatedAt: r.updatedAt,
+                createdAt: reply.createdAt,
+                updatedAt: reply.updatedAt,
                 authorId: authorObj?._id ? String(authorObj._id) : undefined,
                 author,
                 authorType: authorObj?.role ?? "student",
@@ -78,7 +71,6 @@ export const listReplies = async (req, res) => {
         return res.status(500).json({ message: "Failed to load replies" });
     }
 };
-// POST /api/questions/:id/answers/:answerId/replies (requireAuth)
 export const postReply = async (req, res) => {
     try {
         const { id: questionId, answerId } = req.params;
@@ -89,11 +81,10 @@ export const postReply = async (req, res) => {
         if (!html || html.length < 3) {
             return res.status(400).json({ message: "Reply is too short" });
         }
-        const ans = await Answer.findOne({ _id: answerId, questionId }).lean();
-        if (!ans)
+        const answer = await Answer.findOne({ _id: answerId, questionId }).lean();
+        if (!answer)
             return res.status(404).json({ message: "Answer not found" });
         let parentReplyAuthorId = "";
-        // if replying to a reply, ensure it belongs to same answer/question
         if (parentReplyId) {
             const parent = await Reply.findOne({ _id: parentReplyId, questionId, answerId }).lean();
             if (!parent)
@@ -111,7 +102,7 @@ export const postReply = async (req, res) => {
             .select("firstName lastName role email avatarUrl")
             .lean();
         const actorId = String(req.user.id);
-        const answerAuthorId = String(ans?.authorId ?? "");
+        const answerAuthorId = String(answer?.authorId ?? "");
         const recipientIds = new Set();
         if (answerAuthorId && answerAuthorId !== actorId)
             recipientIds.add(answerAuthorId);
@@ -159,7 +150,6 @@ export const postReply = async (req, res) => {
         return res.status(500).json({ message: "Failed to post reply" });
     }
 };
-// PATCH /api/questions/:id/answers/:answerId/replies/:replyId (requireAuth)
 export const updateReply = async (req, res) => {
     try {
         const { id: questionId, answerId, replyId } = req.params;
@@ -192,7 +182,6 @@ export const updateReply = async (req, res) => {
         return res.status(500).json({ message: "Failed to update reply" });
     }
 };
-// DELETE /api/questions/:id/answers/:answerId/replies/:replyId (requireAuth)
 export const deleteReply = async (req, res) => {
     try {
         const { id: questionId, answerId, replyId } = req.params;
@@ -205,7 +194,6 @@ export const deleteReply = async (req, res) => {
         const isAdmin = req.user.role === "admin";
         if (!isOwner && !isAdmin)
             return res.status(403).json({ message: "Not allowed" });
-        // delete this reply + its children (simple cascade)
         await Reply.deleteMany({
             questionId,
             answerId,
@@ -217,7 +205,6 @@ export const deleteReply = async (req, res) => {
         return res.status(500).json({ message: "Failed to delete reply" });
     }
 };
-// POST /api/questions/:id/answers/:answerId/replies/:replyId/upvote
 export const upvoteReply = async (req, res) => {
     try {
         const { id: questionId, answerId, replyId } = req.params;
@@ -247,7 +234,6 @@ export const upvoteReply = async (req, res) => {
         return res.status(500).json({ message: "Failed to upvote reply" });
     }
 };
-// POST /api/questions/:id/answers/:answerId/replies/:replyId/downvote
 export const downvoteReply = async (req, res) => {
     try {
         const { id: questionId, answerId, replyId } = req.params;

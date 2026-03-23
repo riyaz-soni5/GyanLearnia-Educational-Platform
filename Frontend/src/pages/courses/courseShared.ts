@@ -39,8 +39,11 @@ export type CourseUiModel = {
   hours: number;
   lessons: number;
   enrolled: number;
+  instructorId?: string;
   instructorName: string;
   instructorAvatarUrl?: string | null;
+  instructorBio?: string;
+  instructorJoinedAt?: string;
   thumbnailUrl: string;
   outcomes: string[];
   requirements: string[];
@@ -92,7 +95,14 @@ type RawCourse = {
   price?: unknown;
   rating?: unknown;
   enrolled?: unknown;
-  instructor?: { name?: unknown; email?: unknown; avatarUrl?: unknown } | null;
+  instructor?: {
+    id?: unknown;
+    name?: unknown;
+    email?: unknown;
+    avatarUrl?: unknown;
+    bio?: unknown;
+    joinedAt?: unknown;
+  } | null;
   instructorName?: unknown;
   thumbnailUrl?: unknown;
   outcomes?: unknown;
@@ -268,8 +278,12 @@ export const toUiCourse = (payload: unknown): CourseUiModel | null => {
   const instructorName =
     String(c.instructor?.name ?? c.instructor?.email ?? c.instructorName ?? "").trim() ||
     "Unknown Instructor";
+  const instructorId = String(c.instructor?.id ?? "").trim() || undefined;
   const instructorAvatarUrl =
     typeof c.instructor?.avatarUrl === "string" ? resolveAssetUrl(c.instructor.avatarUrl) : null;
+  const instructorBio = String(c.instructor?.bio ?? "").trim() || undefined;
+  const instructorJoinedAt =
+    typeof c.instructor?.joinedAt === "string" ? c.instructor.joinedAt : undefined;
 
   return {
     id: String(c._id ?? c.id ?? ""),
@@ -285,8 +299,11 @@ export const toUiCourse = (payload: unknown): CourseUiModel | null => {
     hours,
     lessons,
     enrolled: Number(c.enrolled ?? 0),
+    instructorId,
     instructorName,
     instructorAvatarUrl,
+    instructorBio,
+    instructorJoinedAt,
     thumbnailUrl: thumb,
     outcomes,
     requirements,

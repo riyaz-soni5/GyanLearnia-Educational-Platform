@@ -26,14 +26,15 @@ export const login = async (req, res) => {
         if (!ok)
             return res.status(401).json({ message: "Invalid credentials" });
         const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: rememberMe ? "7d" : "2h" });
-        // ✅ httpOnly cookie (session cookie if rememberMe is false)
         res.cookie("access_token", token, {
             httpOnly: true,
             sameSite: "lax",
-            secure: false, // set true in production https
-            ...(rememberMe ? { maxAge: 7 * 24 * 60 * 60 * 1000 } : {}), // no maxAge => session cookie
+            secure: false,
+            ...(rememberMe ? { maxAge: 7 * 24 * 60 * 60 * 1000 } : {}),
         });
         const plan = getUserPlanSnapshot(user);
+        const walletBalancePaisa = Number(user.walletBalancePaisa ?? 0);
+        const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
         return res.json({
             message: "Login successful",
             user: {
@@ -44,13 +45,13 @@ export const login = async (req, res) => {
                 lastName: user.lastName,
                 avatarUrl: user.avatarUrl ?? null,
                 isVerified: Boolean(user.isVerified),
-                verificationStatus: user.verificationStatus, // ✅ add this
+                verificationStatus: user.verificationStatus,
                 currentPlan: plan.currentPlan,
                 planStatus: plan.planStatus,
                 planActivatedAt: plan.planActivatedAt,
                 planExpiresAt: plan.planExpiresAt,
-                walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
-                walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
+                walletBalancePaisa,
+                walletBalance,
             },
         });
     }
@@ -78,6 +79,8 @@ export const register = async (req, res) => {
             expertise: role === "instructor" ? String(expertise || "").trim() || undefined : undefined,
             institution: role === "instructor" ? String(institution || "").trim() || undefined : undefined,
         });
+        const walletBalancePaisa = Number(user.walletBalancePaisa ?? 0);
+        const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
         res.status(201).json({
             message: "Registration successful",
             user: {
@@ -91,12 +94,12 @@ export const register = async (req, res) => {
                 planStatus: "Active",
                 planActivatedAt: user.planActivatedAt ?? null,
                 planExpiresAt: user.planExpiresAt ?? null,
-                walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
-                walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
+                walletBalancePaisa,
+                walletBalance,
             },
         });
     }
-    catch (err) {
-        res.status(500).json({ message: "Registration failed" });
+    catch {
+        return res.status(500).json({ message: "Registration failed" });
     }
 };

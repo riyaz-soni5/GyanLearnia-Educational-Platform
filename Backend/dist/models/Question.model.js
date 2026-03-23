@@ -1,4 +1,3 @@
-// Question.model.ts
 import { Schema, model, Types } from "mongoose";
 const QuestionVoteSchema = new Schema({
     userId: { type: Types.ObjectId, ref: "User", required: true },
@@ -14,8 +13,8 @@ const QuestionSchema = new Schema({
     views: { type: Number, default: 0 },
     viewedBy: [{ type: Types.ObjectId, ref: "User" }],
     viewedKeys: [{ type: String }],
-    votes: { type: Number, default: 0 }, // cached
-    voters: { type: [QuestionVoteSchema], default: [] }, // ✅ NEW
+    votes: { type: Number, default: 0 },
+    voters: { type: [QuestionVoteSchema], default: [] },
     answersCount: { type: Number, default: 0 },
     hasVerifiedAnswer: { type: Boolean, default: false },
     acceptedAnswerId: { type: Types.ObjectId, ref: "Answer", default: null },
@@ -37,6 +36,5 @@ const QuestionSchema = new Schema({
     fastResponsePlatformFeePaisa: { type: Number, default: 0, min: 0 },
     fastResponseReleasedAt: { type: Date, default: null },
 }, { timestamps: true });
-// extra safety (same pattern as Answer)
 QuestionSchema.index({ _id: 1, "voters.userId": 1 });
 export default model("Question", QuestionSchema);

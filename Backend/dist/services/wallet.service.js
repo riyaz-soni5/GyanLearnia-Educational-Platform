@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import User from "../models/User.model.js";
 import WalletTransaction from "../models/WalletTransaction.model.js";
-const sanitizeAmountPaisa = (value) => {
+const parseAmountPaisa = (value) => {
     const amount = Number(value);
     if (!Number.isInteger(amount) || amount <= 0)
         return 0;
@@ -9,19 +9,20 @@ const sanitizeAmountPaisa = (value) => {
 };
 export async function creditUserWallet(input) {
     const userId = String(input.userId || "").trim();
-    const amountPaisa = sanitizeAmountPaisa(input.amountPaisa);
+    const amountPaisa = parseAmountPaisa(input.amountPaisa);
     if (!mongoose.Types.ObjectId.isValid(userId) || amountPaisa <= 0) {
         return { ok: false, error: "Invalid wallet credit input" };
     }
     const user = await User.findByIdAndUpdate(userId, { $inc: { walletBalancePaisa: amountPaisa } }, { new: true });
     if (!user)
         return { ok: false, error: "User not found" };
-    const tx = await WalletTransaction.create({
+    const balancePaisa = Number(user.walletBalancePaisa ?? 0);
+    const transaction = await WalletTransaction.create({
         userId,
         type: input.type,
         direction: "credit",
         amountPaisa,
-        balanceAfterPaisa: Number(user.walletBalancePaisa ?? 0),
+        balanceAfterPaisa: balancePaisa,
         status: "completed",
         note: String(input.note || ""),
         referenceId: input.referenceId ? String(input.referenceId) : null,
@@ -29,25 +30,26 @@ export async function creditUserWallet(input) {
     });
     return {
         ok: true,
-        balancePaisa: Number(user.walletBalancePaisa ?? 0),
-        transactionId: String(tx._id),
+        balancePaisa,
+        transactionId: String(transaction._id),
     };
 }
 export async function debitUserWallet(input) {
     const userId = String(input.userId || "").trim();
-    const amountPaisa = sanitizeAmountPaisa(input.amountPaisa);
+    const amountPaisa = parseAmountPaisa(input.amountPaisa);
     if (!mongoose.Types.ObjectId.isValid(userId) || amountPaisa <= 0) {
         return { ok: false, error: "Invalid wallet debit input" };
     }
     const user = await User.findOneAndUpdate({ _id: userId, walletBalancePaisa: { $gte: amountPaisa } }, { $inc: { walletBalancePaisa: -amountPaisa } }, { new: true });
     if (!user)
         return { ok: false, error: "Insufficient wallet balance" };
-    const tx = await WalletTransaction.create({
+    const balancePaisa = Number(user.walletBalancePaisa ?? 0);
+    const transaction = await WalletTransaction.create({
         userId,
         type: input.type,
         direction: "debit",
         amountPaisa,
-        balanceAfterPaisa: Number(user.walletBalancePaisa ?? 0),
+        balanceAfterPaisa: balancePaisa,
         status: "completed",
         note: String(input.note || ""),
         referenceId: input.referenceId ? String(input.referenceId) : null,
@@ -55,7 +57,7 @@ export async function debitUserWallet(input) {
     });
     return {
         ok: true,
-        balancePaisa: Number(user.walletBalancePaisa ?? 0),
-        transactionId: String(tx._id),
+        balancePaisa,
+        transactionId: String(transaction._id),
     };
 }

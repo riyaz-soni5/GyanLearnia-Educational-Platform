@@ -325,6 +325,7 @@ export async function listPublishedCourses(req, res) {
                 totalVideoSec: Number(c.totalVideoSec ?? 0),
                 instructor: c.instructorId
                     ? {
+                        id: String(c.instructorId._id),
                         name: [c.instructorId.firstName, c.instructorId.lastName].filter(Boolean).join(" ").trim(),
                         email: c.instructorId.email,
                         avatarUrl: c.instructorId.avatarUrl ?? null,
@@ -333,24 +334,29 @@ export async function listPublishedCourses(req, res) {
             })),
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load courses" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load courses",
+        });
     }
 }
 export async function getPublishedCourse(req, res) {
     try {
         const id = req.params.id;
         const c = await Course.findOne({ _id: id, status: "Published" })
-            .populate("instructorId", "firstName lastName email avatarUrl")
+            .populate("instructorId", "firstName lastName email avatarUrl bio createdAt")
             .lean();
         if (!c)
             return res.status(404).json({ message: "Course not found" });
         const instructorDoc = c.instructorId;
         const instructor = instructorDoc
             ? {
+                id: String(instructorDoc._id),
                 name: [instructorDoc.firstName, instructorDoc.lastName].filter(Boolean).join(" ").trim(),
                 email: instructorDoc.email,
                 avatarUrl: instructorDoc.avatarUrl ?? null,
+                bio: typeof instructorDoc.bio === "string" ? instructorDoc.bio : "",
+                joinedAt: instructorDoc.createdAt ?? null,
             }
             : null;
         const [ratingAgg, enrolledCount] = await Promise.all([
@@ -797,8 +803,10 @@ export async function enrollPublishedCourse(req, res) {
         const progress = await recalcCompletion(enrollment, course);
         return res.json({ item: { enrolled: true, ...progress } });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to enroll course" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to enroll course",
+        });
     }
 }
 export async function getMyCourseProgress(req, res) {
@@ -846,8 +854,10 @@ export async function getMyCourseProgress(req, res) {
             },
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to load course progress" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to load course progress",
+        });
     }
 }
 export async function completeCourseLecture(req, res) {
@@ -888,8 +898,10 @@ export async function completeCourseLecture(req, res) {
             },
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to complete lecture" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to complete lecture",
+        });
     }
 }
 export async function getPublishedCourseReviews(req, res) {
@@ -964,11 +976,13 @@ export async function upsertCourseReview(req, res) {
             item: toReviewItem(review, userId),
         });
     }
-    catch (e) {
-        if (e?.code === 11000) {
+    catch (error) {
+        if (error?.code === 11000) {
             return res.status(409).json({ message: "You have already submitted a review for this course" });
         }
-        return res.status(500).json({ message: e?.message || "Failed to submit review" });
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to submit review",
+        });
     }
 }
 export async function getCourseCertificate(req, res) {
@@ -1015,7 +1029,7 @@ export async function getCourseCertificate(req, res) {
             }
         }
         catch {
-            // keep external URL fallback
+            // use the original image url if embedding fails
         }
         const filenameBase = slugify(`${courseTitle}-${studentName}-certificate`) || "course-certificate";
         const html = `<!doctype html>
@@ -1123,7 +1137,9 @@ export async function getCourseCertificate(req, res) {
             },
         });
     }
-    catch (e) {
-        return res.status(500).json({ message: e?.message || "Failed to generate certificate" });
+    catch (error) {
+        return res.status(500).json({
+            message: error instanceof Error ? error.message : "Failed to generate certificate",
+        });
     }
 }

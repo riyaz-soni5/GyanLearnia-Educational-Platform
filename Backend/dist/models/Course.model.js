@@ -7,14 +7,10 @@ const ResourceSchema = new Schema({
 const LectureSchema = new Schema({
     title: { type: String, required: true, trim: true },
     type: { type: String, enum: ["video", "file", "quiz", "note"], required: true },
-    // video
     videoUrl: { type: String, default: null },
     durationSec: { type: Number, default: 0 },
-    // note
     noteText: { type: String, default: "" },
-    // quiz
     quizId: { type: Types.ObjectId, ref: "Quiz", default: null },
-    // resources for the lecture
     resources: { type: [ResourceSchema], default: [] },
     isFreePreview: { type: Boolean, default: false },
     order: { type: Number, default: 0 },

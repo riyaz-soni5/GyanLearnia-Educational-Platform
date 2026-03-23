@@ -114,7 +114,6 @@ export async function getCurrentUser(req, res) {
                 points: 0,
             });
         }
-        // Keep the final point in sync with the canonical current points value.
         pointsTimeline[pointsTimeline.length - 1].points = Math.max(0, points);
         let badge = "New Learner";
         if (points >= 1000)
@@ -124,6 +123,8 @@ export async function getCurrentUser(req, res) {
         else if (points >= 100)
             badge = "Active Learner";
         const plan = getUserPlanSnapshot(user);
+        const walletBalancePaisa = Number(user.walletBalancePaisa ?? 0);
+        const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
         return res.json({
             id: String(user._id),
             firstName: user.firstName,
@@ -158,8 +159,8 @@ export async function getCurrentUser(req, res) {
             planStatus: plan.planStatus,
             planActivatedAt: plan.planActivatedAt,
             planExpiresAt: plan.planExpiresAt,
-            walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
-            walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
+            walletBalancePaisa,
+            walletBalance,
             stats: {
                 enrolledCoursesCount: enrollmentAgg,
                 completedCoursesCount: completedAgg,
@@ -244,6 +245,8 @@ export async function updateCurrentUser(req, res) {
         user.avatarUrl = String(avatarUrl ?? "").trim() || null;
         await user.save();
         const plan = getUserPlanSnapshot(user);
+        const walletBalancePaisa = Number(user.walletBalancePaisa ?? 0);
+        const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
         return res.json({
             id: String(user._id),
             firstName: user.firstName,
@@ -278,8 +281,8 @@ export async function updateCurrentUser(req, res) {
             planStatus: plan.planStatus,
             planActivatedAt: plan.planActivatedAt,
             planExpiresAt: plan.planExpiresAt,
-            walletBalancePaisa: Number(user.walletBalancePaisa ?? 0),
-            walletBalance: Number((Number(user.walletBalancePaisa ?? 0) / 100).toFixed(2)),
+            walletBalancePaisa,
+            walletBalance,
         });
     }
     catch {

@@ -403,6 +403,7 @@ export async function listPublishedCourses(req: AuthedRequest, res: Response) {
         totalVideoSec: Number(c.totalVideoSec ?? 0),
         instructor: c.instructorId
           ? {
+              id: String(c.instructorId._id),
               name: [c.instructorId.firstName, c.instructorId.lastName].filter(Boolean).join(" ").trim(),
               email: c.instructorId.email,
               avatarUrl: c.instructorId.avatarUrl ?? null,
@@ -422,16 +423,19 @@ export async function getPublishedCourse(req: Request, res: Response) {
     const id = req.params.id;
 
     const c = await Course.findOne({ _id: id, status: "Published" })
-      .populate("instructorId", "firstName lastName email avatarUrl")
+      .populate("instructorId", "firstName lastName email avatarUrl bio createdAt")
       .lean();
     if (!c) return res.status(404).json({ message: "Course not found" });
 
     const instructorDoc = c.instructorId as any;
     const instructor = instructorDoc
       ? {
+          id: String(instructorDoc._id),
           name: [instructorDoc.firstName, instructorDoc.lastName].filter(Boolean).join(" ").trim(),
           email: instructorDoc.email,
           avatarUrl: instructorDoc.avatarUrl ?? null,
+          bio: typeof instructorDoc.bio === "string" ? instructorDoc.bio : "",
+          joinedAt: instructorDoc.createdAt ?? null,
         }
       : null;
 

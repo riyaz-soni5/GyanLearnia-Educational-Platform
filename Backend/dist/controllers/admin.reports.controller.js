@@ -97,7 +97,7 @@ export async function getAdminReportInsights(req, res) {
         const parsedDays = parseInt(String(req.query.days || "30"), 10);
         const windowDays = clamp(Number.isNaN(parsedDays) ? 30 : parsedDays, 7, 90);
         const todayStart = startOfUtcDay(new Date());
-        const endExclusive = addUtcDays(todayStart, 1); // tomorrow 00:00 UTC
+        const endExclusive = addUtcDays(todayStart, 1);
         const windowStart = addUtcDays(todayStart, -(windowDays - 1));
         const previousWindowStart = addUtcDays(windowStart, -windowDays);
         const previousWindowEndExclusive = windowStart;
@@ -479,8 +479,8 @@ export async function getAdminReportInsights(req, res) {
             insights,
         });
     }
-    catch (e) {
-        const message = e instanceof Error ? e.message : "Failed to load report insights";
+    catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load report insights";
         return res.status(500).json({ message });
     }
 }

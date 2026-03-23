@@ -54,7 +54,6 @@ export const listQuestions = async (req, res) => {
     const filter = {};
     if (searchText) {
         const searchRegex = new RegExp(searchText, "i");
-        // Search by title, description(excerpt), and tags.
         filter.$or = [
             { title: searchRegex },
             { excerpt: searchRegex },
@@ -102,9 +101,7 @@ export const listQuestions = async (req, res) => {
     const meId = req.user?.id ? String(req.user.id) : null;
     const mapped = items.map((q) => {
         const authorObj = q.authorId;
-        const myVote = meId
-            ? (q.voters?.find((v) => String(v.userId) === meId)?.value ?? null)
-            : null;
+        const myVote = meId ? (q.voters?.find((v) => String(v.userId) === meId)?.value ?? null) : null;
         return {
             id: String(q._id),
             title: q.title,
@@ -126,18 +123,11 @@ export const listQuestions = async (req, res) => {
             fastResponseEscrowStatus: String(q.fastResponseEscrowStatus || "none"),
             hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
             status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
-            createdAt: q.createdAt
-                ? new Date(q.createdAt).toISOString()
-                : undefined,
-            updatedAt: q.updatedAt
-                ? new Date(q.updatedAt).toISOString()
-                : undefined,
+            createdAt: q.createdAt ? new Date(q.createdAt).toISOString() : undefined,
+            updatedAt: q.updatedAt ? new Date(q.updatedAt).toISOString() : undefined,
             author: authorObj?.firstName && authorObj?.lastName
                 ? `${authorObj.firstName} ${authorObj.lastName}`
-                : authorObj?.fullName ||
-                    authorObj?.name ||
-                    authorObj?.username ||
-                    "Anonymous",
+                : authorObj?.fullName || authorObj?.name || authorObj?.username || "Anonymous",
             authorType: authorObj?.role || "student",
             authorAvatarUrl: authorObj?.avatarUrl || null,
         };
@@ -154,12 +144,11 @@ export const getQuestion = async (req, res) => {
     const ua = String(req.headers["user-agent"] || "");
     const guestKey = `${ip}::${ua}`;
     let q = null;
-    // ✅ Logged-in user logic
     if (userId) {
         q = await Question.findOneAndUpdate({
             _id: id,
-            authorId: { $ne: userId }, // owner view should NOT count
-            viewedBy: { $ne: userId }, // already viewed should NOT count
+            authorId: { $ne: userId },
+            viewedBy: { $ne: userId },
         }, {
             $inc: { views: 1 },
             $addToSet: { viewedBy: userId },
@@ -168,7 +157,6 @@ export const getQuestion = async (req, res) => {
             .populate("authorId", "firstName lastName fullName name username role avatarUrl")
             .lean();
     }
-    // ✅ Guest logic
     else {
         q = await Question.findOneAndUpdate({
             _id: id,
@@ -181,7 +169,6 @@ export const getQuestion = async (req, res) => {
             .populate("authorId", "firstName lastName fullName name username role avatarUrl")
             .lean();
     }
-    // If not incremented, just fetch normally
     if (!q) {
         q = await Question.findById(id)
             .populate("categoryId", "name")
@@ -191,9 +178,7 @@ export const getQuestion = async (req, res) => {
     if (!q)
         return res.status(404).json({ message: "Question not found" });
     const meId = req.user?.id ? String(req.user.id) : null;
-    const myVote = meId
-        ? (q.voters?.find((v) => String(v.userId) === meId)?.value ?? null)
-        : null;
+    const myVote = meId ? (q.voters?.find((v) => String(v.userId) === meId)?.value ?? null) : null;
     const authorObj = q.authorId;
     const authorName = authorObj?.firstName && authorObj?.lastName
         ? `${authorObj.firstName} ${authorObj.lastName}`
@@ -413,7 +398,6 @@ export const createQuestion = async (req, res) => {
     }
     catch {
         if (walletDebitInfo && walletDebitInfo.amountPaisa > 0) {
-            // best-effort refund if question creation fails after wallet debit
             await creditUserWallet({
                 userId,
                 amountPaisa: walletDebitInfo.amountPaisa,
@@ -444,7 +428,6 @@ export const updateQuestion = async (req, res) => {
     const q = await Question.findById(id);
     if (!q)
         return res.status(404).json({ message: "Question not found" });
-    // ✅ only owner can edit
     if (String(q.authorId) !== String(req.user?.id)) {
         return res.status(403).json({ message: "Not allowed" });
     }
@@ -526,7 +509,6 @@ const applyVote = (existing, next) => {
         return { newValue: next, delta: next };
     return { newValue: next, delta: next - existing };
 };
-// POST /api/questions/:id/upvote
 export const upvoteQuestion = async (req, res) => {
     try {
         const { id: questionId } = req.params;
@@ -556,7 +538,6 @@ export const upvoteQuestion = async (req, res) => {
         return res.status(500).json({ message: "Failed to upvote question" });
     }
 };
-// POST /api/questions/:id/downvote
 export const downvoteQuestion = async (req, res) => {
     try {
         const { id: questionId } = req.params;

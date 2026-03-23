@@ -104,9 +104,11 @@ export type CourseListItem = {
   currency: string;
   tags?: string[];
   instructor?: {
+    id?: string;
     name?: string;
     email?: string;
     avatarUrl?: string | null;
+    bio?: string;
   };
   totalLectures?: number;
   totalVideoSec?: number;

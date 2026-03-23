@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   FiAward,
+  FiCheckCircle,
   FiChevronDown,
   FiChevronUp,
   FiDownload,
@@ -24,13 +25,16 @@ import type { Question } from "@/app/types/question.types";
 import { fetchCategories, type CategoryDTO } from "@/services/category";
 import { createQuestion, fetchQuestions } from "@/services/questions";
 import {
+  type CourseListResponse,
   type CourseUiModel,
+  type RelatedCourse,
   type LectureKind,
   type UiLecture,
   findLectureById,
   formatMin,
   parseApiError,
   pickInitialCourseLecture,
+  toCourseRows,
   toUiCourse,
 } from "./courseShared";
 import Logo from "@/assets/icon.svg";
@@ -77,6 +81,19 @@ const formatReviewTimeAgo = (value?: string | null) => {
   return `${years} year${years === 1 ? "" : "s"} ago`;
 };
 
+const formatInstructorCreatedDate = (value?: string | null) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
 const CourseLearnPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -100,6 +117,8 @@ const CourseLearnPage = () => {
   const [shareCopied, setShareCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<LearnTab>("overview");
   const [categories, setCategories] = useState<CategoryDTO[]>([]);
+  const [instructorCourses, setInstructorCourses] = useState<RelatedCourse[]>([]);
+  const [instructorCoursesLoading, setInstructorCoursesLoading] = useState(false);
   const [qaQuestions, setQaQuestions] = useState<Question[]>([]);
   const [qaLoading, setQaLoading] = useState(false);
   const [qaError, setQaError] = useState("");
@@ -359,6 +378,39 @@ const CourseLearnPage = () => {
     void loadReviews(course.id);
   }, [activeTab, course?.id]);
 
+  useEffect(() => {
+    if (!course?.instructorId) {
+      setInstructorCourses([]);
+      setInstructorCoursesLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setInstructorCoursesLoading(true);
+        const data = (await coursesApi.list()) as CourseListResponse;
+        if (cancelled) return;
+
+        const rows = toCourseRows(data);
+        const otherCourses = rows
+          .filter((row) => row.id !== course.id && row.instructor?.id === course.instructorId)
+          .slice(0, 4);
+
+        setInstructorCourses(otherCourses);
+      } catch {
+        if (!cancelled) setInstructorCourses([]);
+      } finally {
+        if (!cancelled) setInstructorCoursesLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [course?.id, course?.instructorId]);
+
   const toggleSection = (sectionId: string) => {
     setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
@@ -430,6 +482,35 @@ const CourseLearnPage = () => {
   const selectLecture = (lecture: UiLecture) => {
     setActionError("");
     setSelectedLectureId(lecture.id);
+  };
+
+  const downloadLectureResource = async (lecture: UiLecture) => {
+    const resource = lecture.resources[0];
+    if (!resource) {
+      setActionError("No files are attached to this lesson yet.");
+      return;
+    }
+
+    try {
+      setActionError("");
+      const response = await fetch(resource.url);
+      if (!response.ok) {
+        throw new Error("Failed to download file.");
+      }
+
+      const blob = await response.blob();
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = resource.name || lecture.title;
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1000);
+    } catch (e: unknown) {
+      setActionError(parseApiError(e, "Failed to download file"));
+    }
   };
 
   const completeLecture = async (lectureId: string) => {
@@ -614,7 +695,7 @@ const CourseLearnPage = () => {
   return (
     <div className="min-h-screen bg-[rgb(var(--bg))] text-[rgb(var(--text))]">
       <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur dark:border-white/10 dark:bg-slate-950/95">
-        <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3 lg:px-6">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 lg:px-6">
           <div className="flex min-w-0 items-center gap-4">
             <Link
               to="/courses"
@@ -692,7 +773,7 @@ const CourseLearnPage = () => {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1500px] px-4 py-6 lg:px-6">
+      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
         {actionError ? (
           <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-100">
             {actionError}
@@ -961,10 +1042,10 @@ const CourseLearnPage = () => {
                     <div className="grid gap-6 lg:grid-cols-2">
                       <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-slate-950/50">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white">What you'll learn</h3>
-                        <div className="mt-4 space-y-3">
+                        <div className="mt-4 flex flex-col gap-3">
                           {course.outcomes.map((item, idx) => (
-                            <p key={`${item}-${idx}`} className="flex items-start gap-3 text-sm text-gray-600 dark:text-slate-300">
-                              <span className="mt-1.5 h-2 w-2 rounded-full bg-indigo-600 dark:bg-indigo-400" />
+                            <p key={`${item}-${idx}`} className="inline-flex items-start gap-2 text-sm text-gray-600 dark:text-slate-300">
+                              <FiCheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
                               <span>{item}</span>
                             </p>
                           ))}
@@ -991,70 +1072,89 @@ const CourseLearnPage = () => {
                       </p>
                     </div>
 
-                    <div className="grid gap-6 lg:grid-cols-2">
-                      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-slate-950/50">
-                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">Rating</p>
-                            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{course.rating.toFixed(1)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">Students</p>
-                            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{course.enrolled.toLocaleString()}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">Lectures</p>
-                            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{course.lessons}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">Total hours</p>
-                            <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">{course.hours}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">Language</p>
-                            <p className="mt-2 text-base font-semibold text-gray-900 dark:text-white">{course.language}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">Level</p>
-                            <p className="mt-2 text-base font-semibold text-gray-900 dark:text-white">{course.level}</p>
-                          </div>
-                          {course.updatedAt ? (
-                            <div className="sm:col-span-2">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-slate-400">Last updated</p>
-                              <p className="mt-2 text-base font-semibold text-gray-900 dark:text-white">
-                                {new Date(course.updatedAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
+                    <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-slate-950/50">
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">Instructor</h3>
 
-                      <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-white/10 dark:bg-slate-950/50">
-                        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Instructor</h3>
-                        <div className="mt-4 flex items-start gap-4">
-                          {course.instructorAvatarUrl ? (
-                            <img
-                              src={course.instructorAvatarUrl}
-                              alt={course.instructorName}
-                              className="h-14 w-14 rounded-2xl object-cover ring-1 ring-gray-200 dark:ring-white/10"
-                            />
-                          ) : (
-                            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gray-900 text-sm font-bold text-white dark:bg-white dark:text-slate-950">
-                              {course.instructorName
-                                .split(" ")
-                                .slice(0, 2)
-                                .map((word) => word[0]?.toUpperCase())
-                                .join("")}
-                            </div>
-                          )}
+                      <div className="mt-5 flex flex-col gap-6">
+                        <div>
+                          <div className="flex items-start gap-4">
+                            {course.instructorAvatarUrl ? (
+                              <img
+                                src={course.instructorAvatarUrl}
+                                alt={course.instructorName}
+                                className="h-20 w-20 rounded-3xl object-cover ring-1 ring-gray-200 dark:ring-white/10"
+                              />
+                            ) : (
+                              <div className="grid h-20 w-20 place-items-center rounded-3xl bg-gray-900 text-lg font-bold text-white dark:bg-white dark:text-slate-950">
+                                {course.instructorName
+                                  .split(" ")
+                                  .slice(0, 2)
+                                  .map((word) => word[0]?.toUpperCase())
+                                  .join("")}
+                              </div>
+                            )}
 
-                          <div>
-                            <p className="text-base font-semibold text-gray-900 dark:text-white">{course.instructorName}</p>
-                            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
-                              Learn with structured lessons, downloadable resources, and guided practice from this instructor.
+                            <div>
+                              <p className="text-base font-semibold text-gray-900 dark:text-white">{course.instructorName}</p>
+                              {course.instructorJoinedAt ? (
+                                <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+                                  Joined in {formatInstructorCreatedDate(course.instructorJoinedAt)}
+                                </p>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="mt-6">
+                            <p className="mt-3 whitespace-pre-line text-sm leading-7 text-gray-600 dark:text-slate-300">
+                              {course.instructorBio?.trim() || "This instructor has not added a bio yet."}
                             </p>
                           </div>
                         </div>
+
+                        {instructorCoursesLoading || instructorCourses.length > 0 ? (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                              Other courses by {course.instructorName}
+                            </h4>
+
+                            {instructorCoursesLoading ? (
+                              <p className="mt-3 text-sm text-gray-600 dark:text-slate-300">Loading courses...</p>
+                            ) : (
+                              <div className="mt-3 space-y-3">
+                                {instructorCourses.map((item) => {
+                                  const priceText =
+                                    Number(item.price || 0) > 0
+                                      ? `NPR ${Number(item.price).toLocaleString()}`
+                                      : "Free";
+                                  const totalMinutes = Math.max(
+                                    0,
+                                    Math.round(Number(item.totalVideoSec || 0) / 60)
+                                  );
+
+                                  return (
+                                    <Link
+                                      key={item.id}
+                                      to={`/courses/${item.id}`}
+                                      className="block rounded-xl border border-gray-200 p-3 transition hover:bg-gray-50 dark:border-white/10 dark:hover:bg-white/5"
+                                    >
+                                      <p className="line-clamp-2 text-sm font-semibold text-gray-900 dark:text-white">
+                                        {item.title}
+                                      </p>
+                                      <p className="mt-1 text-xs text-gray-600 dark:text-slate-300">
+                                        {item.category} • {item.level}
+                                      </p>
+                                      <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
+                                        {Number(item.totalLectures || 0)} lecture{Number(item.totalLectures || 0) === 1 ? "" : "s"}
+                                        {totalMinutes > 0 ? ` • ${formatMin(totalMinutes)}` : ""}
+                                      </p>
+                                      <p className="mt-2 text-sm font-bold text-gray-900 dark:text-white">{priceText}</p>
+                                    </Link>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -1410,17 +1510,14 @@ const CourseLearnPage = () => {
                           {section.lectures.map((lecture) => {
                             const isSelected = selectedLectureId === lecture.id;
                             const isCompleted = completedLectureSet.has(lecture.id);
+                            const isFileLecture = lecture.type === "File";
+                            const rowClassName = [
+                              "flex w-full items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 text-left transition last:border-b-0 dark:border-white/5",
+                              isSelected ? "bg-indigo-50 dark:bg-indigo-500/10" : "hover:bg-gray-100 dark:hover:bg-white/5",
+                            ].join(" ");
 
-                            return (
-                              <button
-                                key={lecture.id}
-                                type="button"
-                                onClick={() => selectLecture(lecture)}
-                                className={[
-                                  "flex w-full cursor-pointer items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 text-left transition last:border-b-0 dark:border-white/5",
-                                  isSelected ? "bg-indigo-50 dark:bg-indigo-500/10" : "hover:bg-gray-100 dark:hover:bg-white/5",
-                                ].join(" ")}
-                              >
+                            const rowContent = (
+                              <>
                                 <div className="flex min-w-0 items-start gap-3">
                                   <span
                                     className={[
@@ -1433,7 +1530,20 @@ const CourseLearnPage = () => {
                                     {lessonIcon(lecture.type)}
                                   </span>
                                   <div className="min-w-0">
-                                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{lecture.title}</p>
+                                    {isFileLecture ? (
+                                      <button
+                                        type="button"
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          void downloadLectureResource(lecture);
+                                        }}
+                                        className="cursor-pointer truncate text-left text-sm font-semibold text-indigo-700 transition hover:text-indigo-800 hover:underline dark:text-indigo-300 dark:hover:text-indigo-200"
+                                      >
+                                        {lecture.title}
+                                      </button>
+                                    ) : (
+                                      <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">{lecture.title}</p>
+                                    )}
                                     <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
                                       {lecture.type}
                                       {lecture.durationMin > 0 ? ` • ${lecture.durationMin} min` : ""}
@@ -1448,6 +1558,21 @@ const CourseLearnPage = () => {
                                     </span>
                                   ) : null}
                                 </div>
+                              </>
+                            );
+
+                            return isFileLecture ? (
+                              <div key={lecture.id} className={rowClassName}>
+                                {rowContent}
+                              </div>
+                            ) : (
+                              <button
+                                key={lecture.id}
+                                type="button"
+                                onClick={() => selectLecture(lecture)}
+                                className={`${rowClassName} cursor-pointer`}
+                              >
+                                {rowContent}
                               </button>
                             );
                           })}

@@ -5,11 +5,11 @@ export async function requireVerifiedInstructor(req, res, next) {
             return res.status(401).json({ message: "Unauthorized" });
         if (req.user.role !== "instructor")
             return res.status(403).json({ message: "Forbidden" });
-        const u = await User.findById(req.user.id).select("isVerified verificationStatus role");
-        if (!u)
+        const user = await User.findById(req.user.id).select("isVerified verificationStatus role");
+        if (!user)
             return res.status(401).json({ message: "Unauthorized" });
-        const ok = Boolean(u.isVerified) || u.verificationStatus === "Verified";
-        if (!ok)
+        const isVerified = Boolean(user.isVerified) || user.verificationStatus === "Verified";
+        if (!isVerified)
             return res.status(403).json({ message: "Instructor not verified" });
         return next();
     }
