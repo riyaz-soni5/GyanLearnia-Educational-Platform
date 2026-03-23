@@ -21,6 +21,7 @@ import {
   type AppNotification,
 } from "@/services/notifications";
 import Logo from "@/assets/icon.svg";
+import { applyTheme, getPreferredTheme, type AppTheme } from "@/lib/theme";
 
 type NavItem = { name: string; path: string };
 
@@ -82,7 +83,7 @@ const Header = () => {
   const nav = useNavigate();
   const location = useLocation();
 
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<AppTheme>(() => getPreferredTheme());
   const [user, setUser] = useState<StoredUser | null>(null);
 
   const isLoggedIn = useMemo(() => !!user?.id, [user]);
@@ -95,15 +96,6 @@ const Header = () => {
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-
-  // theme init
-  useEffect(() => {
-    const saved = localStorage.getItem("theme") as "light" | "dark" | null;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = saved ?? (prefersDark ? "dark" : "light");
-    setTheme(initial);
-    document.documentElement.classList.toggle("dark", initial === "dark");
-  }, []);
 
   // reload user on route change (after login redirect)
   useEffect(() => {
@@ -170,7 +162,7 @@ const Header = () => {
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
+    applyTheme(next);
     localStorage.setItem("theme", next);
   };
 

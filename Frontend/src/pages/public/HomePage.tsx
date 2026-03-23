@@ -1,12 +1,10 @@
 import { Link } from "react-router-dom";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import HeroImg from "@/assets/HeroIMG.png";
 import RoleCard from "@/components/RoleCard";
 import FeatureCard from "@/components/FeatureCard";
 import ImpactCard from "@/components/ImpactCard";
 import TestimonialsSection from "@/components/TestomonialsSection";
-
-
 import {
   FaUserGraduate,
   FaQuestionCircle,
@@ -43,6 +41,19 @@ function useCountUp(target: number, durationMs = 900) {
 function useInViewOnce<T extends HTMLElement>(threshold = 0.16) {
   const ref = useRef<T | null>(null);
   const [inView, setInView] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!ref.current || inView) return;
+
+    const rect = ref.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+    const visibleRatio = visibleHeight / Math.max(rect.height, 1);
+
+    if (visibleHeight > 0 && visibleRatio >= threshold) {
+      setInView(true);
+    }
+  }, [inView, threshold]);
 
   useEffect(() => {
     if (!ref.current || inView) return;
@@ -101,25 +112,21 @@ const HomePage = () => {
 
   return (
     <div className="mx-auto max-w-7xl space-y-20 px-4">
-
-      <section className=" bg-surface p-10 border-base">
+      <section className="border-base bg-surface p-10">
         <div className="grid gap-10 lg:grid-cols-12 lg:items-start">
-
           <Reveal className="lg:col-span-7" delay={40}>
             <h1 className="text-5xl font-bold leading-tight text-basec sm:text-6xl lg:text-7xl">
               GyanLearnia
             </h1>
 
             <p className="mt-6 max-w-3xl text-base text-muted sm:text-lg">
-              Learn with learners across Nepal by exploring courses, tackling
-              exam-style practice, and getting verified Q&amp;A support.
+              Learn and Get Help in Learning!
             </p>
 
             <div className="mt-10 transition-transform duration-500 hover:-translate-y-1">
               <img src={HeroImg} alt="" className="w-full max-w-xl" />
             </div>
           </Reveal>
-
 
           <Reveal className="lg:col-span-5" delay={120}>
             <div className="rounded-2xl bg-surface border border-base p-6 shadow-sm">
@@ -145,7 +152,6 @@ const HomePage = () => {
           </Reveal>
         </div>
       </section>
-
 
       <section className="flex flex-col items-center justify-center">
         <Reveal>
@@ -195,7 +201,6 @@ const HomePage = () => {
         </div>
       </section>
 
-
       <section className="mt-20">
         <Reveal>
           <h2 className="text-center text-4xl font-bold leading-tight text-basec">
@@ -238,13 +243,11 @@ const HomePage = () => {
         </div>
       </section>
 
-
       <Reveal>
         <section className="w-full max-w-full overflow-x-hidden">
           <TestimonialsSection />
         </section>
       </Reveal>
-
 
       <Reveal delay={80}>
         <section className="relative overflow-hidden rounded-2xl border border-indigo-300/50 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-400 px-6 py-12 text-center text-white shadow-sm sm:px-10 dark:border-indigo-800/60 dark:from-indigo-900 dark:via-indigo-800 dark:to-slate-900">

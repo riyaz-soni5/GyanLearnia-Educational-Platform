@@ -1,50 +1,47 @@
-
 import React from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import type { IconType } from "react-icons";
 import { FiMoon, FiSun } from "react-icons/fi";
 import {
-  MdDashboard,
-  MdVerifiedUser,
-  MdMenuBook,
-  MdPeople,
   MdAssessment,
+  MdClose,
+  MdDashboard,
   MdLogout,
   MdMenu,
-  MdClose,
+  MdMenuBook,
+  MdPeople,
+  MdVerifiedUser,
 } from "react-icons/md";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import LogoIcon from "@/assets/icon.svg";
+import { applyTheme, getPreferredTheme, type AppTheme } from "@/lib/theme";
 import { logout } from "@/services/session";
 
-const Icon = {
-  Dashboard: (p: React.ComponentProps<"svg">) => <MdDashboard {...p} />,
-  Verify: (p: React.ComponentProps<"svg">) => <MdVerifiedUser {...p} />,
-  Courses: (p: React.ComponentProps<"svg">) => <MdMenuBook {...p} />,
-  Users: (p: React.ComponentProps<"svg">) => <MdPeople {...p} />,
-  Reports: (p: React.ComponentProps<"svg">) => <MdAssessment {...p} />,
-  Logout: (p: React.ComponentProps<"svg">) => <MdLogout {...p} />,
-  Menu: (p: React.ComponentProps<"svg">) => <MdMenu {...p} />,
-  Close: (p: React.ComponentProps<"svg">) => <MdClose {...p} />,
+type NavItem = {
+  to: string;
+  label: string;
+  icon: IconType;
+  end?: boolean;
 };
 
-const navItems = [
-  { to: "/admin", label: "Dashboard", icon: Icon.Dashboard, end: true },
-  { to: "/admin/verify-instructors", label: "Manage Instructor", icon: Icon.Verify },
-  { to: "/admin/course-approvals", label: "Manage Course", icon: Icon.Courses },
-  { to: "/admin/users", label: "Manage Users", icon: Icon.Users },
-  { to: "/admin/reports", label: "Reports", icon: Icon.Reports },
+const navItems: NavItem[] = [
+  { to: "/admin", label: "Dashboard", icon: MdDashboard, end: true },
+  { to: "/admin/verify-instructors", label: "Manage Instructor", icon: MdVerifiedUser },
+  { to: "/admin/course-approvals", label: "Manage Course", icon: MdMenuBook },
+  { to: "/admin/users", label: "Manage Users", icon: MdPeople },
+  { to: "/admin/reports", label: "Reports", icon: MdAssessment },
 ];
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <nav className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
       <div className="space-y-1">
-        {navItems.map((it) => {
-          const Ico = it.icon;
+        {navItems.map((item) => {
+          const ItemIcon = item.icon;
           return (
             <NavLink
-              key={it.to}
-              to={it.to}
-              end={it.end as any}
+              key={item.to}
+              to={item.to}
+              end={item.end}
               onClick={onNavigate}
               className={({ isActive }) =>
                 [
@@ -55,10 +52,10 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                 ].join(" ")
               }
             >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white ring-1 ring-gray-200 text-gray-800 dark:bg-gray-950 dark:ring-white/10 dark:text-gray-200">
-                <Ico className="h-5 w-5" />
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-white text-gray-800 ring-1 ring-gray-200 dark:bg-gray-950 dark:text-gray-200 dark:ring-white/10">
+                <ItemIcon className="h-5 w-5" />
               </span>
-              <span className="truncate">{it.label}</span>
+              <span className="truncate">{item.label}</span>
             </NavLink>
           );
         })}
@@ -71,7 +68,9 @@ const AdminLayout = () => {
   const adminName = "Admin";
   const navigate = useNavigate();
   const [loggingOut, setLoggingOut] = React.useState(false);
-  const [theme, setTheme] = React.useState<"light" | "dark">("light");
+  const [theme, setTheme] = React.useState<AppTheme>(() => getPreferredTheme());
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const location = useLocation();
 
   const onLogout = async () => {
     if (loggingOut) return;
@@ -85,20 +84,14 @@ const AdminLayout = () => {
     }
   };
 
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const location = useLocation();
-  const pageTitle = React.useMemo(() => {
-    const current = navItems.find((item) =>
-      item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)
-    );
-    return current?.label || "Admin";
-  }, [location.pathname]);
-
+  const currentPage = navItems.find((item) =>
+    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)
+  );
+  const pageTitle = currentPage?.label || "Admin";
 
   React.useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
-
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -107,7 +100,6 @@ const AdminLayout = () => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
-
 
   React.useEffect(() => {
     if (!sidebarOpen) return;
@@ -118,34 +110,25 @@ const AdminLayout = () => {
     };
   }, [sidebarOpen]);
 
-  React.useEffect(() => {
-    const saved = localStorage.getItem("theme") as "light" | "dark" | null;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initial = saved ?? (prefersDark ? "dark" : "light");
-    setTheme(initial);
-    document.documentElement.classList.toggle("dark", initial === "dark");
-  }, []);
-
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
-    document.documentElement.classList.toggle("dark", next === "dark");
+    applyTheme(next);
     localStorage.setItem("theme", next);
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex flex-col dark:bg-black">
+    <div className="flex min-h-screen w-full flex-col bg-gray-50 dark:bg-black">
       <header className="fixed inset-x-0 top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur dark:border-white/10 dark:bg-gray-950/85">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              className="inline-flex lg:hidden items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+              className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5 lg:hidden"
               aria-label="Open sidebar"
             >
-              <Icon.Menu className="h-5 w-5" />
+              <MdMenu className="h-5 w-5" />
             </button>
 
             <div className="flex items-center justify-center rounded-lg bg-white p-1 shadow-sm">
@@ -153,12 +136,14 @@ const AdminLayout = () => {
             </div>
 
             <div className="leading-tight">
-              <p className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white sm:text-xl">{pageTitle}</p>
+              <p className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white sm:text-xl">
+                {pageTitle}
+              </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
+            <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold text-gray-900 dark:text-white">{adminName}</p>
             </div>
 
@@ -179,21 +164,16 @@ const AdminLayout = () => {
               title="Logout"
             >
               {loggingOut ? "Logging out..." : "Logout"}
-              <Icon.Logout className="h-4 w-4" color="red" />
+              <MdLogout className="h-4 w-4" color="red" />
             </button>
           </div>
         </div>
       </header>
 
-
       <div
-        className={[
-          "fixed inset-0 z-40 lg:hidden",
-          sidebarOpen ? "" : "pointer-events-none",
-        ].join(" ")}
+        className={["fixed inset-0 z-40 lg:hidden", sidebarOpen ? "" : "pointer-events-none"].join(" ")}
         aria-hidden={!sidebarOpen}
       >
-
         <div
           onClick={() => setSidebarOpen(false)}
           className={[
@@ -202,10 +182,9 @@ const AdminLayout = () => {
           ].join(" ")}
         />
 
-
         <div
           className={[
-            "absolute left-0 top-0 h-full w-[85%] max-w-sm bg-gray-50 border-r border-gray-200 p-4 transition-transform dark:border-white/10 dark:bg-black",
+            "absolute left-0 top-0 h-full w-[85%] max-w-sm border-r border-gray-200 bg-gray-50 p-4 transition-transform dark:border-white/10 dark:bg-black",
             sidebarOpen ? "translate-x-0" : "-translate-x-full",
           ].join(" ")}
           role="dialog"
@@ -228,7 +207,7 @@ const AdminLayout = () => {
               className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
               aria-label="Close sidebar"
             >
-              <Icon.Close className="h-5 w-5" />
+              <MdClose className="h-5 w-5" />
             </button>
           </div>
 

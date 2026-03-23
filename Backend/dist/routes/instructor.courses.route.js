@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
 import { requireVerifiedInstructor } from "../middlewares/requireVerifiedInstructor.middleware.js";
-import { createInstructorCourse, deleteInstructorCourse, getInstructorCourseById, listInstructorCourses, resubmitInstructorCourse, } from "../controllers/instructor.courses.controller.js";
+import { getInstructorAnalytics, createInstructorCourse, deleteInstructorCourse, getInstructorEarnings, getInstructorCourseById, listInstructorCourses, resubmitInstructorCourse, } from "../controllers/instructor.courses.controller.js";
 const router = Router();
 router.get("/mine", requireAuth, requireRole("instructor"), listInstructorCourses);
+router.get("/analytics", requireAuth, requireRole("instructor"), getInstructorAnalytics);
+router.get("/earnings", requireAuth, requireRole("instructor"), getInstructorEarnings);
 router.get("/:id", requireAuth, requireRole("instructor"), getInstructorCourseById);
 // verified instructor can submit (Pending)
 router.post("/", requireAuth, requireRole("instructor"), requireVerifiedInstructor, createInstructorCourse);

@@ -20,314 +20,28 @@ import {
 } from "react-icons/fi";
 import {
   coursesApi,
-  type CourseCertificate,
   type CourseProgress,
   type CourseQuiz,
   type CourseQuizResult,
   type CourseReview,
 } from "@/app/api/courses.api";
-import type { CourseListItem } from "@/app/types/course.type";
 import { getUser } from "@/services/session";
-
-type LectureKind = "Video" | "Quiz" | "File";
-
-type UiLectureResource = {
-  name: string;
-  url: string;
-  sizeBytes: number;
-};
-
-type UiLecture = {
-  id: string;
-  title: string;
-  type: LectureKind;
-  durationMin: number;
-  isPreview: boolean;
-  quizId?: string;
-  videoUrl?: string;
-  resources: UiLectureResource[];
-};
-
-type UiSection = {
-  id: string;
-  title: string;
-  lectures: UiLecture[];
-};
-
-type CourseUiModel = {
-  id: string;
-  title: string;
-  subtitle: string;
-  description: string;
-  category: string;
-  level: string;
-  language: string;
-  priceType: "Free" | "Paid";
-  priceNpr: number;
-  rating: number;
-  hours: number;
-  lessons: number;
-  enrolled: number;
-  instructorName: string;
-  instructorAvatarUrl?: string | null;
-  thumbnailUrl: string;
-  outcomes: string[];
-  requirements: string[];
-  tags: string[];
-  certificateEnabled: boolean;
-  sections: UiSection[];
-  updatedAt?: string;
-};
-
-type RelatedCourse = CourseListItem & {
-  instructor?: { name?: string; email?: string };
-  totalLectures?: number;
-  totalVideoSec?: number;
-};
-
-type CourseListResponse = RelatedCourse[] | { items?: RelatedCourse[] };
-
-type RawLecture = {
-  _id?: unknown;
-  id?: unknown;
-  title?: unknown;
-  type?: unknown;
-  durationSec?: unknown;
-  isFreePreview?: unknown;
-  isPreview?: unknown;
-  quizId?: unknown;
-  videoUrl?: unknown;
-  fileUrl?: unknown;
-  resources?: unknown;
-};
-
-type RawSection = {
-  _id?: unknown;
-  id?: unknown;
-  title?: unknown;
-  lectures?: unknown;
-};
-
-type RawCourse = {
-  item?: unknown;
-  _id?: unknown;
-  id?: unknown;
-  title?: unknown;
-  subtitle?: unknown;
-  description?: unknown;
-  category?: unknown;
-  level?: unknown;
-  language?: unknown;
-  price?: unknown;
-  rating?: unknown;
-  enrolled?: unknown;
-  instructor?: { name?: unknown; email?: unknown; avatarUrl?: unknown } | null;
-  instructorName?: unknown;
-  thumbnailUrl?: unknown;
-  outcomes?: unknown;
-  requirements?: unknown;
-  tags?: unknown;
-  certificate?: { enabled?: unknown } | null;
-  sections?: unknown;
-  totalVideoSec?: unknown;
-  updatedAt?: unknown;
-  averageRating?: unknown;
-  reviewsCount?: unknown;
-};
-
-type RawLectureResource = {
-  name?: unknown;
-  url?: unknown;
-  sizeBytes?: unknown;
-};
-
-const asObject = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === "object" ? (value as Record<string, unknown>) : null;
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-
-const resolveAssetUrl = (url?: string | null) => {
-  if (!url) return null;
-  const clean = String(url).trim();
-  if (!clean) return null;
-  if (/^https?:\/\//i.test(clean)) return clean;
-  return `${API_BASE}${clean.startsWith("/") ? clean : `/${clean}`}`;
-};
-
-const pickCourseItem = (payload: unknown): RawCourse | null => {
-  const outer = asObject(payload);
-  if (!outer) return null;
-  const item = asObject(outer.item);
-  return (item ?? outer) as RawCourse;
-};
-
-const toCourseRows = (payload: CourseListResponse): RelatedCourse[] => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
-};
-
-const toLectureType = (raw: unknown): LectureKind => {
-  const normalized = String(raw ?? "").toLowerCase();
-  if (normalized === "video") return "Video";
-  if (normalized === "file") return "File";
-  if (normalized === "quiz") return "Quiz";
-  return "File";
-};
-
-const formatMin = (min: number): string => {
-  if (min >= 60) {
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    return m === 0 ? `${h} hr` : `${h} hr ${m} min`;
-  }
-  return `${min} min`;
-};
-
-const parseApiError = (error: unknown, fallback: string): string => {
-  if (!(error instanceof Error)) return fallback;
-  const raw = String(error.message || "").trim();
-  if (!raw) return fallback;
-
-  try {
-    const parsed = JSON.parse(raw) as { message?: unknown; error?: unknown };
-    if (typeof parsed.message === "string" && parsed.message.trim()) return parsed.message;
-    if (typeof parsed.error === "string" && parsed.error.trim()) return parsed.error;
-  } catch {
-    // keep raw fallback
-  }
-
-  return raw;
-};
+import {
+  type CourseListResponse,
+  type CourseUiModel,
+  type LectureKind,
+  type RelatedCourse,
+  type UiLecture,
+  formatMin,
+  parseApiError,
+  toCourseRows,
+  toUiCourse,
+} from "./courseShared";
 
 const lessonIcon = (type: LectureKind) => {
   if (type === "Video") return <FiPlayCircle className="h-4 w-4" />;
   if (type === "File") return <FiPaperclip className="h-4 w-4" />;
   return <FiHelpCircle className="h-4 w-4" />;
-};
-
-const toUiCourse = (payload: unknown): CourseUiModel | null => {
-  const c = pickCourseItem(payload);
-  if (!c) return null;
-
-  const sectionsRaw: RawSection[] = Array.isArray(c.sections) ? (c.sections as RawSection[]) : [];
-
-  const sections: UiSection[] = sectionsRaw.map((s: RawSection, idx: number) => {
-    const lecturesRaw: RawLecture[] = Array.isArray(s.lectures) ? (s.lectures as RawLecture[]) : [];
-
-    const lectures: UiLecture[] = lecturesRaw.map((l: RawLecture, lectureIdx: number) => {
-      const lectureResourcesRaw = Array.isArray(l.resources) ? (l.resources as RawLectureResource[]) : [];
-      const normalizedResources: UiLectureResource[] = lectureResourcesRaw
-        .map((r, resourceIdx) => {
-          const resolvedUrl = resolveAssetUrl(typeof r?.url === "string" ? r.url : "");
-          if (!resolvedUrl) return null;
-          return {
-            name: String(r?.name ?? `Resource ${resourceIdx + 1}`).trim() || `Resource ${resourceIdx + 1}`,
-            url: resolvedUrl,
-            sizeBytes: Math.max(0, Number(r?.sizeBytes ?? 0)),
-          };
-        })
-        .filter((r): r is UiLectureResource => Boolean(r));
-
-      const legacyFileUrl = resolveAssetUrl(typeof l.fileUrl === "string" ? l.fileUrl : "");
-      const resources = normalizedResources.length > 0
-        ? normalizedResources
-        : legacyFileUrl
-        ? [{ name: "Resource", url: legacyFileUrl, sizeBytes: 0 }]
-        : [];
-
-      const videoUrl = resolveAssetUrl(typeof l.videoUrl === "string" ? l.videoUrl : "");
-
-      return {
-        id: String(l._id ?? l.id ?? `${idx + 1}-${lectureIdx + 1}`),
-        title: String(l.title ?? "Untitled lecture"),
-        type: toLectureType(l.type),
-        durationMin: Math.max(0, Math.round(Number(l.durationSec ?? 0) / 60)),
-        isPreview: Boolean(l.isFreePreview ?? l.isPreview),
-        quizId: l.quizId ? String(l.quizId) : undefined,
-        videoUrl: videoUrl ?? undefined,
-        resources,
-      };
-    });
-
-    return {
-      id: String(s._id ?? s.id ?? idx + 1),
-      title: String(s.title ?? `Section ${idx + 1}`),
-      lectures,
-    };
-  });
-
-  const lessons = sections.reduce((acc, s) => acc + s.lectures.length, 0);
-  const totalVideoSec = Number(c.totalVideoSec ?? 0);
-  const hours = Math.max(0, Math.round((totalVideoSec / 3600) * 10) / 10);
-
-  const fallbackOutcomes = [
-    "Understand the core concepts step by step",
-    "Practice with guided examples and explanations",
-    "Build confidence through quizzes and revision",
-  ];
-  const fallbackRequirements = [
-    "Basic familiarity with the subject",
-    "A notebook and regular practice time",
-    "Internet connection to access course materials",
-  ];
-
-  const outcomesRaw = Array.isArray(c.outcomes) ? c.outcomes : [];
-  const requirementsRaw = Array.isArray(c.requirements) ? c.requirements : [];
-
-  const outcomes =
-    outcomesRaw.length > 0
-      ? outcomesRaw.map((x: unknown) => String(x)).filter(Boolean)
-      : fallbackOutcomes;
-
-  const requirements =
-    requirementsRaw.length > 0
-      ? requirementsRaw.map((x: unknown) => String(x)).filter(Boolean)
-      : fallbackRequirements;
-
-  const thumb =
-    typeof c.thumbnailUrl === "string" && c.thumbnailUrl.trim()
-      ? c.thumbnailUrl
-      : "https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=1600&q=60";
-
-  const category = String(c.category ?? "General").trim() || "General";
-  const rawLevel = String(c.level ?? "").trim();
-  const level =
-    category === "Academic"
-      ? rawLevel || "Class 10 (SEE)"
-      : rawLevel && rawLevel !== "Class 10 (SEE)"
-      ? rawLevel
-      : "All Levels";
-
-  const instructorName =
-    String(c.instructor?.name ?? c.instructor?.email ?? c.instructorName ?? "").trim() ||
-    "Unknown Instructor";
-  const instructorAvatarUrl =
-    typeof c.instructor?.avatarUrl === "string" ? resolveAssetUrl(c.instructor.avatarUrl) : null;
-
-  return {
-    id: String(c._id ?? c.id ?? ""),
-    title: String(c.title ?? "Untitled Course"),
-    subtitle: String(c.subtitle ?? ""),
-    description: String(c.description ?? "No description provided yet."),
-    category,
-    level,
-    language: String(c.language ?? "English"),
-    priceType: Number(c.price ?? 0) > 0 ? "Paid" : "Free",
-    priceNpr: Number(c.price ?? 0),
-    rating: Number(c.averageRating ?? c.rating ?? 0),
-    hours,
-    lessons,
-    enrolled: Number(c.enrolled ?? 0),
-    instructorName,
-    instructorAvatarUrl,
-    thumbnailUrl: thumb,
-    outcomes,
-    requirements,
-    tags: Array.isArray(c.tags) ? c.tags.map((x: unknown) => String(x).trim()).filter(Boolean) : [],
-    certificateEnabled: Boolean(c.certificate?.enabled),
-    sections,
-    updatedAt: typeof c.updatedAt === "string" ? c.updatedAt : undefined,
-  };
 };
 
 const CourseDetailsPage = () => {
@@ -342,16 +56,15 @@ const CourseDetailsPage = () => {
   const [isEnrolled, setIsEnrolled] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const [quizOpen, setQuizOpen] = useState(false);
-  const [quizTitle, setQuizTitle] = useState("");
-  const [quizLoading, setQuizLoading] = useState(false);
+  const [quizTitle] = useState("");
+  const [quizLoading] = useState(false);
   const [quizSubmitting, setQuizSubmitting] = useState(false);
-  const [quizData, setQuizData] = useState<CourseQuiz | null>(null);
+  const [quizData] = useState<CourseQuiz | null>(null);
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [quizResult, setQuizResult] = useState<CourseQuizResult | null>(null);
   const [progress, setProgress] = useState<CourseProgress | null>(null);
   const [progressLoading, setProgressLoading] = useState(false);
   const [markingLectureId, setMarkingLectureId] = useState<string>("");
-  const [certificateLoading, setCertificateLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [contentLecture, setContentLecture] = useState<UiLecture | null>(null);
   const [reviews, setReviews] = useState<CourseReview[]>([]);
@@ -359,9 +72,6 @@ const CourseDetailsPage = () => {
   const [reviewsError, setReviewsError] = useState("");
   const [reviewAverageRating, setReviewAverageRating] = useState(0);
   const [reviewsCount, setReviewsCount] = useState(0);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewComment, setReviewComment] = useState("");
-  const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [purchaseProcessing, setPurchaseProcessing] = useState(false);
 
   useEffect(() => {
@@ -559,6 +269,11 @@ const CourseDetailsPage = () => {
     setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
 
+  const goToCourse = () => {
+    if (!course) return;
+    navigate(`/courses/${course.id}/learn`);
+  };
+
   const enrollCourse = async () => {
     if (!course || purchaseProcessing || progressLoading || isEnrolled) return;
     setActionError("");
@@ -634,73 +349,26 @@ const CourseDetailsPage = () => {
     }
   };
 
-  const openCertificate = async () => {
-    if (!course) return;
-    const win = window.open("", "_blank");
-    if (!win) {
-      setActionError("Popup blocked by browser. Please allow popups for this site.");
-      return;
-    }
-
-    win.document.write(
-      "<!doctype html><html><body style='font-family:Arial,sans-serif;padding:24px'>Generating certificate...</body></html>"
-    );
-    win.document.close();
-
-    try {
-      setActionError("");
-      setCertificateLoading(true);
-      const res = await coursesApi.getCertificate(course.id);
-      const cert: CourseCertificate = res.item;
-      win.document.open();
-      win.document.write(cert.html);
-      win.document.close();
-    } catch (e: unknown) {
-      win.close();
-      setActionError(e instanceof Error ? e.message : "Failed to open certificate");
-    } finally {
-      setCertificateLoading(false);
-    }
-  };
-
   const openQuiz = async (lecture: UiLecture) => {
-    if (!course || !lecture.quizId) return;
-    if (!(lecture.isPreview || isEnrolled)) {
-      setActionError("Enroll in this course to unlock this lesson.");
+    if (!lecture.isPreview) {
+      setActionError(
+        isEnrolled
+          ? "This page shows preview content only. Use Go to course for full lessons."
+          : "Only preview lessons can be opened from this page."
+      );
       return;
     }
 
-    setActionError("");
-    setQuizOpen(true);
-    setQuizLoading(true);
-    setQuizTitle(lecture.title);
-    setQuizResult(null);
-    setQuizAnswers({});
-
-    try {
-      const res = await coursesApi.getQuiz(course.id, lecture.quizId);
-      setQuizData(res.item);
-      setQuizAnswers(
-        (res.item.questions || []).reduce<Record<string, string>>((acc, q) => {
-          acc[q.id] = "";
-          return acc;
-        }, {})
-      );
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load quiz";
-      setQuizData(null);
-      setQuizResult(null);
-      setActionError(msg);
-      setQuizOpen(false);
-    } finally {
-      setQuizLoading(false);
-    }
+    setActionError("Quiz lessons open inside Go to course.");
   };
 
   const openLectureContent = (lecture: UiLecture) => {
-    const canAccess = lecture.isPreview || isEnrolled;
-    if (!canAccess) {
-      setActionError("Enroll in this course to unlock this lesson.");
+    if (!lecture.isPreview) {
+      setActionError(
+        isEnrolled
+          ? "This page shows preview content only. Use Go to course for full lessons."
+          : "Only preview lessons can be opened from this page."
+      );
       return;
     }
 
@@ -731,27 +399,6 @@ const CourseDetailsPage = () => {
       setActionError(msg);
     } finally {
       setQuizSubmitting(false);
-    }
-  };
-
-  const submitReview = async () => {
-    if (!course) return;
-    const comment = reviewComment.trim();
-    if (comment.length < 3) {
-      setActionError("Review comment must be at least 3 characters.");
-      return;
-    }
-
-    try {
-      setActionError("");
-      setReviewSubmitting(true);
-      await coursesApi.submitReview(course.id, { rating: reviewRating, comment });
-      setReviewComment("");
-      await loadReviews(course.id);
-    } catch (e: unknown) {
-      setActionError(e instanceof Error ? e.message : "Failed to submit review");
-    } finally {
-      setReviewSubmitting(false);
     }
   };
 
@@ -802,8 +449,6 @@ const CourseDetailsPage = () => {
 
   const priceText = course.priceType === "Free" ? "Free" : `NPR ${course.priceNpr.toLocaleString()}`;
   const completedLectureSet = new Set(progress?.completedLectureIds ?? []);
-  const myReview = reviews.find((review) => review.isMine);
-  const canSubmitReview = Boolean(progress?.isCompleted) && !myReview;
 
   return (
     <div className="mx-auto max-w-7xl px-4">
@@ -884,19 +529,25 @@ const CourseDetailsPage = () => {
 
               <button
                 type="button"
-                onClick={() => void enrollCourse()}
-                disabled={progressLoading || purchaseProcessing || isEnrolled}
+                onClick={() => {
+                  if (isEnrolled) {
+                    goToCourse();
+                    return;
+                  }
+                  void enrollCourse();
+                }}
+                disabled={progressLoading || purchaseProcessing}
                 className={[
                   "mt-4 w-full cursor-pointer rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
                   isEnrolled
-                    ? "cursor-not-allowed bg-green-600"
+                    ? "bg-gray-900 hover:bg-gray-800"
                     : progressLoading || purchaseProcessing
                     ? "cursor-not-allowed bg-gray-400"
                     : "bg-indigo-600 hover:bg-indigo-700",
                 ].join(" ")}
               >
                 {isEnrolled
-                  ? "You are enrolled"
+                  ? "Go to Course"
                   : progressLoading || purchaseProcessing
                   ? "Please wait..."
                   : course.priceType === "Free"
@@ -935,22 +586,6 @@ const CourseDetailsPage = () => {
                   <p className="mt-2 text-xs text-gray-600">
                     {progress.completedCount}/{progress.totalCount} completed
                   </p>
-                  {course.certificateEnabled ? (
-                    <button
-                      type="button"
-                      onClick={() => void openCertificate()}
-                      disabled={!progress.certificateEligible || certificateLoading}
-                      className={[
-                        "mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold",
-                        progress.certificateEligible && !certificateLoading
-                          ? "bg-gray-900 text-white hover:bg-gray-800"
-                          : "cursor-not-allowed border border-gray-300 bg-white text-gray-400",
-                      ].join(" ")}
-                    >
-                      <FiAward className="h-4 w-4" />
-                      {certificateLoading ? "Generating..." : "Get Certificate"}
-                    </button>
-                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -989,7 +624,6 @@ const CourseDetailsPage = () => {
             <p className="mt-2 text-sm text-gray-600">
               {course.sections.length} sections • {course.lessons} lectures • {formatMin(curriculumMinutes)} total length
             </p>
-
             <div className="mt-5 space-y-3">
               {course.sections.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-600">
@@ -1032,32 +666,30 @@ const CourseDetailsPage = () => {
                                 </span>
 
                                 <div className="min-w-0">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      lecture.type === "Quiz"
-                                        ? void openQuiz(lecture)
-                                        : openLectureContent(lecture)
-                                    }
-                                    className={[
-                                      "cursor-pointer truncate text-left text-sm font-semibold transition",
-                                      lecture.isPreview || isEnrolled
-                                        ? "text-indigo-700 hover:text-indigo-800 hover:underline"
-                                        : "text-gray-900 hover:underline",
-                                    ].join(" ")}
-                                  >
-                                    {lecture.title}
-                                  </button>
+                                  {lecture.isPreview && lecture.type !== "Quiz" ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => openLectureContent(lecture)}
+                                      className="cursor-pointer truncate text-left text-sm font-semibold text-indigo-700 transition hover:text-indigo-800 hover:underline"
+                                    >
+                                      {lecture.title}
+                                    </button>
+                                  ) : lecture.isPreview ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => void openQuiz(lecture)}
+                                      className="cursor-pointer truncate text-left text-sm font-semibold text-gray-900 transition hover:text-gray-700"
+                                    >
+                                      {lecture.title}
+                                    </button>
+                                  ) : (
+                                    <p className="truncate text-sm font-semibold text-gray-900">{lecture.title}</p>
+                                  )}
                                   <p className="mt-0.5 text-xs text-gray-500">{lecture.type}</p>
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-2 text-xs text-gray-500">
-                                {completedLectureSet.has(lecture.id) ? (
-                                  <span className="rounded-full bg-green-50 px-2 py-0.5 font-semibold text-green-700 ring-1 ring-green-200">
-                                    Completed
-                                  </span>
-                                ) : null}
                                 {lecture.isPreview ? (
                                   <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-semibold text-indigo-700 ring-1 ring-indigo-200">
                                     Preview
@@ -1086,48 +718,9 @@ const CourseDetailsPage = () => {
             <p className="mt-2 text-sm text-gray-600">
               {reviewsCount > 0 ? `${reviewAverageRating.toFixed(1)} average from ${reviewsCount} review(s)` : "No reviews yet"}
             </p>
-
-            {canSubmitReview ? (
-              <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
-                <p className="text-sm font-semibold text-gray-900">Leave your review</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-12">
-                  <div className="sm:col-span-3">
-                    <label className="text-xs font-medium text-gray-700">Rating</label>
-                    <select
-                      value={reviewRating}
-                      onChange={(e) => setReviewRating(Number(e.target.value || 5))}
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                    >
-                      <option value={5}>5 - Excellent</option>
-                      <option value={4}>4 - Good</option>
-                      <option value={3}>3 - Average</option>
-                      <option value={2}>2 - Poor</option>
-                      <option value={1}>1 - Very Poor</option>
-                    </select>
-                  </div>
-                  <div className="sm:col-span-9">
-                    <label className="text-xs font-medium text-gray-700">Comment</label>
-                    <textarea
-                      value={reviewComment}
-                      onChange={(e) => setReviewComment(e.target.value)}
-                      rows={3}
-                      placeholder="Share your learning experience from this course..."
-                      className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => void submitReview()}
-                    disabled={reviewSubmitting}
-                    className="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-400"
-                  >
-                    {reviewSubmitting ? "Submitting..." : "Submit Review"}
-                  </button>
-                </div>
-              </div>
-            ) : null}
+            <p className="mt-3 text-sm text-gray-500">
+              Reviews can be submitted from the learning page after the course is completed.
+            </p>
 
             <div className="mt-4 space-y-3">
               {reviewsLoading ? (

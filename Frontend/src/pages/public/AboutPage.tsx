@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 import {
   FiCheckCircle,
   FiLinkedin,
@@ -6,7 +7,6 @@ import {
   FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
-import { FaFacebookF, FaGoogle, FaInstagram, FaTwitter } from "react-icons/fa";
 import FounderImg from "@/assets/FounderImg.png";
 import { useToast } from "@/components/toast";
 import { fetchCurrentUserProfile } from "@/services/userProfile";
@@ -14,34 +14,21 @@ import { submitContactSubmission } from "@/services/contactSubmission";
 
 const storySteps = [
   {
+    period: "2023",
+    title: "The Idea Was Born",
+    desc: "The journey began with a simple idea inspired by personal challenges faced during high school. Many students struggled to find quick academic help and reliable answers to their questions. This inspired the vision of creating a platform.",
+  },
+  {
     period: "2024",
-    title: "Started with one local problem",
-    desc: "Learners in Nepal needed trusted, affordable, and practical learning in one platform.",
-    highlights: [
-      "Observed fragmented online learning resources",
-      "Focused on trust, affordability, and outcomes",
-    ],
+    title: "Exploring Solutions",
+    desc: "In the following year, efforts shifted toward building a practical solution. The goal was to create a collaborative space where students could share note effectively.",
   },
   {
     period: "2025",
-    title: "Built quality-first systems",
-    desc: "We introduced instructor verification and course approval to protect learner trust.",
-    highlights: [
-      "Launched instructor verification pipeline",
-      "Added structured course quality approvals",
-    ],
-  },
-  {
-    period: "2026",
-    title: "Scaled to a wider classroom",
-    desc: "Now we are growing as a Nepal-rooted platform with global-quality learning standards.",
-    highlights: [
-      "Expanded learning pathways and mentorship",
-      "Strengthened Nepal-first, global-ready model",
-    ],
-  },
+    title: "Building the Ultimate Learning Platform",
+    desc: "By 2025, the idea evolved into a comprehensive educational platform designed for both students and teachers. The platform enables course enrollment, certification, and access to academic assistance—creating a complete digital learning ecosystem.",
+  }
 ];
-
 const differentiators = [
   {
     title: "Verified instructors",
@@ -114,6 +101,7 @@ const Reveal = ({
 };
 
 const AboutPage = () => {
+  const location = useLocation();
   const { showToast } = useToast();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -121,6 +109,7 @@ const AboutPage = () => {
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [hasAutofilledProfile, setHasAutofilledProfile] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -132,6 +121,7 @@ const AboutPage = () => {
         setFirstName(profile.firstName ?? "");
         setLastName(profile.lastName ?? "");
         setEmail(profile.email ?? "");
+        setHasAutofilledProfile(true);
       } catch {
         // Guest users can still submit the form.
       }
@@ -141,6 +131,20 @@ const AboutPage = () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!location.hash) return;
+
+    const targetId = location.hash.slice(1);
+    const scrollToTarget = () => {
+      const element = document.getElementById(targetId);
+      if (!element) return;
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    const timeoutId = window.setTimeout(scrollToTarget, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [location.hash]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -158,8 +162,16 @@ const AboutPage = () => {
         phone: phone.trim(),
         message: message.trim(),
       });
-      setPhone("");
-      setMessage("");
+      if (hasAutofilledProfile) {
+        setPhone("");
+        setMessage("");
+      } else {
+        setFirstName("");
+        setLastName("");
+        setEmail("");
+        setPhone("");
+        setMessage("");
+      }
       showToast("Your message has been sent successfully.", "success");
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : "Failed to submit contact form.", "error");
@@ -191,9 +203,6 @@ const AboutPage = () => {
         <Reveal>
           <section className="rounded-2xl bg-surface p-8 sm:p-10">
             <h2 className="text-center text-4xl font-bold text-basec">Our Story</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-muted">
-              From Nepal classrooms to a digital-first ecosystem, this is the journey behind GyanLearnia.
-            </p>
             <div className="mx-auto mt-2 h-1 w-24 rounded-full bg-gradient-to-r from-indigo-500 to-cyan-500" />
 
             <div className="relative mt-10">
@@ -217,11 +226,6 @@ const AboutPage = () => {
                             </p>
                             <h3 className="mt-3 text-2xl font-bold text-basec">{item.title}</h3>
                             <p className="mt-2 text-sm text-muted">{item.desc}</p>
-                            <ul className="mt-3 space-y-1 text-sm text-muted">
-                              {item.highlights.map((point) => (
-                                <li key={point}>- {point}</li>
-                              ))}
-                            </ul>
                           </article>
                         ) : null}
                       </div>
@@ -240,11 +244,6 @@ const AboutPage = () => {
                             </p>
                             <h3 className="mt-3 text-2xl font-bold text-basec">{item.title}</h3>
                             <p className="mt-2 text-sm text-muted">{item.desc}</p>
-                            <ul className="mt-3 space-y-1 text-sm text-muted">
-                              {item.highlights.map((point) => (
-                                <li key={point}>- {point}</li>
-                              ))}
-                            </ul>
                           </article>
                         ) : null}
                       </div>
@@ -315,7 +314,7 @@ const AboutPage = () => {
           </Reveal>
 
           <Reveal delay={80}>
-            <section className="relative rounded-t-none rounded-b-2xl px-2 pb-6 pt-10 sm:px-4">
+            <section id="contact" className="relative rounded-t-none rounded-b-2xl px-2 pb-6 pt-10 sm:px-4">
               <div className="absolute inset-x-0 top-0 h-40 rounded-b-2xl rounded-t-none bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-400" />
               <div className="relative">
                 <div className="mx-auto max-w-5xl rounded-2xl border border-base bg-surface p-6 shadow-xl sm:p-10">

@@ -1,8 +1,6 @@
-// src/services/questions.ts
 import type { Question } from "@/app/types/question.types";
 import { http } from "./http";
 
-// ---------- Types ----------
 export type AnswerDTO = {
   id: string;
   questionId: string;
@@ -19,7 +17,7 @@ export type AnswerDTO = {
 export type CreateQuestionPayload = {
   title: string;
   excerpt: string;
-  categoryId: string; // ✅ changed
+  categoryId: string;
   level: string;
   tags: string[];
   isFastResponse?: boolean;
@@ -54,9 +52,23 @@ export type PostAnswerResponse = {
   answer: AnswerDTO;
 };
 
-// ---------- API calls ----------
+type VoteResponse = {
+  message: string;
+  votes: number;
+  myVote: 1 | -1 | null;
+};
+
+type UpdateReplyResponse = {
+  message: string;
+  item: Pick<ReplyDTO, "id" | "content" | "updatedAt">;
+};
+
+type DeleteReplyResponse = {
+  message: string;
+};
+
 export async function createQuestion(payload: CreateQuestionPayload) {
-  return http<CreateQuestionResponse>(`/api/questions`, {
+  return http<CreateQuestionResponse>("/api/questions", {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -64,7 +76,7 @@ export async function createQuestion(payload: CreateQuestionPayload) {
 
 export async function fetchQuestions(params?: {
   q?: string;
-  categoryId?: string; // ✅ new
+  categoryId?: string;
   level?: string;
   sort?: string;
   status?: string;
@@ -73,11 +85,11 @@ export async function fetchQuestions(params?: {
 }) {
   const qs = new URLSearchParams();
 
-  Object.entries(params || {}).forEach(([k, v]) => {
-    if (v === undefined || v === null) return;
-    const s = String(v).trim();
-    if (!s || s === "All") return;
-    qs.set(k, s);
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    const text = String(value).trim();
+    if (!text || text === "All") return;
+    qs.set(key, text);
   });
 
   const query = qs.toString();
@@ -106,7 +118,6 @@ export async function updateAnswer(questionId: string, answerId: string, content
   });
 }
 
-
 export async function deleteAnswer(questionId: string, answerId: string) {
   return http(`/api/questions/${questionId}/answers/${answerId}`, {
     method: "DELETE",
@@ -129,33 +140,28 @@ export async function deleteQuestion(questionId: string) {
   });
 }
 
-
 export async function upvoteAnswer(questionId: string, answerId: string) {
-  return http<{ message: string; votes: number; myVote: 1 | -1 | null }>(
-    `/api/questions/${questionId}/answers/${answerId}/upvote`,
-    { method: "POST" }
-  );
+  return http<VoteResponse>(`/api/questions/${questionId}/answers/${answerId}/upvote`, {
+    method: "POST",
+  });
 }
 
 export async function downvoteAnswer(questionId: string, answerId: string) {
-  return http<{ message: string; votes: number; myVote: 1 | -1 | null }>(
-    `/api/questions/${questionId}/answers/${answerId}/downvote`,
-    { method: "POST" }
-  );
+  return http<VoteResponse>(`/api/questions/${questionId}/answers/${answerId}/downvote`, {
+    method: "POST",
+  });
 }
 
 export async function upvoteQuestion(questionId: string) {
-  return http<{ message: string; votes: number; myVote: 1 | -1 | null }>(
-    `/api/questions/${questionId}/upvote`,
-    { method: "POST" }
-  );
+  return http<VoteResponse>(`/api/questions/${questionId}/upvote`, {
+    method: "POST",
+  });
 }
 
 export async function downvoteQuestion(questionId: string) {
-  return http<{ message: string; votes: number; myVote: 1 | -1 | null }>(
-    `/api/questions/${questionId}/downvote`,
-    { method: "POST" }
-  );
+  return http<VoteResponse>(`/api/questions/${questionId}/downvote`, {
+    method: "POST",
+  });
 }
 
 export type ReplyDTO = {
@@ -183,8 +189,9 @@ export async function fetchReplies(
   if (params?.parentId !== undefined) qs.set("parentId", params.parentId ?? "null");
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.cursor) qs.set("cursor", String(params.cursor));
-  const q = qs.toString() ? `?${qs.toString()}` : "";
-  return http(`/api/questions/${questionId}/answers/${answerId}/replies${q}`);
+
+  const query = qs.toString();
+  return http(`/api/questions/${questionId}/answers/${answerId}/replies${query ? `?${query}` : ""}`);
 }
 
 export async function postReply(
@@ -204,7 +211,7 @@ export async function updateReply(
   answerId: string,
   replyId: string,
   content: string
-): Promise<any> {
+): Promise<UpdateReplyResponse> {
   return http(`/api/questions/${questionId}/answers/${answerId}/replies/${replyId}`, {
     method: "PATCH",
     body: JSON.stringify({ content }),
@@ -215,25 +222,23 @@ export async function deleteReply(
   questionId: string,
   answerId: string,
   replyId: string
-): Promise<any> {
+): Promise<DeleteReplyResponse> {
   return http(`/api/questions/${questionId}/answers/${answerId}/replies/${replyId}`, {
     method: "DELETE",
   });
 }
 
 export async function upvoteReply(questionId: string, answerId: string, replyId: string) {
-  return http(`/api/questions/${questionId}/answers/${answerId}/replies/${replyId}/upvote`, {
+  return http<VoteResponse>(`/api/questions/${questionId}/answers/${answerId}/replies/${replyId}/upvote`, {
     method: "POST",
   });
 }
 
 export async function downvoteReply(questionId: string, answerId: string, replyId: string) {
-  return http(`/api/questions/${questionId}/answers/${answerId}/replies/${replyId}/downvote`, {
+  return http<VoteResponse>(`/api/questions/${questionId}/answers/${answerId}/replies/${replyId}/downvote`, {
     method: "POST",
   });
 }
-
-
 
 export async function acceptAnswer(questionId: string, answerId: string) {
   return http<{ message: string; acceptedAnswerId: string | null; hasVerifiedAnswer: boolean }>(

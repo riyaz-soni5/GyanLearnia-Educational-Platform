@@ -5,14 +5,16 @@ type JwtPayload = { id: string; role: "student" | "instructor" | "admin" };
 
 export type AuthedRequest = Request & { user?: JwtPayload };
 
+function getToken(req: Request) {
+  const cookieToken = (req as any).cookies?.access_token;
+  const authHeader = req.headers.authorization;
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  return cookieToken || bearerToken;
+}
+
 export function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   try {
-    const cookieToken = (req as any).cookies?.access_token;
-
-    const header = req.headers.authorization;
-    const bearerToken = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
-
-    const token = cookieToken || bearerToken;
+    const token = getToken(req);
     if (!token) return res.status(401).json({ message: "Unauthorized" });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
@@ -33,22 +35,16 @@ export function requireRole(...roles: JwtPayload["role"][]) {
   };
 }
 
-// auth.middleware.ts
 export function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
   try {
-    const cookieToken = (req as any).cookies?.access_token;
-
-    const header = req.headers.authorization;
-    const bearerToken = header?.startsWith("Bearer ") ? header.split(" ")[1] : null;
-
-    const token = cookieToken || bearerToken;
-    if (!token) return next(); // ✅ guest allowed
+    const token = getToken(req);
+    if (!token) return next();
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as JwtPayload;
     req.user = decoded;
 
     return next();
   } catch {
-    return next(); // ✅ invalid token → treat as guest
+    return next();
   }
 }

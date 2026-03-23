@@ -9,7 +9,7 @@ export async function listAdminCourses(status?: "All" | "Draft" | "Pending" | "P
 }
 
 export async function listPendingCourses() {
-  return http<{ items: AdminCourseRow[] }>(`/api/admin/courses/pending`);
+  return http<{ items: AdminCourseRow[] }>("/api/admin/courses/pending");
 }
 
 export async function approveCourse(id: string) {

@@ -8,10 +8,8 @@ const KHALTI_INITIATE_URL = "https://dev.khalti.com/api/v2/epayment/initiate/";
 const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
 
 const normalizeKhaltiSecretKey = (raw: string): string => {
-  const value = String(raw || "").trim();
+  const value = String(raw ?? "").trim();
   if (!value) return "";
-
-  // Older samples use prefixed keys; ePayment expects the raw key value.
   if (value.startsWith("test_secret_key_")) return value.replace("test_secret_key_", "");
   if (value.startsWith("live_secret_key_")) return value.replace("live_secret_key_", "");
   return value;

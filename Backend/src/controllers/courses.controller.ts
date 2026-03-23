@@ -28,6 +28,9 @@ const escapeXml = (value: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 
+const escapeRegex = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const slugify = (value: string) =>
   value
     .toLowerCase()
@@ -285,11 +288,54 @@ const ensureInstructorCreditForPurchase = async (purchase: any, courseTitle: str
 export async function listPublishedCourses(req: AuthedRequest, res: Response) {
   try {
     const userId = req.user?.id;
-    const items = await Course.find({ status: "Published" })
+    const searchText = String(req.query.q || req.query.query || "").trim();
+    const level = String(req.query.level || "All").trim();
+    const category = String(req.query.type || req.query.category || "All").trim();
+    const priceType = String(req.query.priceType || req.query.price || "All").trim();
+    const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+    const page = Math.max(1, Number.parseInt(String(req.query.page || "1"), 10) || 1);
+    const limit = Math.min(50, Math.max(1, Number.parseInt(String(req.query.limit || "9"), 10) || 9));
+
+    const filter: Record<string, unknown> = { status: "Published" };
+
+    if (searchText) {
+      const searchRegex = new RegExp(escapeRegex(searchText), "i");
+      filter.$or = [
+        { title: searchRegex },
+        { subtitle: searchRegex },
+        { description: searchRegex },
+        { category: searchRegex },
+        { tags: searchRegex },
+      ];
+    }
+
+    if (level && level !== "All") {
+      filter.level = new RegExp(`^${escapeRegex(level)}$`, "i");
+    }
+
+    if (category && category !== "All") {
+      filter.category = new RegExp(`^${escapeRegex(category)}$`, "i");
+    }
+
+    if (priceType === "Free") {
+      filter.price = { $lte: 0 };
+    } else if (priceType === "Paid") {
+      filter.price = { $gt: 0 };
+    }
+
+    const query = Course.find(filter)
       .select("title subtitle thumbnailUrl category level language price currency tags totalLectures totalVideoSec createdAt")
       .populate("instructorId", "firstName lastName email avatarUrl")
-      .sort({ createdAt: -1 })
-      .lean();
+      .sort({ createdAt: -1 });
+
+    if (hasPagination) {
+      query.skip((page - 1) * limit).limit(limit);
+    }
+
+    const [items, total] = await Promise.all([
+      query.lean(),
+      Course.countDocuments(filter),
+    ]);
 
     const courseIds = items
       .map((c: any) => c?._id)
@@ -336,6 +382,9 @@ export async function listPublishedCourses(req: AuthedRequest, res: Response) {
         : new Set<string>();
 
     return res.json({
+      total,
+      page,
+      limit: hasPagination ? limit : items.length,
       items: items.map((c: any) => ({
         ...(ratingMap.get(String(c._id)) || { averageRating: 0, reviewsCount: 0 }),
         enrolled: enrolledMap.get(String(c._id)) || 0,
@@ -361,8 +410,10 @@ export async function listPublishedCourses(req: AuthedRequest, res: Response) {
           : undefined,
       })),
     });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to load courses" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to load courses",
+    });
   }
 }
 
@@ -902,8 +953,10 @@ export async function enrollPublishedCourse(req: AuthedRequest, res: Response) {
     const progress = await recalcCompletion(enrollment, course);
 
     return res.json({ item: { enrolled: true, ...progress } });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to enroll course" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to enroll course",
+    });
   }
 }
 
@@ -956,8 +1009,10 @@ export async function getMyCourseProgress(req: AuthedRequest, res: Response) {
         certificateEligible: progress.isCompleted && Boolean((course as any)?.certificate?.enabled),
       },
     });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to load course progress" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to load course progress",
+    });
   }
 }
 
@@ -1001,8 +1056,10 @@ export async function completeCourseLecture(req: AuthedRequest, res: Response) {
         completedLectureIds: enrollment.completedLectureIds,
       },
     });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to complete lecture" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to complete lecture",
+    });
   }
 }
 
@@ -1086,11 +1143,13 @@ export async function upsertCourseReview(req: AuthedRequest, res: Response) {
     return res.json({
       item: toReviewItem(review, userId),
     });
-  } catch (e: any) {
-    if (e?.code === 11000) {
+  } catch (error) {
+    if ((error as { code?: number } | null)?.code === 11000) {
       return res.status(409).json({ message: "You have already submitted a review for this course" });
     }
-    return res.status(500).json({ message: e?.message || "Failed to submit review" });
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to submit review",
+    });
   }
 }
 
@@ -1137,7 +1196,7 @@ export async function getCourseCertificate(req: AuthedRequest, res: Response) {
         embeddedTemplateUrl = `data:${contentType};base64,${imgBuffer.toString("base64")}`;
       }
     } catch {
-      // keep external URL fallback
+      // use the original image url if embedding fails
     }
 
     const filenameBase = slugify(`${courseTitle}-${studentName}-certificate`) || "course-certificate";
@@ -1247,7 +1306,9 @@ export async function getCourseCertificate(req: AuthedRequest, res: Response) {
         html,
       },
     });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to generate certificate" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to generate certificate",
+    });
   }
 }

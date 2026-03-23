@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { FiX } from "react-icons/fi";
+import { FiHelpCircle, FiX } from "react-icons/fi";
 import { HiOutlineExclamationTriangle } from "react-icons/hi2";
-import { FiHelpCircle } from "react-icons/fi";
 
 type Tone = "danger" | "primary" | "neutral";
 
@@ -76,10 +75,8 @@ export default function ConfirmDialog({
 }: Props) {
   const cfg = toneConfig(tone);
   const IconCmp = cfg.IconCmp;
-
   const closeBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  // ESC close
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -89,14 +86,12 @@ export default function ConfirmDialog({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, loading, onClose]);
 
-  // focus close button
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => closeBtnRef.current?.focus(), 0);
     return () => clearTimeout(t);
   }, [open]);
 
-  // lock scroll
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -112,85 +107,52 @@ export default function ConfirmDialog({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] grid place-items-center p-4">
-      {/* backdrop */}
       <div
         className="absolute inset-0 bg-black/30 backdrop-blur-[4px]"
         onClick={() => !loading && onClose()}
       />
 
-      {/* modal */}
-      <div
-        className="
-          relative w-full max-w-md
-          rounded-2xl
-          border border-base
-          bg-surface
-          shadow-xl
-        "
-      >
-        {/* close */}
+      <div className="relative w-full max-w-md rounded-2xl border border-base bg-surface shadow-xl">
         <button
+          type="button"
           ref={closeBtnRef}
           onClick={() => !loading && onClose()}
-          className="
-            absolute right-3 top-3
-            rounded-lg p-1.5
-            text-muted hover:text-basec
-            hover:bg-black/5 dark:hover:bg-white/5
-          "
+          className="absolute right-3 top-3 rounded-lg p-1.5 text-muted hover:bg-black/5 hover:text-basec dark:hover:bg-white/5"
         >
           <FiX className="h-5 w-5" />
         </button>
 
         <div className="px-6 py-7 text-center">
-          {/* icon */}
           <div className="flex justify-center">
             <div className={`grid h-12 w-12 place-items-center rounded-full ${cfg.iconWrap}`}>
               <IconCmp className="h-6 w-6" />
             </div>
           </div>
 
-          {/* title */}
-          <h2 className="mt-4 text-lg font-bold text-basec">
-            {title}
-          </h2>
+          <h2 className="mt-4 text-lg font-bold text-basec">{title}</h2>
 
-          {/* desc */}
           {description && (
-            <p className="mt-2 text-sm text-muted leading-relaxed">
-              {description}
-            </p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
           )}
 
-          {/* actions */}
           <div className="mt-6 flex gap-3">
             <button
+              type="button"
               onClick={() => !loading && onClose()}
               disabled={loading}
-              className="
-                flex-1 h-10
-                rounded-lg border border-base
-                text-sm font-semibold text-basec
-                hover:bg-black/5 dark:hover:bg-white/5
-                disabled:opacity-60
-              "
+              className="h-10 flex-1 rounded-lg border border-base text-sm font-semibold text-basec hover:bg-black/5 disabled:opacity-60 dark:hover:bg-white/5"
             >
               {cancelText}
             </button>
 
             <button
+              type="button"
               onClick={onConfirm}
               disabled={confirmDisabled}
               className={`
-                flex-1 h-10 rounded-lg
-                text-sm font-semibold
-                transition
-                flex items-center justify-center gap-2
-                ${
-                  confirmDisabled
-                    ? cfg.confirmBtnDisabled
-                    : cfg.confirmBtn
-                }
+                flex h-10 flex-1 items-center justify-center gap-2 rounded-lg
+                text-sm font-semibold transition
+                ${confirmDisabled ? cfg.confirmBtnDisabled : cfg.confirmBtn}
               `}
             >
               {loading && <Spinner />}

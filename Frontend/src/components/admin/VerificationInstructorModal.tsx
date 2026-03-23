@@ -1,9 +1,8 @@
-// src/components/admin/VerificationInstructorModal.tsx
 import { FiX, FiExternalLink, FiFileText } from "react-icons/fi";
-import type { AdminVerificationItem, VerificationStatus } from "@/services/adminVerification";
+import type { AdminVerificationItem } from "@/services/adminVerification";
 import { useMemo, useState } from "react";
-import ConfirmDialog from "../ConfirmDialog"; // adjust path if needed
-import RejectReasonDialog from "../admin/RejectReasonDialog"; // ✅ new
+import ConfirmDialog from "../ConfirmDialog";
+import RejectReasonDialog from "../admin/RejectReasonDialog";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -12,7 +11,7 @@ type Props = {
   busy?: boolean;
   onClose: () => void;
   onApprove: () => void;
-  onReject: (reason: string) => void; // ✅ keep reason
+  onReject: (reason: string) => void;
 };
 
 export default function VerificationInstructorModal({

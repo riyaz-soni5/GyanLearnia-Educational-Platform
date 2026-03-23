@@ -2,7 +2,6 @@ import { http } from "./http";
 
 export type UserRole = "student" | "instructor" | "admin";
 
-
 export type AdminRoleKey =
   | "student"
   | "admin"
@@ -16,12 +15,9 @@ export type AdminUser = {
   firstName: string;
   lastName: string;
   email: string;
-
-
   role: UserRole;
   isVerified: boolean;
   verificationStatus: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
-
   points: number;
   acceptedAnswers: number;
   joinedAt: string;

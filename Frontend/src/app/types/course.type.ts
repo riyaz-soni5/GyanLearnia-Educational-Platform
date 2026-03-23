@@ -38,14 +38,9 @@ export type LessonDraft = {
   type: LessonType;
   durationMin: number;
   isPreview: boolean;
-
-  // content
   videoUrl?: string;
   fileUrl?: string;
-
   resources: LessonResource[];
-
-  // minimal quiz draft (upgrade later)
   quiz?: {
     title?: string;
     passPercent?: number;
@@ -84,7 +79,7 @@ export type CourseDraft = {
   requirements: string[];
 
   sections: SectionDraft[];
-  lessons?: LessonDraft[]; // backward compatibility for older drafts
+  lessons?: LessonDraft[];
   certificate?: {
     enabled: boolean;
     templateImageUrl?: string;

@@ -160,10 +160,7 @@ const ensurePrivateChatRoom = async (
   });
 };
 
-const findChatRoomForConnection = async (
-  connection: any,
-  createIfMissing: boolean
-) => {
+const findChatRoomForConnection = async (connection: any, createIfMissing: boolean) => {
   const pairKey = String(connection?.pairKey ?? "");
   let room = await PrivateChatRoom.findOne({ pairKey });
 
@@ -760,11 +757,11 @@ export async function getConnectionMessages(req: AuthedRequest, res: Response) {
       if (!Number.isNaN(parsed.getTime())) beforeDate = parsed;
     }
 
-    const query: Record<string, unknown> = { roomId: room._id };
-    if (beforeDate) query.createdAt = { $lt: beforeDate };
+    const messageFilter: Record<string, unknown> = { roomId: room._id };
+    if (beforeDate) messageFilter.createdAt = { $lt: beforeDate };
 
     const limit = 50;
-    const messages = (await PrivateChatMessage.find(query)
+    const messages = (await PrivateChatMessage.find(messageFilter)
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean()) as any[];

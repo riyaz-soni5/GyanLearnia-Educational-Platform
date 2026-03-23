@@ -1,13 +1,9 @@
-// src/pages/admin/CourseApprovalsPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import RejectReasonDialog from "@/components/admin/RejectReasonDialog";
 import AdminPagination from "@/components/admin/AdminPagination";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import { FiSearch, FiEye, FiCheck, FiX, FiAward, FiBookOpen } from "react-icons/fi";
-
-
 import { listAdminCourses, approveCourse, rejectCourse } from "@/services/adminCourse";
 
 type ApprovalStatus = "Pending" | "Published" | "Rejected";

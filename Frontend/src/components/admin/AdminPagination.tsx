@@ -13,8 +13,10 @@ const AdminPagination = ({
 }: AdminPaginationProps) => {
   if (totalPages <= 1) return null;
 
+  const wrapClass = `mt-6 flex flex-wrap items-center justify-between gap-3 ${className}`.trim();
+
   return (
-    <div className={`mt-6 flex flex-wrap items-center justify-between gap-3 ${className}`.trim()}>
+    <div className={wrapClass}>
       <p className="text-xs text-gray-600">
         Page <span className="font-semibold text-gray-900">{page}</span> of{" "}
         <span className="font-semibold text-gray-900">{totalPages}</span>

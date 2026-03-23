@@ -1,9 +1,8 @@
-// controllers/answer.controller.ts
 import { Response } from "express";
 import Answer from "../models/Answer.model.js";
 import Question from "../models/Question.model.js";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
-import User from "../models/User.model.js"; // ✅ add
+import User from "../models/User.model.js";
 import { createNotification } from "../services/notification.service.js";
 import { creditUserWallet } from "../services/wallet.service.js";
 
@@ -19,17 +18,15 @@ const toPlainText = (html: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-// GET /api/questions/:id/answers
 export const listAnswers = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId } = req.params;
 
     const answers = await Answer.find({ questionId })
-      .sort({ isVerified: -1, votes: -1, createdAt: -1 }) // verified first, then top votes
+      .sort({ isVerified: -1, votes: -1, createdAt: -1 })
       .populate("authorId", "firstName lastName role email avatarUrl")
       .lean();
 
-    // return in a frontend-friendly shape
     const meId = req.user?.id ? String(req.user.id) : null;
 
     const items = answers.map((a: any) => {
@@ -43,7 +40,7 @@ export const listAnswers = async (req: AuthedRequest, res: Response) => {
         questionId: String(a.questionId),
         content: a.content,
         votes: a.votes,
-        myVote, // IMPORTANT
+        myVote,
         isVerified: a.isVerified,
         createdAt: a.createdAt,
         authorId: a.authorId?._id ? String(a.authorId._id) : undefined,
@@ -56,13 +53,11 @@ export const listAnswers = async (req: AuthedRequest, res: Response) => {
     });
 
     return res.json({ items });
-  } catch (err) {
+  } catch {
     return res.status(500).json({ message: "Failed to load answers" });
   }
 };
 
-// POST /api/questions/:id/answers (requireAuth)
-// controllers/answer.controller.ts
 export const postAnswer = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId } = req.params;
@@ -76,12 +71,10 @@ export const postAnswer = async (req: AuthedRequest, res: Response) => {
     const q = await Question.findById(questionId);
     if (!q) return res.status(404).json({ message: "Question not found" });
 
-    // ✅ 1) question owner cannot answer
     if (String(q.authorId) === String(req.user.id)) {
       return res.status(403).json({ message: "You cannot answer your own question" });
     }
 
-    // ✅ 2) only one answer per user per question
     const existing = await Answer.findOne({ questionId, authorId: req.user.id });
     if (existing) {
       return res.status(409).json({ message: "You already answered. Delete your answer to answer again." });
@@ -96,7 +89,6 @@ export const postAnswer = async (req: AuthedRequest, res: Response) => {
       .select("firstName lastName role email avatarUrl")
       .lean();
 
-    // ✅ update cached count only (DO NOT mark as answered here)
     await Question.findByIdAndUpdate(questionId, { $inc: { answersCount: 1 } });
 
     const questionOwnerId = String((q as any)?.authorId ?? "");
@@ -133,15 +125,12 @@ export const postAnswer = async (req: AuthedRequest, res: Response) => {
       authorType: (authorDoc as any)?.role ?? req.user.role ?? "student",
     });
   } catch (err: any) {
-    // ✅ handle unique index conflict gracefully if you add the index
     if (err?.code === 11000) {
       return res.status(409).json({ message: "You already answered. Delete your answer to answer again." });
     }
     return res.status(500).json({ message: "Failed to post answer" });
   }
 };
-
-// POST /api/questions/:id/answers/:answerId/accept (requireAuth)
 
 export const acceptAnswer = async (req: AuthedRequest, res: Response) => {
   try {
@@ -178,11 +167,9 @@ export const acceptAnswer = async (req: AuthedRequest, res: Response) => {
     const prevAcceptedId = q.acceptedAnswerId ? String(q.acceptedAnswerId) : null;
     const nextAcceptedId = String(ans._id);
 
-    // ✅ If clicking the same accepted answer again -> toggle OFF (optional but nice UX)
     if (prevAcceptedId && prevAcceptedId === nextAcceptedId) {
       await Answer.updateOne({ _id: ans._id }, { $set: { isVerified: false } });
 
-      // remove points from that author (optional but fair)
       await User.updateOne(
         { _id: ans.authorId },
         { $inc: { points: -ACCEPT_POINTS, acceptedAnswers: -1 } }
@@ -199,12 +186,10 @@ export const acceptAnswer = async (req: AuthedRequest, res: Response) => {
       });
     }
 
-    // ✅ unverify old accepted if exists
     if (q.acceptedAnswerId) {
       const prev = await Answer.findById(q.acceptedAnswerId).lean();
       await Answer.updateOne({ _id: q.acceptedAnswerId }, { $set: { isVerified: false } });
 
-      // remove points from previous author (only if it exists)
       if (prev?.authorId) {
         await User.updateOne(
           { _id: prev.authorId },
@@ -213,16 +198,13 @@ export const acceptAnswer = async (req: AuthedRequest, res: Response) => {
       }
     }
 
-    // ✅ verify this answer
     await Answer.updateOne({ _id: ans._id }, { $set: { isVerified: true } });
 
-    // ✅ award points to new accepted answer author
     await User.updateOne(
       { _id: ans.authorId },
       { $inc: { points: ACCEPT_POINTS, acceptedAnswers: 1 } }
     );
 
-    // ✅ update question solved state
     q.acceptedAnswerId = ans._id as any;
     q.hasVerifiedAnswer = true;
 
@@ -300,9 +282,6 @@ export const acceptAnswer = async (req: AuthedRequest, res: Response) => {
     return res.status(500).json({ message: "Failed to accept answer" });
   }
 };
-
-
-// PATCH /api/questions/:id/answers/:answerId (requireAuth)
 export const updateAnswer = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId, answerId } = req.params as any;
@@ -341,9 +320,6 @@ export const updateAnswer = async (req: AuthedRequest, res: Response) => {
     return res.status(500).json({ message: "Failed to update answer" });
   }
 };
-
-
-// DELETE /api/questions/:id/answers/:answerId (requireAuth)
 export const deleteAnswer = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId, answerId } = req.params as any;
@@ -359,7 +335,6 @@ export const deleteAnswer = async (req: AuthedRequest, res: Response) => {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // If this answer was accepted, un-accept it on the question too
     const q = await Question.findById(questionId);
     if (q && String((q as any).acceptedAnswerId || "") === String(ans._id)) {
       (q as any).acceptedAnswerId = undefined;
@@ -369,39 +344,22 @@ export const deleteAnswer = async (req: AuthedRequest, res: Response) => {
 
     await Answer.deleteOne({ _id: answerId });
 
-    // decrease cached count (protect from going negative)
     await Question.findByIdAndUpdate(questionId, { $inc: { answersCount: -1 } });
-
-    // safer simple version (recommended) — replace the above block with this if needed:
-    // await Question.findByIdAndUpdate(questionId, { $inc: { answersCount: -1 } });
 
     return res.json({ message: "Answer deleted" });
   } catch {
     return res.status(500).json({ message: "Failed to delete answer" });
   }
 };
-
-
-// ✅ helper: apply vote switch / toggle
 const applyVote = (existing: number | null, next: 1 | -1) => {
-  // returns: { newValue, delta }
-  // delta = how much to change cached votes by
   if (existing === next) {
-    // toggle off
     return { newValue: null, delta: -next };
   }
   if (existing === null) {
-    // new vote
     return { newValue: next, delta: next };
   }
-  // switch from -1 to +1 or +1 to -1
-  // example: existing=-1 next=+1 => delta = +2
   return { newValue: next, delta: next - existing };
 };
-
-
-
-// POST /api/questions/:id/answers/:answerId/upvote
 export const upvoteAnswer = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId, answerId } = req.params as any;
@@ -409,7 +367,6 @@ export const upvoteAnswer = async (req: AuthedRequest, res: Response) => {
 
     const ans: any = await Answer.findOne({ _id: answerId, questionId });
     if (!ans) return res.status(404).json({ message: "Answer not found" });
-
 
     const userId = String(req.user.id);
 
@@ -419,17 +376,14 @@ export const upvoteAnswer = async (req: AuthedRequest, res: Response) => {
     const { newValue, delta } = applyVote(existing, 1);
 
     if (newValue === null) {
-      // remove vote
       ans.voters = ans.voters.filter((v: any) => String(v.userId) !== userId);
     } else if (idx >= 0) {
-      // update vote
       ans.voters[idx].value = newValue;
     } else {
-      // add vote
       ans.voters.push({ userId: req.user.id, value: newValue });
     }
 
-    ans.votes = Math.max(0, Number(ans.votes || 0) + delta); // keep non-negative (optional)
+    ans.votes = Math.max(0, Number(ans.votes || 0) + delta);
     await ans.save();
 
     return res.json({ message: "Voted", votes: ans.votes, myVote: newValue });
@@ -438,7 +392,6 @@ export const upvoteAnswer = async (req: AuthedRequest, res: Response) => {
   }
 };
 
-// POST /api/questions/:id/answers/:answerId/downvote
 export const downvoteAnswer = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId, answerId } = req.params as any;
@@ -462,7 +415,7 @@ export const downvoteAnswer = async (req: AuthedRequest, res: Response) => {
       ans.voters.push({ userId: req.user.id, value: newValue });
     }
 
-    ans.votes = Math.max(0, Number(ans.votes || 0) + delta); // keep non-negative (optional)
+    ans.votes = Math.max(0, Number(ans.votes || 0) + delta);
     await ans.save();
 
     return res.json({ message: "Voted", votes: ans.votes, myVote: newValue });

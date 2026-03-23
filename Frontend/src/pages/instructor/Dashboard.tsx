@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiBookOpen, FiCheckCircle, FiClock, FiEdit2, FiShield, FiTrendingUp, FiTrash2 } from "react-icons/fi";
-
+import { FiBookOpen, FiCheckCircle, FiClock, FiEdit2, FiTrendingUp, FiTrash2 } from "react-icons/fi";
 import CourseSubmissionStatusCard from "@/components/instructor/CourseSubmissionStatusCard";
 import InstructorHoursChart from "@/components/instructor/InstructorHoursChart";
 import InstructorStatCard from "@/components/instructor/InstructorStatCard";
@@ -41,18 +40,6 @@ const formatDate = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString();
-};
-
-const getInitials = (firstName?: string, lastName?: string, email?: string) => {
-  const full = `${firstName ?? ""} ${lastName ?? ""}`.trim();
-  if (full) {
-    return full
-      .split(" ")
-      .slice(0, 2)
-      .map((x) => x[0]?.toUpperCase())
-      .join("");
-  }
-  return (email?.slice(0, 2) || "IN").toUpperCase();
 };
 
 const shortDate = (isoDay: string) => {

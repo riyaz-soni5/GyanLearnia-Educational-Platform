@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import { http } from "@/services/http";
-import {
-  FiAward,
-  FiStar,
-} from "react-icons/fi";
+import { FiAward, FiStar } from "react-icons/fi";
 
 type LeaderDTO = {
   id: string;
@@ -80,21 +77,15 @@ const Leaderboard = () => {
 
   return (
     <aside className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900">
-      {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-base font-bold text-gray-900 dark:text-white">
-          Leaderboard
-        </h3>
+        <h3 className="text-base font-bold text-gray-900 dark:text-white">Leaderboard</h3>
         <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">
           {range}
         </span>
       </div>
 
-      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-        Top contributors
-      </p>
+      <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Top contributors</p>
 
-      {/* States */}
       {loading ? (
         <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
           Loading leaderboard...
@@ -114,15 +105,8 @@ const Leaderboard = () => {
               key={u.id}
               className={`flex items-center justify-between rounded-xl border px-4 py-3 transition hover:shadow-sm ${getRankRowClass(idx)}`}
             >
-              {/* Left */}
-              <div className="flex items-center gap-3 min-w-0">
-                {/* Rank */}
-                <div className="flex items-center justify-center h-8 w-8">
-                  {getRankIcon(idx)}
-                </div>
-
-
-                {/* Name + role */}
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center">{getRankIcon(idx)}</div>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                     {u.name}
@@ -136,7 +120,6 @@ const Leaderboard = () => {
                 </div>
               </div>
 
-              {/* Right stats */}
               <div className="flex items-center gap-5 text-right">
                 <div>
                   <p className="flex items-center justify-end gap-1 text-sm font-bold text-gray-900 dark:text-white">
@@ -146,7 +129,6 @@ const Leaderboard = () => {
                     points
                   </p>
                 </div>
-
               </div>
             </div>
           ))}

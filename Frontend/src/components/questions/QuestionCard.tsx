@@ -1,4 +1,3 @@
-// src/components/questions/QuestionCard.tsx
 import { Link, useNavigate } from "react-router-dom";
 import type { Question } from "@/app/types/question.types";
 import { BiUpvote } from "react-icons/bi";
@@ -27,27 +26,27 @@ const formatRole = (role?: string) => {
   return role;
 };
 
-// ✅ turn HTML -> plain text (for card preview only)
 const htmlToText = (html?: string) => {
   const raw = (html ?? "").trim();
   if (!raw) return "";
-
-  // If it doesn't look like HTML, return as-is
   if (!/[<>&]/.test(raw)) return raw;
 
-  // Browser-safe plain text extraction
   const tmp = document.createElement("div");
   tmp.innerHTML = raw;
-
-  // remove Quill UI spans if present
   tmp.querySelectorAll(".ql-ui").forEach((n) => n.remove());
 
   const text = (tmp.textContent || tmp.innerText || "").replace(/\s+/g, " ").trim();
   return text;
 };
 
-// ✅ optional: keep preview short even before line-clamp
 const truncate = (s: string, max = 180) => (s.length > max ? s.slice(0, max - 1).trim() + "…" : s);
+
+type QuestionCardItem = Question & {
+  categoryName?: string;
+  myVote?: 1 | -1 | null;
+  author?: string;
+  authorType?: string;
+};
 
 const Badge = ({
   text,
@@ -79,7 +78,7 @@ const QuestionCard = ({
   onUpvoteQuestion,
   isUpvoteLoading = false,
 }: {
-  question: Question & { categoryName?: string; myVote?: 1 | -1 | null };
+  question: QuestionCardItem;
   onUpvoteQuestion?: (questionId: string) => void;
   isUpvoteLoading?: boolean;
 }) => {
@@ -88,15 +87,11 @@ const QuestionCard = ({
   const isUpvoted = question.myVote === 1;
 
   const answered = question.status === "Answered";
-  const categoryLabel = (question as any).categoryName || question.subject || "Category";
+  const categoryLabel = question.categoryName || question.subject || "Category";
   const isFastResponse = Boolean(question.isFastResponse);
-
   const authorName =
-    (question as any).author && (question as any).author !== "Unknown"
-      ? (question as any).author
-      : "Anonymous";
-
-  const authorTypeLabel = formatRole((question as any).authorType);
+    question.author && question.author !== "Unknown" ? question.author : "Anonymous";
+  const authorTypeLabel = formatRole(question.authorType);
 
   const openDetails = () => nav(`/questions/${question.id}`);
 
@@ -123,7 +118,6 @@ const QuestionCard = ({
     }
   };
 
-  // ✅ plain text preview for cards
   const excerptPlain = truncate(htmlToText(question.excerpt ?? ""), 180);
 
   return (
@@ -142,7 +136,6 @@ const QuestionCard = ({
       ].join(" ")}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
-        {/* Content */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {Number(question.fastResponsePrice || 0) > 0 ? (
@@ -164,7 +157,6 @@ const QuestionCard = ({
             </span>
           </div>
 
-          {/* Title: keep Link for semantics, but stop bubbling so it doesn't double-trigger */}
           <Link
             to={`/questions/${question.id}`}
             onClick={(e) => e.stopPropagation()}
@@ -173,7 +165,6 @@ const QuestionCard = ({
             {question.title}
           </Link>
 
-          {/* ✅ Plain text only */}
           <p className="mt-2 line-clamp-2 break-words text-sm text-gray-600 dark:text-gray-300">
             {excerptPlain || "No details provided."}
           </p>
@@ -191,7 +182,6 @@ const QuestionCard = ({
           </div>
         </div>
 
-        {/* Meta */}
         <div className="w-full shrink-0 border-t border-gray-100 pt-3 text-left dark:border-white/10 md:w-auto md:border-t-0 md:pt-0 md:text-right md:whitespace-nowrap">
           <p className="text-xs text-gray-500 dark:text-gray-400">{formatDateOnly(question.createdAt)}</p>
           <p className="mt-1 text-sm font-medium text-gray-900 dark:text-white">{authorName}</p>
@@ -199,7 +189,6 @@ const QuestionCard = ({
         </div>
       </div>
 
-      {/* Action Bar */}
       <div
         onClick={(e) => e.stopPropagation()}
         className="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-3 dark:border-white/10 md:flex-row md:items-center md:justify-between"
@@ -228,7 +217,7 @@ const QuestionCard = ({
           <Link
             to={`/questions/${question.id}`}
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex cursor-pointer items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
+            className="inline-flex cursor-pointer items-center gap-2 transition hover:text-indigo-600 dark:hover:text-indigo-300"
             title="Open to answer"
           >
             <FaRegCommentDots className="h-4 w-4" />
@@ -245,7 +234,7 @@ const QuestionCard = ({
           <button
             type="button"
             onClick={onShare}
-            className="inline-flex cursor-pointer items-center gap-2 hover:text-indigo-600 dark:hover:text-indigo-300 transition"
+            className="inline-flex cursor-pointer items-center gap-2 transition hover:text-indigo-600 dark:hover:text-indigo-300"
             title="Share"
           >
             <FiShare2 className="h-4 w-4" />

@@ -108,9 +108,8 @@ const RegisterPage = () => {
 
       showToast("Account created successfully", "success");
       setTimeout(() => nav("/login", { replace: true }), 1200);
-    } catch (err: any) {
-      setError(err.message || "Registration failed");
-
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -121,7 +120,6 @@ const RegisterPage = () => {
       <div className="min-h-screen flex items-start md:items-center justify-center py-10 transition">
         <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-base bg-surface shadow-sm">
           <div className="grid md:grid-cols-12">
-            {/* Left panel */}
             <div className="hidden md:flex md:col-span-4 flex-col items-center justify-center bg-gray-900 p-8 text-white">
               <div className="bg-white p-2 rounded">
                 <img
@@ -135,7 +133,6 @@ const RegisterPage = () => {
 
             <div className="md:col-span-8 p-8 sm:p-10">
               <h1 className="text-2xl font-bold text-basec">Create account</h1>
-
 
               <div className="mt-2">
                 <p className="text-xs font-medium text-muted">Register as</p>
@@ -169,7 +166,6 @@ const RegisterPage = () => {
               </div>
 
               <form onSubmit={onSubmit} className="mt-2 space-y-4">
-
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="text-xs font-medium text-muted">First name</label>
@@ -204,7 +200,6 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-
                 <div>
                   <label className="text-xs font-medium text-muted">Email</label>
                   <div className="mt-2 relative">
@@ -221,7 +216,6 @@ const RegisterPage = () => {
                     />
                   </div>
                 </div>
-
 
                 <div>
                   <label className="text-xs font-medium text-muted">Password</label>
@@ -258,7 +252,6 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-
                 <div>
                   <label className="text-xs font-medium text-muted">Confirm password</label>
                   <div className="relative mt-2">
@@ -290,7 +283,6 @@ const RegisterPage = () => {
                     </button>
                   </div>
                 </div>
-
 
                 <div
                   className={[
@@ -327,7 +319,6 @@ const RegisterPage = () => {
                   </div>
                 </div>
 
-
                 <div
                   className={[
                     "text-[12px] text-red-500 transition",
@@ -338,13 +329,12 @@ const RegisterPage = () => {
                   *{error ?? "\u00A0"}
                 </div>
 
-
                 <button
                   type="submit"
                   disabled={loading}
                   className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition ${
                     loading
-                      ? "bg-gray-400 cursor-not-allowed"
+                      ? "cursor-not-allowed bg-gray-400"
                       : "bg-indigo-600 hover:bg-indigo-700"
                   }`}
                 >

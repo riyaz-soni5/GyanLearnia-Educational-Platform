@@ -1,35 +1,32 @@
-
 import { createBrowserRouter, redirect } from "react-router-dom";
-import MainLayout from "@/layouts/MainLayout";
-import AuthLayout from "@/layouts/AuthLayout";
 import AdminLayout from "@/layouts/AdminLayout";
-
-
+import AuthLayout from "@/layouts/AuthLayout";
+import MainLayout from "@/layouts/MainLayout";
 import { getUser, isLoggedIn } from "@/services/session";
-
-
-import HomePage from "@/pages/public/HomePage";
-import CoursesPage from "@/pages/courses/CoursePage";
-import QuestionsPage from "@/pages/questions/QuestionPage";
-import MentorsPage from "@/pages/public/MentorsDiscovryPage";
-import LoginPage from "@/pages/auth/LoginPage";
-import RegisterPage from "@/pages/auth/RegisterPage";
-import ProfilePage from "@/pages/auth/ProfilePage";
-import WalletPage from "@/pages/auth/WalletPage";
-import PricingPage from "@/pages/public/PricingPage";
-import AboutPage from "@/pages/public/AboutPage";
-import QuestionDetailsPage from "@/pages/questions/QuestionDetailsPage";
-import CourseDetailsPage from "@/pages/courses/CourseDetailsPage";
-import UploadCoursePage from "@/pages/instructor/UploadCoursePage";
-import InstructorDashboardPage from "@/pages/instructor/Dashboard";
 import AdminDashboardPage from "@/pages/admin/Dashboard";
-import VerifyInstructorsPage from "@/pages/admin/VerifyInstructorPage";
 import CourseApprovalsPage from "@/pages/admin/CourseApprovalsPage";
 import ManageUsersPage from "@/pages/admin/ManageUserPage";
 import ReportsPage from "@/pages/admin/ReportsPage";
-import AskQuestionPage from "@/pages/questions/AskQuestionPage";
+import VerifyInstructorsPage from "@/pages/admin/VerifyInstructorPage";
+import LoginPage from "@/pages/auth/LoginPage";
+import ProfilePage from "@/pages/auth/ProfilePage";
+import RegisterPage from "@/pages/auth/RegisterPage";
+import WalletPage from "@/pages/auth/WalletPage";
+import CourseDetailsPage from "@/pages/courses/CourseDetailsPage";
+import CourseLearnPage from "@/pages/courses/CourseLearnPage";
+import CoursesPage from "@/pages/courses/CoursePage";
+import InstructorDashboardPage from "@/pages/instructor/Dashboard";
 import InstructorVerificationPage from "@/pages/instructor/InstructorVerificationPage";
+import UploadCoursePage from "@/pages/instructor/UploadCoursePage";
+import AboutPage from "@/pages/public/AboutPage";
+import HomePage from "@/pages/public/HomePage";
+import MentorsPage from "@/pages/public/MentorsDiscovryPage";
+import PricingPage from "@/pages/public/PricingPage";
+import AskQuestionPage from "@/pages/questions/AskQuestionPage";
+import QuestionDetailsPage from "@/pages/questions/QuestionDetailsPage";
+import QuestionsPage from "@/pages/questions/QuestionPage";
 
+type UserRole = "student" | "instructor" | "admin";
 
 const redirectIfLoggedIn = () => {
   if (isLoggedIn()) return redirect("/courses");
@@ -41,15 +38,14 @@ const requireAuth = () => {
   return null;
 };
 
-const requireRole = (...roles: Array<"student" | "instructor" | "admin">) => {
-  const u = getUser();
-  if (!u) return redirect("/login");
-  if (!roles.includes(u.role)) return redirect("/");
+const requireRole = (...roles: UserRole[]) => {
+  const user = getUser();
+  if (!user) return redirect("/login");
+  if (!roles.includes(user.role)) return redirect("/");
   return null;
 };
 
 export const router = createBrowserRouter([
-
   {
     path: "/",
     element: <AuthLayout />,
@@ -59,31 +55,22 @@ export const router = createBrowserRouter([
       { path: "instructor/verify", element: <InstructorVerificationPage />, loader: requireAuth },
     ],
   },
-
-
   {
     path: "/",
     element: <MainLayout />,
     children: [
-
       { index: true, element: <HomePage />, loader: redirectIfLoggedIn },
-
       { path: "courses", element: <CoursesPage /> },
       { path: "courses/:id", element: <CourseDetailsPage /> },
-
-
+      { path: "courses/:id/learn", element: <CourseLearnPage />, loader: requireAuth },
       { path: "questions/ask", element: <AskQuestionPage />, loader: requireAuth },
-
       { path: "questions", element: <QuestionsPage /> },
       { path: "questions/:id", element: <QuestionDetailsPage /> },
-
       { path: "mentors", element: <MentorsPage />, loader: requireAuth },
       { path: "pricing", element: <PricingPage /> },
       { path: "about", element: <AboutPage /> },
       { path: "profile", element: <ProfilePage />, loader: requireAuth },
       { path: "wallet", element: <WalletPage />, loader: requireAuth },
-
-
       {
         path: "instructor/upload-course",
         element: <UploadCoursePage />,
@@ -96,8 +83,6 @@ export const router = createBrowserRouter([
       },
     ],
   },
-
-
   {
     path: "/admin",
     element: <AdminLayout />,

@@ -9,12 +9,10 @@ const InstructorDocSchema = new mongoose.Schema(
       enum: ["idCard", "certificate", "experienceLetter", "other"],
       required: true,
     },
-
     data: { type: Buffer, required: true },
-    contentType: { type: String, required: true }, // "application/pdf", "image/png"
+    contentType: { type: String, required: true },
     fileName: { type: String },
     size: { type: Number },
-
     status: { type: String, enum: ["Pending", "Verified", "Rejected"], default: "Pending" },
   },
   { timestamps: true }

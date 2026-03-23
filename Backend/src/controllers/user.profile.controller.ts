@@ -2,7 +2,6 @@ import type { Response } from "express";
 import bcrypt from "bcryptjs";
 import User from "../models/User.model.js";
 import Enrollment from "../models/Enrollment.model.js";
-import Course from "../models/Course.model.js";
 import Answer from "../models/Answer.model.js";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 
@@ -141,7 +140,6 @@ export async function getCurrentUser(req: AuthedRequest, res: Response) {
       });
     }
 
-    // Keep the final point in sync with the canonical current points value.
     pointsTimeline[pointsTimeline.length - 1].points = Math.max(0, points);
 
     let badge: "New Learner" | "Active Learner" | "Top Performer" | "Legend" = "New Learner";
@@ -150,6 +148,8 @@ export async function getCurrentUser(req: AuthedRequest, res: Response) {
     else if (points >= 100) badge = "Active Learner";
 
     const plan = getUserPlanSnapshot(user);
+    const walletBalancePaisa = Number((user as any).walletBalancePaisa ?? 0);
+    const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
 
     return res.json({
       id: String(user._id),
@@ -185,8 +185,8 @@ export async function getCurrentUser(req: AuthedRequest, res: Response) {
       planStatus: plan.planStatus,
       planActivatedAt: plan.planActivatedAt,
       planExpiresAt: plan.planExpiresAt,
-      walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
-      walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
+      walletBalancePaisa,
+      walletBalance,
       stats: {
         enrolledCoursesCount: enrollmentAgg,
         completedCoursesCount: completedAgg,
@@ -319,6 +319,8 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
     await user.save();
 
     const plan = getUserPlanSnapshot(user);
+    const walletBalancePaisa = Number((user as any).walletBalancePaisa ?? 0);
+    const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
 
     return res.json({
       id: String(user._id),
@@ -354,8 +356,8 @@ export async function updateCurrentUser(req: AuthedRequest, res: Response) {
       planStatus: plan.planStatus,
       planActivatedAt: plan.planActivatedAt,
       planExpiresAt: plan.planExpiresAt,
-      walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
-      walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
+      walletBalancePaisa,
+      walletBalance,
     });
   } catch {
     return res.status(500).json({ message: "Failed to update profile" });

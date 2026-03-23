@@ -1,4 +1,3 @@
-// models/User.model.ts
 import { Schema, model } from "mongoose";
 
 export type UserRole = "student" | "instructor" | "admin";
@@ -13,8 +12,6 @@ const UserSchema = new Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
     role: { type: String, enum: ["student", "instructor", "admin"], required: true },
-
-    // Profile extras
     avatarUrl: { type: String, trim: true, default: null },
     dateOfBirth: { type: Date, default: null },
     gender: {
@@ -45,22 +42,15 @@ const UserSchema = new Schema(
       instagram: { type: String, trim: true, default: "" },
       website: { type: String, trim: true, default: "" },
     },
-
-    // Instructor-only
     expertise: { type: String, trim: true },
     institution: { type: String, trim: true },
-
-    // ✅ verification flow
     verificationStatus: {
       type: String,
       enum: ["NotSubmitted", "Pending", "Rejected", "Verified"],
       default: "NotSubmitted",
     },
     verificationReason: { type: String, trim: true, default: null },
-
     isVerified: { type: Boolean, default: false },
-
-    // Pricing plan
     plan: {
       type: String,
       enum: ["Free", "Pro"],
@@ -68,9 +58,7 @@ const UserSchema = new Schema(
     },
     planActivatedAt: { type: Date, default: Date.now },
     planExpiresAt: { type: Date, default: null },
-
     walletBalancePaisa: { type: Number, default: 0, min: 0 },
-
     points: { type: Number, default: 0 },
     acceptedAnswers: { type: Number, default: 0 },
   },

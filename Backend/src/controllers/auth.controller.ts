@@ -1,4 +1,3 @@
-// controllers/auth.controller.ts (updated)
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -25,7 +24,6 @@ const getUserPlanSnapshot = (user: any): UserPlanSnapshot => {
   };
 };
 
-
 export const login = async (req: Request, res: Response) => {
   try {
     const { email, password, rememberMe } = req.body;
@@ -46,15 +44,16 @@ export const login = async (req: Request, res: Response) => {
       { expiresIn: rememberMe ? "7d" : "2h" }
     );
 
-    // ✅ httpOnly cookie (session cookie if rememberMe is false)
     res.cookie("access_token", token, {
       httpOnly: true,
       sameSite: "lax",
-      secure: false, // set true in production https
-      ...(rememberMe ? { maxAge: 7 * 24 * 60 * 60 * 1000 } : {}), // no maxAge => session cookie
+      secure: false,
+      ...(rememberMe ? { maxAge: 7 * 24 * 60 * 60 * 1000 } : {}),
     });
 
     const plan = getUserPlanSnapshot(user);
+    const walletBalancePaisa = Number((user as any).walletBalancePaisa ?? 0);
+    const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
 
     return res.json({
       message: "Login successful",
@@ -66,20 +65,19 @@ export const login = async (req: Request, res: Response) => {
         lastName: user.lastName,
         avatarUrl: user.avatarUrl ?? null,
         isVerified: Boolean(user.isVerified),
-        verificationStatus: user.verificationStatus, // ✅ add this
+        verificationStatus: user.verificationStatus,
         currentPlan: plan.currentPlan,
         planStatus: plan.planStatus,
         planActivatedAt: plan.planActivatedAt,
         planExpiresAt: plan.planExpiresAt,
-        walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
-        walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
+        walletBalancePaisa,
+        walletBalance,
       },
     });
   } catch {
     return res.status(500).json({ message: "Login failed" });
   }
 };
-
 
 export const register = async (req: Request, res: Response) => {
   try {
@@ -106,6 +104,9 @@ export const register = async (req: Request, res: Response) => {
       institution: role === "instructor" ? String(institution || "").trim() || undefined : undefined,
     });
 
+    const walletBalancePaisa = Number((user as any).walletBalancePaisa ?? 0);
+    const walletBalance = Number((walletBalancePaisa / 100).toFixed(2));
+
     res.status(201).json({
       message: "Registration successful",
       user: {
@@ -119,11 +120,11 @@ export const register = async (req: Request, res: Response) => {
         planStatus: "Active",
         planActivatedAt: user.planActivatedAt ?? null,
         planExpiresAt: user.planExpiresAt ?? null,
-        walletBalancePaisa: Number((user as any).walletBalancePaisa ?? 0),
-        walletBalance: Number((Number((user as any).walletBalancePaisa ?? 0) / 100).toFixed(2)),
+        walletBalancePaisa,
+        walletBalance,
       },
     });
-  } catch (err) {
-    res.status(500).json({ message: "Registration failed" });
+  } catch {
+    return res.status(500).json({ message: "Registration failed" });
   }
 };

@@ -1,6 +1,5 @@
-// src/components/instructor/courseBuilder/ThumbnailUploadCard.tsx
 import { useRef, useState } from "react";
-import { FiImage, FiUploadCloud, FiX } from "react-icons/fi";
+import { FiUploadCloud, FiX } from "react-icons/fi";
 import { useToast } from "../toast";
 import { uploadFileToCloud } from "../../features/instructor/uploadHelpers";
 
@@ -25,8 +24,8 @@ export default function ThumbnailUploadCard({ thumbnailUrl, onChange }: Props) {
       const out = await uploadFileToCloud({ file, kind: "thumbnail" });
       onChange(out.publicUrl);
       showToast("Thumbnail uploaded", "success");
-    } catch (e: any) {
-      showToast(e?.message || "Thumbnail upload failed", "error");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Thumbnail upload failed", "error");
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -38,9 +37,7 @@ export default function ThumbnailUploadCard({ thumbnailUrl, onChange }: Props) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-bold text-gray-900">Thumbnail</p>
-          <p className="mt-1 text-xs text-gray-600">
-             (recommended 1280×720)
-          </p>
+          <p className="mt-1 text-xs text-gray-600">(recommended 1280×720)</p>
         </div>
 
         {thumbnailUrl ? (
@@ -73,9 +70,9 @@ export default function ThumbnailUploadCard({ thumbnailUrl, onChange }: Props) {
             disabled={uploading}
             onClick={() => inputRef.current?.click()}
             className={[
-              "col-span-12 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition w-full",
+              "col-span-12 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition",
               uploading
-                ? "bg-gray-400 cursor-not-allowed"
+                ? "cursor-not-allowed bg-gray-400"
                 : "bg-indigo-600 hover:bg-indigo-700",
             ].join(" ")}
           >

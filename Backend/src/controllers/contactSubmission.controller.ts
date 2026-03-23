@@ -12,7 +12,7 @@ export async function createContactSubmission(req: AuthedRequest, res: Response)
       message = "",
     } = req.body as Record<string, unknown>;
 
-    const payload = {
+    const data = {
       userId: req.user?.id || null,
       firstName: String(firstName).trim(),
       lastName: String(lastName).trim(),
@@ -21,15 +21,15 @@ export async function createContactSubmission(req: AuthedRequest, res: Response)
       message: String(message).trim(),
     };
 
-    if (!payload.firstName || !payload.lastName || !payload.email || !payload.phone || !payload.message) {
+    if (!data.firstName || !data.lastName || !data.email || !data.phone || !data.message) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    if (payload.message.length < 10) {
+    if (data.message.length < 10) {
       return res.status(400).json({ message: "Message must be at least 10 characters long" });
     }
 
-    const created = await ContactSubmission.create(payload);
+    const created = await ContactSubmission.create(data);
     return res.status(201).json({
       message: "Contact form submitted successfully",
       item: {
@@ -42,8 +42,10 @@ export async function createContactSubmission(req: AuthedRequest, res: Response)
         createdAt: created.createdAt,
       },
     });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to submit contact form" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to submit contact form",
+    });
   }
 }
 
@@ -66,7 +68,9 @@ export async function listContactSubmissions(_req: AuthedRequest, res: Response)
         createdAt: item.createdAt,
       })),
     });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to load contact submissions" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to load contact submissions",
+    });
   }
 }

@@ -53,7 +53,7 @@ const StatCard = ({
   <div className="min-w-[220px] flex-1 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
     <div className="flex items-start justify-between gap-4">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">{label}</p>
+        <p className="text-[11px] font-semibold uppercase text-gray-400">{label}</p>
         <p className="mt-3 text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">{value}</p>
       </div>
       <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200">
@@ -133,26 +133,33 @@ function PieChart({ segments, emptyText }: { segments: PieSegment[]; emptyText: 
   const cx = size / 2;
   const cy = size / 2;
   const radius = 82;
-  let startAngle = -Math.PI / 2;
+  const slices = segments.reduce<{
+    endAngle: number;
+    items: Array<PieSegment & { path: string }>;
+  }>(
+    (result, seg) => {
+      const startAngle = result.endAngle;
+      const fraction = seg.value / total;
+      const angle = fraction * Math.PI * 2;
+      const endAngle = startAngle + angle;
+      const x1 = cx + radius * Math.cos(startAngle);
+      const y1 = cy + radius * Math.sin(startAngle);
+      const x2 = cx + radius * Math.cos(endAngle);
+      const y2 = cy + radius * Math.sin(endAngle);
+      const largeArcFlag = angle > Math.PI ? 1 : 0;
+      const path = [
+        `M ${cx} ${cy}`,
+        `L ${x1} ${y1}`,
+        `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+        "Z",
+      ].join(" ");
 
-  const slices = segments.map((seg) => {
-    const fraction = seg.value / total;
-    const angle = fraction * Math.PI * 2;
-    const endAngle = startAngle + angle;
-    const x1 = cx + radius * Math.cos(startAngle);
-    const y1 = cy + radius * Math.sin(startAngle);
-    const x2 = cx + radius * Math.cos(endAngle);
-    const y2 = cy + radius * Math.sin(endAngle);
-    const largeArcFlag = angle > Math.PI ? 1 : 0;
-    const path = [
-      `M ${cx} ${cy}`,
-      `L ${x1} ${y1}`,
-      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-      "Z",
-    ].join(" ");
-    startAngle = endAngle;
-    return { ...seg, path };
-  });
+      result.items.push({ ...seg, path });
+      result.endAngle = endAngle;
+      return result;
+    },
+    { endAngle: -Math.PI / 2, items: [] }
+  ).items;
 
   return (
     <div className="relative mx-auto w-full max-w-[220px]">

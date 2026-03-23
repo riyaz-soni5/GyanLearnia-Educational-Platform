@@ -1,4 +1,3 @@
-// src/components/courses/CourseCard.tsx
 import { Link } from "react-router-dom";
 import { FiStar, FiUsers } from "react-icons/fi";
 import type { CourseListItem } from "@/app/types/course.type";
@@ -8,23 +7,6 @@ type CourseCardModel = CourseListItem & {
   totalLectures?: number;
   totalVideoSec?: number;
   badge?: "Popular" | "Certified" | "New" | string;
-};
-
-const BadgePill = ({ text }: { text: string }) => {
-  const tone =
-    text === "Popular"
-      ? "bg-indigo-600 text-white"
-      : text === "Certified"
-      ? "bg-green-600 text-white"
-      : text === "New"
-      ? "bg-yellow-400 text-gray-900"
-      : "bg-gray-900 text-white";
-
-  return (
-    <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold shadow ${tone}`}>
-      {text}
-    </span>
-  );
 };
 
 const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; previewMode?: boolean }) => {
@@ -42,14 +24,20 @@ const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; 
   const averageRating = Number(course.averageRating ?? course.rating ?? 0);
   const reviewsCount = Math.max(0, Number(course.reviewsCount ?? 0));
   const enrolledCount = Math.max(0, Number(course.enrolled ?? 0));
-
-  // prefer email if available (you said your site doesn't use username)
   const instructorLine =
     course.instructor?.name?.trim() ||
     course.instructor?.email?.trim() ||
     "";
+  const badgeClass =
+    course.badge === "Popular"
+      ? "bg-indigo-600 text-white"
+      : course.badge === "Certified"
+      ? "bg-green-600 text-white"
+      : course.badge === "New"
+      ? "bg-yellow-400 text-gray-900"
+      : "bg-gray-900 text-white";
 
-  const CardBody = (
+  const content = (
     <>
       <div className="relative">
         <div className="aspect-video w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
@@ -62,7 +50,11 @@ const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; 
         </div>
 
         <div className="absolute left-3 top-3 flex gap-2">
-          {course.badge ? <BadgePill text={course.badge} /> : null}
+          {course.badge ? (
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold shadow ${badgeClass}`}>
+              {course.badge}
+            </span>
+          ) : null}
         </div>
 
         <div className="absolute bottom-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-medium text-white">
@@ -115,10 +107,10 @@ const CourseCard = ({ course, previewMode = false }: { course: CourseCardModel; 
   return (
     <article className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
       {previewMode ? (
-        <div className="block">{CardBody}</div>
+        <div className="block">{content}</div>
       ) : (
-        <Link to={`/courses/${course.id}`} className="block">
-          {CardBody}
+        <Link to={`/courses/${course.id}`} className="block cursor-pointer">
+          {content}
         </Link>
       )}
 

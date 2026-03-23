@@ -3,7 +3,7 @@ import Quill from "quill";
 import "quill/dist/quill.snow.css";
 
 type Props = {
-  value: string; // HTML
+  value: string;
   onChange: (html: string) => void;
   placeholder?: string;
   className?: string;
@@ -23,13 +23,11 @@ export default function RichTextEditor({
     const container = containerRef.current;
     if (!container) return;
 
-    // ✅ StrictMode-safe: wipe previous DOM
     container.innerHTML = "";
 
     const editorEl = document.createElement("div");
     container.appendChild(editorEl);
 
-    // ✅ your backend base URL
     const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
     const q = new Quill(editorEl, {
@@ -43,7 +41,7 @@ export default function RichTextEditor({
             [{ list: "ordered" }, { list: "bullet" }],
             [{ align: [] }],
             ["blockquote", "code-block"],
-            ["link", "image"], // ✅ add image button
+            ["link", "image"],
             ["clean"],
           ],
           handlers: {
@@ -56,7 +54,6 @@ export default function RichTextEditor({
                 const file = input.files?.[0];
                 if (!file) return;
 
-                // optional size limit (match backend)
                 if (file.size > 2 * 1024 * 1024) {
                   alert("Max 2MB image allowed.");
                   return;
@@ -72,17 +69,16 @@ export default function RichTextEditor({
                   });
 
                   if (!res.ok) throw new Error("Image upload failed");
-                  const data = await res.json(); // { id, url }
+                  const data = (await res.json()) as { url: string };
 
-                  // ✅ insert returned URL into editor
                   const range = q.getSelection(true);
                   const index = range ? range.index : q.getLength();
                   const imgUrl = data.url.startsWith("http") ? data.url : `${API_BASE}${data.url}`;
 
                   q.insertEmbed(index, "image", imgUrl, "user");
                   q.setSelection(index + 1);
-                } catch (e: any) {
-                  alert(e?.message || "Upload failed");
+                } catch (e: unknown) {
+                  alert(e instanceof Error ? e.message : "Upload failed");
                 }
               };
 
@@ -95,7 +91,6 @@ export default function RichTextEditor({
 
     quillRef.current = q;
 
-    // ✅ set initial HTML
     if (value) {
       q.clipboard.dangerouslyPasteHTML(value);
       lastHtmlRef.current = value;
@@ -112,12 +107,11 @@ export default function RichTextEditor({
     return () => {
       q.off("text-change", handler);
       quillRef.current = null;
-      if (containerRef.current) containerRef.current.innerHTML = "";
+      container.innerHTML = "";
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ Sync value changes from parent
   useEffect(() => {
     const q = quillRef.current;
     if (!q) return;

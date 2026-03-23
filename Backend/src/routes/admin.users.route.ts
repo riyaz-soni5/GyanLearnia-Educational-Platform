@@ -1,7 +1,6 @@
-// routes/admin.users.route.ts
 import { Router } from "express";
-import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
 import { deleteUser, listUsers, updateUserRole } from "../controllers/admin.users.controller.js";
+import { requireAuth, requireRole } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 

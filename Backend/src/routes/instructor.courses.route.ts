@@ -17,8 +17,6 @@ router.get("/mine", requireAuth, requireRole("instructor"), listInstructorCourse
 router.get("/analytics", requireAuth, requireRole("instructor"), getInstructorAnalytics);
 router.get("/earnings", requireAuth, requireRole("instructor"), getInstructorEarnings);
 router.get("/:id", requireAuth, requireRole("instructor"), getInstructorCourseById);
-
-// verified instructor can submit (Pending)
 router.post("/", requireAuth, requireRole("instructor"), requireVerifiedInstructor, createInstructorCourse);
 router.put(
   "/:id/resubmit",

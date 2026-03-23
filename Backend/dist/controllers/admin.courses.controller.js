@@ -1,48 +1,61 @@
 import Course from "../models/Course.model.js";
 import User from "../models/User.model.js";
+async function buildAdminCourseRows(filter) {
+    const items = await Course.find(filter)
+        .select("title subtitle description outcomes requirements thumbnailUrl sections category level language price currency status instructorId totalLectures totalVideoSec createdAt rejectionReason")
+        .sort({ createdAt: -1 })
+        .lean();
+    const instructorIds = items.map((x) => x.instructorId);
+    const instructors = await User.find({ _id: { $in: instructorIds } })
+        .select("firstName lastName email")
+        .lean();
+    const map = new Map();
+    instructors.forEach((u) => map.set(String(u._id), u));
+    return items.map((c) => {
+        const u = map.get(String(c.instructorId));
+        const name = u ? `${u.firstName} ${u.lastName}`.trim() : "Instructor";
+        return {
+            id: String(c._id),
+            title: c.title,
+            subtitle: c.subtitle,
+            category: c.category,
+            level: c.level,
+            language: c.language,
+            price: c.price,
+            currency: c.currency,
+            status: c.status,
+            description: c.description,
+            outcomes: Array.isArray(c.outcomes) ? c.outcomes : [],
+            requirements: Array.isArray(c.requirements) ? c.requirements : [],
+            thumbnailUrl: c.thumbnailUrl ?? null,
+            sections: Array.isArray(c.sections) ? c.sections : [],
+            rejectionReason: c.rejectionReason ?? null,
+            instructor: {
+                id: String(c.instructorId),
+                name,
+                email: u?.email || "",
+            },
+            totalLectures: c.totalLectures || 0,
+            totalVideoSec: c.totalVideoSec || 0,
+            createdAt: c.createdAt,
+        };
+    });
+}
+export async function listAdminCourses(req, res) {
+    try {
+        const status = typeof req.query.status === "string" ? req.query.status : "All";
+        const filter = status && status !== "All" ? { status } : {};
+        const items = await buildAdminCourseRows(filter);
+        return res.json({ items });
+    }
+    catch (e) {
+        return res.status(500).json({ message: e?.message || "Failed to load courses" });
+    }
+}
 export async function listPendingCourses(req, res) {
     try {
-        const items = await Course.find({ status: "Pending" })
-            .select("title subtitle description outcomes requirements thumbnailUrl sections category level language price currency status instructorId totalLectures totalVideoSec createdAt rejectionReason")
-            .sort({ createdAt: -1 })
-            .lean();
-        const instructorIds = items.map((x) => x.instructorId);
-        const instructors = await User.find({ _id: { $in: instructorIds } })
-            .select("firstName lastName email")
-            .lean();
-        const map = new Map();
-        instructors.forEach((u) => map.set(String(u._id), u));
-        return res.json({
-            items: items.map((c) => {
-                const u = map.get(String(c.instructorId));
-                const name = u ? `${u.firstName} ${u.lastName}`.trim() : "Instructor";
-                return {
-                    id: String(c._id),
-                    title: c.title,
-                    subtitle: c.subtitle,
-                    category: c.category,
-                    level: c.level,
-                    language: c.language,
-                    price: c.price,
-                    currency: c.currency,
-                    status: c.status,
-                    description: c.description,
-                    outcomes: Array.isArray(c.outcomes) ? c.outcomes : [],
-                    requirements: Array.isArray(c.requirements) ? c.requirements : [],
-                    thumbnailUrl: c.thumbnailUrl ?? null,
-                    sections: Array.isArray(c.sections) ? c.sections : [],
-                    rejectionReason: c.rejectionReason ?? null,
-                    instructor: {
-                        id: String(c.instructorId),
-                        name,
-                        email: u?.email || "",
-                    },
-                    totalLectures: c.totalLectures || 0,
-                    totalVideoSec: c.totalVideoSec || 0,
-                    createdAt: c.createdAt,
-                };
-            }),
-        });
+        const items = await buildAdminCourseRows({ status: "Pending" });
+        return res.json({ items });
     }
     catch (e) {
         return res.status(500).json({ message: e?.message || "Failed to load pending courses" });

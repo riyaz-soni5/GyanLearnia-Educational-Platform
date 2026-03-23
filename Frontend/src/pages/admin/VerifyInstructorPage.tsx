@@ -1,7 +1,5 @@
-// src/pages/admin/VerifyInstructorsPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { FiSearch, FiEye, FiCheckCircle, FiXCircle } from "react-icons/fi";
-
+import { FiSearch, FiEye } from "react-icons/fi";
 import VerificationInstructorModal from "@/components/admin/VerificationInstructorModal";
 import AdminPagination from "@/components/admin/AdminPagination";
 import {
@@ -11,8 +9,6 @@ import {
   approveInstructor,
   rejectInstructor,
 } from "@/services/adminVerification";
-
-
 
 const VerifyInstructorsPage = () => {
   const [items, setItems] = useState<AdminVerificationItem[]>([]);
@@ -56,8 +52,8 @@ const VerifyInstructorsPage = () => {
         status: params?.status ?? status,
       });
       setItems(res.items || []);
-    } catch (e: any) {
-      setErr(e?.message || "Failed to load verification requests");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Failed to load verification requests");
     } finally {
       setLoading(false);
     }
@@ -86,7 +82,7 @@ const VerifyInstructorsPage = () => {
     await load({ q: query, status });
   };
 
-  const onChangeStatus = async (v: any) => {
+  const onChangeStatus = async (v: VerificationStatus | "All") => {
     setStatus(v);
     // fetch immediately with new filter
     await load({ q: query, status: v });
@@ -98,8 +94,8 @@ const VerifyInstructorsPage = () => {
     try {
       await approveInstructor(id);
       await load();
-    } catch (e: any) {
-      setErr(e?.message || "Approve failed");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Approve failed");
     } finally {
       setLoading(false);
     }
@@ -111,8 +107,8 @@ const VerifyInstructorsPage = () => {
     try {
       await rejectInstructor(id, reason);
       await load();
-    } catch (e: any) {
-      setErr(e?.message || "Reject failed");
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Reject failed");
     } finally {
       setLoading(false);
     }
@@ -154,7 +150,7 @@ const VerifyInstructorsPage = () => {
             <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Status</label>
             <select
               value={status}
-              onChange={(e) => onChangeStatus(e.target.value)}
+              onChange={(e) => onChangeStatus(e.target.value as VerificationStatus | "All")}
               className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-white/10 dark:bg-gray-950 dark:text-white dark:focus:ring-indigo-500/20"
               disabled={loading}
             >

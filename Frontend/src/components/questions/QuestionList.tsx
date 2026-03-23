@@ -1,4 +1,3 @@
-// src/components/questions/QuestionsList.tsx
 import type { Question } from "@/app/types/question.types";
 import QuestionCard from "./QuestionCard";
 

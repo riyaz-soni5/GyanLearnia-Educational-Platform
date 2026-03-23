@@ -1,40 +1,37 @@
-// routes/question.route.ts
 import { Router } from "express";
 import {
-  listQuestions,
-  getQuestion,
   createQuestion,
-  updateQuestion,
   deleteQuestion,
+  downvoteQuestion,
+  getQuestion,
+  listQuestions,
+  updateQuestion,
+  upvoteQuestion,
 } from "../controllers/question.controller.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
 import {
+  acceptAnswer,
+  deleteAnswer,
+  downvoteAnswer,
   listAnswers,
   postAnswer,
-  acceptAnswer,
   updateAnswer,
-  deleteAnswer,
-  upvoteAnswer,     // ✅ NEW
-  downvoteAnswer,   // ✅ NEW
+  upvoteAnswer,
 } from "../controllers/answer.controller.js";
-import { upvoteQuestion, downvoteQuestion } from "../controllers/question.controller.js";
+import { getLeaderboard } from "../controllers/leaderboard.controller.js";
 import {
+  deleteReply,
+  downvoteReply,
   listReplies,
   postReply,
   updateReply,
-  deleteReply,
   upvoteReply,
-  downvoteReply,
 } from "../controllers/reply.controller.js";
-
-
-import { optionalAuth } from "../middlewares/auth.middleware.js";
-import { getLeaderboard } from "../controllers/leaderboard.controller.js"; // ✅ NEW
+import { optionalAuth, requireAuth } from "../middlewares/auth.middleware.js";
 
 const router = Router();
 
 router.get("/", optionalAuth, listQuestions);
-router.get("/leaderboard", getLeaderboard); // ✅ NEW (must be before "/:id" routes ideally)
+router.get("/leaderboard", getLeaderboard);
 router.get("/:id", optionalAuth, getQuestion);
 
 router.post("/", requireAuth, createQuestion);
@@ -42,7 +39,7 @@ router.post("/", requireAuth, createQuestion);
 router.get("/:id/answers", optionalAuth, listAnswers);
 router.post("/:id/answers", requireAuth, postAnswer);
 
-// Replies (Reddit-style threads)
+// Replies
 router.get("/:id/answers/:answerId/replies", optionalAuth, listReplies);
 router.post("/:id/answers/:answerId/replies", requireAuth, postReply);
 
@@ -55,8 +52,6 @@ router.post("/:id/answers/:answerId/replies/:replyId/downvote", requireAuth, dow
 router.post("/:id/answers/:answerId/accept", requireAuth, acceptAnswer);
 router.patch("/:id/answers/:answerId", requireAuth, updateAnswer);
 router.delete("/:id/answers/:answerId", requireAuth, deleteAnswer);
-
-// ✅ NEW: votes
 router.post("/:id/answers/:answerId/upvote", requireAuth, upvoteAnswer);
 router.post("/:id/answers/:answerId/downvote", requireAuth, downvoteAnswer);
 
@@ -65,7 +60,5 @@ router.delete("/:id", requireAuth, deleteQuestion);
 
 router.post("/:id/upvote", requireAuth, upvoteQuestion);
 router.post("/:id/downvote", requireAuth, downvoteQuestion);
-
-
 
 export default router;

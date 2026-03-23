@@ -8,7 +8,6 @@ function RoleCard({ to, label }: { to: string; label: string }) {
     >
       <span className="text-lg font-semibold text-basec">{label}</span>
 
-      {/* Arrow icon */}
       <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white/70 text-indigo-700 ring-1 ring-indigo-200 transition group-hover:bg-white dark:bg-indigo-900/30 dark:ring-indigo-700">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-5 w-5">
           <path

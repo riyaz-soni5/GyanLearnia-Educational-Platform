@@ -1,4 +1,3 @@
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export async function http<T>(
@@ -7,15 +6,14 @@ export async function http<T>(
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    credentials: "include", // cookie auth
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
   });
 
-
-    if (!res.ok) {
+  if (!res.ok) {
     let msg = "Request failed";
 
     const contentType = res.headers.get("content-type") || "";
@@ -27,7 +25,9 @@ export async function http<T>(
         const text = await res.text();
         msg = text?.slice(0, 300) || msg;
       }
-    } catch {}
+    } catch {
+      // ignore bad error body
+    }
 
     throw new Error(msg);
   }

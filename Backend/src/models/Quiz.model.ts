@@ -18,10 +18,8 @@ const QuizSchema = new Schema(
   {
     courseId: { type: Types.ObjectId, ref: "Course", required: true },
     instructorId: { type: Types.ObjectId, ref: "User", required: true },
-
     title: { type: String, required: true, trim: true },
     passPercent: { type: Number, default: 60 },
-
     questions: { type: [QuestionSchema], default: [] },
   },
   { timestamps: true }

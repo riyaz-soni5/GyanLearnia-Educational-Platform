@@ -1,8 +1,8 @@
 import { Request, Response } from "express";
 import Category from "../models/Category.model.js";
 
-const toSlug = (s: string) =>
-  s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+const toSlug = (value: string) =>
+  value.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
 export const listCategories = async (_req: Request, res: Response) => {
   const items = await Category.find({ isActive: true })
@@ -14,9 +14,8 @@ export const listCategories = async (_req: Request, res: Response) => {
   });
 };
 
-// optional: allow adding new categories (admin only if you want)
 export const createCategory = async (req: Request, res: Response) => {
-  const name = String(req.body?.name || "").trim();
+  const name = String(req.body?.name ?? "").trim();
   if (name.length < 2) return res.status(400).json({ message: "Category name too short" });
 
   const slug = toSlug(name);

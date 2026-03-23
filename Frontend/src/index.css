@@ -1,28 +1,89 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Merriweather:wght@400;700;900&display=swap");
 @import "tailwindcss";
 @import "quill/dist/quill.core.css";
 @import "quill/dist/quill.snow.css";
 
-/* Tailwind v4: enable class-based dark mode */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Theme tokens */
 :root {
-  --bg: 255 255 255;         /* page background */
-  --surface: 255 255 255;    /* cards */
-  --text: 17 24 39;          /* gray-900 */
-  --muted: 75 85 99;         /* gray-600 */
-  --border: 229 231 235;     /* gray-200 */
+  --font-heading: "Merriweather", Georgia, serif;
+  --font-body: "Inter", "Segoe UI", sans-serif;
+  --bg: 255 255 255;
+  --surface: 255 255 255;
+  --text: 17 24 39;
+  --muted: 75 85 99;
+  --border: 229 231 235;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: var(--font-body);
+  }
+
+  p,
+  span,
+  div,
+  a,
+  li,
+  label,
+  input,
+  textarea,
+  select,
+  button {
+    font-family: var(--font-body);
+  }
+
+  :where(
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p[class*="text-xl"],
+    p[class*="text-2xl"],
+    p[class*="text-3xl"],
+    p[class*="text-4xl"],
+    p[class*="text-5xl"],
+    p[class*="text-6xl"],
+    p[class*="text-7xl"],
+    p[class*="tracking-tight"],
+    div[class*="text-xl"],
+    div[class*="text-2xl"],
+    div[class*="text-3xl"],
+    div[class*="text-4xl"],
+    div[class*="text-5xl"],
+    div[class*="text-6xl"],
+    div[class*="text-7xl"],
+    div[class*="tracking-tight"],
+    span[class*="text-xl"],
+    span[class*="text-2xl"],
+    span[class*="text-3xl"],
+    span[class*="text-4xl"],
+    span[class*="text-5xl"],
+    span[class*="text-6xl"],
+    span[class*="text-7xl"],
+    span[class*="tracking-tight"]
+  ) {
+    font-family: var(--font-heading);
+  }
 }
 
 .dark {
-  --bg: 3 7 18;              /* near black */
-  --surface: 17 24 39;       /* gray-900 */
-  --text: 243 244 246;       /* gray-100 */
-  --muted: 156 163 175;      /* gray-400 */
-  --border: 31 41 55;        /* gray-800 */
+  --bg: 3 7 18;
+  --surface: 17 24 39;
+  --text: 243 244 246;
+  --muted: 156 163 175;
+  --border: 31 41 55;
 }
 
-/* Apply tokens globally (THIS is the missing part) */
 html,
 body {
   min-height: 100%;
@@ -42,7 +103,6 @@ html {
   overflow-x: hidden;
 }
 
-/* Remove Vite demo centering */
 body {
   margin: 0;
   min-height: 100dvh;
@@ -51,7 +111,6 @@ body {
   overflow-y: visible;
 }
 
-/* Optional utility helpers (use these in components) */
 @layer utilities {
   .bg-surface { background-color: rgb(var(--surface)); }
   .text-basec { color: rgb(var(--text)); }
@@ -59,36 +118,27 @@ body {
   .border-base { border-color: rgb(var(--border)); }
 }
 
-
-/* Quill editor text size fix */
 .ql-editor {
   font-size: 16px;
   line-height: 1.7;
   font-family: inherit;
 }
 
-/* headings inside editor */
 .ql-editor h1 { font-size: 26px; }
 .ql-editor h2 { font-size: 22px; }
 .ql-editor h3 { font-size: 18px; }
-
-/* spacing */
 .ql-editor p { margin-bottom: 0.6rem; }
 
-
-/* ✅ ONLY the editor should be fixed height + scroll */
 .quill-editor .ql-container {
   height: 300px;
   overflow-y: auto;
 }
 
-/* bigger typing text */
 .quill-editor .ql-editor {
   font-size: 14px;
   line-height: 1.6;
 }
 
-/* compact chat composer */
 .chat-quill-editor .ql-container {
   height: 140px;
   overflow-y: auto;
@@ -116,25 +166,17 @@ body {
   border-radius: 8px;
 }
 
-
-/* =========================
-   ✅ Fix Quill width growth (unbroken text)
-   ========================= */
-
-/* Quill containers should never exceed parent width */
 .ql-container,
 .ql-editor {
   max-width: 100%;
 }
 
-/* Force wrapping for normal content */
 .ql-editor {
-  overflow-wrap: anywhere;  /* best for long strings */
+  overflow-wrap: anywhere;
   word-break: break-word;
-  white-space: pre-wrap;    /* allow wrapping + keep new lines */
+  white-space: pre-wrap;
 }
 
-/* IMPORTANT: code blocks are the real issue (they use white-space: pre) */
 .ql-editor pre,
 .ql-editor code {
   white-space: pre-wrap !important;
@@ -142,13 +184,11 @@ body {
   word-break: break-word !important;
 }
 
-/* Images should also never overflow */
 .ql-editor img {
   max-width: 100%;
   height: auto;
 }
 
-/* Optional: prevent layout blowout if some element still tries to overflow */
 .ql-container {
   overflow-x: hidden;
 }

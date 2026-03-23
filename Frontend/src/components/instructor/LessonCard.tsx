@@ -1,4 +1,3 @@
-// src/components/instructor/courseBuilder/LessonCard.tsx
 import { useRef, useState } from "react";
 import { FiChevronUp, FiChevronDown, FiTrash2, FiUploadCloud, FiPaperclip } from "react-icons/fi";
 import { useToast } from "../toast";
@@ -110,12 +109,11 @@ export default function LessonCard({
     const quiz = ensureQuiz();
     const questions = quiz.questions.map((q, i) => {
       if (i !== idx) return q;
+
       return {
         ...q,
         ...patch,
-        options: Array.isArray((patch as { options?: string[] }).options)
-          ? ((patch as { options?: string[] }).options as string[])
-          : q.options,
+        options: Array.isArray(patch.options) ? patch.options : q.options,
       };
     });
     onChange({ quiz: { ...quiz, questions } });
@@ -186,7 +184,6 @@ export default function LessonCard({
             Mark as Preview (free access)
           </label>
 
-          {/* Type-specific area */}
           <div className="mt-4 rounded-2xl bg-gray-50 p-4">
             {type === "Video" ? (
               <div className="flex flex-col gap-3">
@@ -211,7 +208,7 @@ export default function LessonCard({
                       onClick={() => videoRef.current?.click()}
                       className={[
                         "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white",
-                        disabled || uploadingVideo ? "bg-gray-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700",
+                        disabled || uploadingVideo ? "cursor-not-allowed bg-gray-400" : "bg-indigo-600 hover:bg-indigo-700",
                       ].join(" ")}
                     >
                       <FiUploadCloud className="h-4 w-4" />
@@ -222,9 +219,7 @@ export default function LessonCard({
 
                 {lesson.videoUrl ? (
                   <video src={lesson.videoUrl} controls className="w-full rounded-xl border border-gray-200 bg-white" />
-                ) : (
-                  <p className="text-xs text-gray-600"></p>
-                )}
+                ) : null}
               </div>
             ) : null}
 
@@ -356,7 +351,7 @@ export default function LessonCard({
                       onClick={() => fileRef.current?.click()}
                       className={[
                         "inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-gray-50",
-                        disabled || uploadingFile ? "opacity-60 cursor-not-allowed" : "",
+                        disabled || uploadingFile ? "cursor-not-allowed opacity-60" : "",
                       ].join(" ")}
                     >
                       <FiPaperclip className="h-4 w-4" />
@@ -405,7 +400,6 @@ export default function LessonCard({
           ) : null}
         </div>
 
-        {/* right actions */}
         <div className="flex items-center gap-2">
           <button
             type="button"

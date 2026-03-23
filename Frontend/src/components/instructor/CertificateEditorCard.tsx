@@ -22,7 +22,7 @@ export default function CertificateEditorCard({ value, onChange }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const update = (patch: Partial<CertificateDraft>) => onChange({ ...value, ...patch });
+  const updateValue = (patch: Partial<CertificateDraft>) => onChange({ ...value, ...patch });
 
   const onPick = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -32,7 +32,7 @@ export default function CertificateEditorCard({ value, onChange }: Props) {
     setUploading(true);
     try {
       const out = await uploadFileToCloud({ file, kind: "thumbnail" });
-      update({ templateImageUrl: out.publicUrl });
+      updateValue({ templateImageUrl: out.publicUrl });
       showToast("Certificate template uploaded", "success");
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : "Upload failed", "error");
@@ -53,7 +53,7 @@ export default function CertificateEditorCard({ value, onChange }: Props) {
           <input
             type="checkbox"
             checked={value.enabled}
-            onChange={(e) => update({ enabled: e.target.checked })}
+            onChange={(e) => updateValue({ enabled: e.target.checked })}
           />
           Include certificate
         </label>
@@ -90,7 +90,7 @@ export default function CertificateEditorCard({ value, onChange }: Props) {
                 min={0}
                 max={100}
                 value={value.nameXPercent}
-                onChange={(e) => update({ nameXPercent: Number(e.target.value) })}
+                onChange={(e) => updateValue({ nameXPercent: Number(e.target.value) })}
                 className="mt-2 w-full"
               />
             </label>
@@ -101,7 +101,7 @@ export default function CertificateEditorCard({ value, onChange }: Props) {
                 min={0}
                 max={100}
                 value={value.nameYPercent}
-                onChange={(e) => update({ nameYPercent: Number(e.target.value) })}
+                onChange={(e) => updateValue({ nameYPercent: Number(e.target.value) })}
                 className="mt-2 w-full"
               />
             </label>
@@ -115,7 +115,7 @@ export default function CertificateEditorCard({ value, onChange }: Props) {
                 min={16}
                 max={96}
                 value={value.nameFontSizePx}
-                onChange={(e) => update({ nameFontSizePx: Number(e.target.value || 42) })}
+                onChange={(e) => updateValue({ nameFontSizePx: Number(e.target.value || 42) })}
                 className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               />
             </label>
@@ -124,7 +124,7 @@ export default function CertificateEditorCard({ value, onChange }: Props) {
               <input
                 type="color"
                 value={value.nameColor}
-                onChange={(e) => update({ nameColor: e.target.value })}
+                onChange={(e) => updateValue({ nameColor: e.target.value })}
                 className="mt-2 h-10 w-full rounded-lg border border-gray-300 bg-white"
               />
             </label>

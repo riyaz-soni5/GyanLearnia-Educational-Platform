@@ -7,7 +7,7 @@ const PrivateChatRoomSchema = new Schema(
       type: [{ type: Types.ObjectId, ref: "User", required: true }],
       required: true,
       validate: {
-        validator: (value: Types.ObjectId[]) => Array.isArray(value) && value.length === 2,
+        validator: (members: Types.ObjectId[]) => Array.isArray(members) && members.length === 2,
         message: "Private chat room must contain exactly two members",
       },
     },

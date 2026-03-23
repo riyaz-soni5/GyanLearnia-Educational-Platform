@@ -1,33 +1,51 @@
-// src/pages/CoursesPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import CourseCard from "@/components/courses/CourseCard";
 import CourseFilters from "@/components/courses/CourseFilters";
+import PaginationControls from "@/components/PaginationControls";
 import type { CourseListItem } from "@/app/types/course.type";
 import { coursesApi } from "@/app/api/courses.api";
 
 type CourseListRow = CourseListItem & {
-  // Optional extras if your API returns them (nice for UI)
   instructor?: { name?: string; email?: string };
   totalLectures?: number;
   totalVideoSec?: number;
 };
 
-type CourseListResponse = CourseListRow[] | { items?: CourseListRow[] };
+type CourseListResponse =
+  | CourseListRow[]
+  | { items?: CourseListRow[]; total?: number; page?: number; limit?: number };
 
-const toCourseRows = (payload: CourseListResponse): CourseListRow[] => {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.items)) return payload.items;
-  return [];
+const COURSE_PAGE_SIZE = 9;
+
+const normalizeCourseList = (payload: CourseListResponse) => {
+  if (Array.isArray(payload)) {
+    return {
+      items: payload,
+      total: payload.length,
+      page: 1,
+      limit: payload.length || COURSE_PAGE_SIZE,
+    };
+  }
+
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  return {
+    items,
+    total: Number(payload?.total ?? items.length),
+    page: Number(payload?.page ?? 1),
+    limit: Number(payload?.limit ?? COURSE_PAGE_SIZE),
+  };
 };
 
 const CoursesPage = () => {
   const [courses, setCourses] = useState<CourseListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
 
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState<string>("All");
-  const [type, setType] = useState<string>("All");   // maps to category on backend usually
+  const [type, setType] = useState<string>("All");
   const [price, setPrice] = useState<string>("All");
 
   useEffect(() => {
@@ -38,19 +56,24 @@ const CoursesPage = () => {
         setLoading(true);
         setError("");
 
-        // NOTE: keep your existing API contract
-        // If your backend expects "category" instead of "type",
-        // update coursesApi.list() implementation — not this page.
         const data = (await coursesApi.list({
           q: query.trim(),
           level,
           type,
           price,
+          page,
+          limit: COURSE_PAGE_SIZE,
         })) as CourseListResponse;
+        const normalized = normalizeCourseList(data);
 
-        if (!cancelled) setCourses(toCourseRows(data));
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Failed to load courses");
+        if (!cancelled) {
+          setCourses(normalized.items);
+          setTotal(normalized.total);
+        }
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Failed to load courses");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -60,31 +83,59 @@ const CoursesPage = () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [query, level, type, price]);
+  }, [page, query, level, type, price]);
+
+  const handleQueryChange = (value: string) => {
+    setPage(1);
+    setQuery(value);
+  };
+
+  const handleLevelChange = (value: string) => {
+    setPage(1);
+    setLevel(value);
+  };
+
+  const handleTypeChange = (value: string) => {
+    setPage(1);
+    setType(value);
+  };
+
+  const handlePriceChange = (value: string) => {
+    setPage(1);
+    setPrice(value);
+  };
 
   const handleReset = () => {
+    setPage(1);
     setQuery("");
     setLevel("All");
     setType("All");
     setPrice("All");
   };
 
-  const resultCount = useMemo(() => courses.length, [courses]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(total / COURSE_PAGE_SIZE)),
+    [total]
+  );
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   return (
     <div className="mx-auto max-w-7xl px-4">
       <div className="space-y-8">
         <CourseFilters
           query={query}
-          setQuery={setQuery}
+          setQuery={handleQueryChange}
           level={level}
-          setLevel={setLevel}
+          setLevel={handleLevelChange}
           type={type}
-          setType={setType}
+          setType={handleTypeChange}
           price={price}
-          setPrice={setPrice}
+          setPrice={handlePriceChange}
           onReset={handleReset}
-          resultCount={resultCount}
+          resultCount={total}
         />
 
         {loading ? (
@@ -106,6 +157,10 @@ const CoursesPage = () => {
             ))}
           </section>
         )}
+
+        {!loading && !error ? (
+          <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+        ) : null}
       </div>
     </div>
   );

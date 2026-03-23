@@ -1,4 +1,3 @@
-
 import type { CourseListItem } from "../types/course.type";
 
 export type Lesson = {
@@ -9,7 +8,9 @@ export type Lesson = {
   isPreview?: boolean;
 };
 
-export type CourseListResponse = { items: CourseListItem[] } | CourseListItem[];
+export type CourseListResponse =
+  | { items: CourseListItem[]; total?: number; page?: number; limit?: number }
+  | CourseListItem[];
 export type CourseDetailsResponse = { item: Record<string, unknown> } | Record<string, unknown>;
 export type CourseQuiz = {
   id: string;
@@ -93,13 +94,22 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const coursesApi = {
-  list: (params?: { q?: string; level?: string; type?: string; price?: string }) => {
-    const sp = new URLSearchParams();
-    if (params?.q) sp.set("q", params.q);
-    if (params?.level && params.level !== "All") sp.set("level", params.level);
-    if (params?.type && params.type !== "All") sp.set("type", params.type);
-    if (params?.price && params.price !== "All") sp.set("priceType", params.price);
-    const qs = sp.toString();
+  list: (params?: {
+    q?: string;
+    level?: string;
+    type?: string;
+    price?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.q) searchParams.set("q", params.q);
+    if (params?.level && params.level !== "All") searchParams.set("level", params.level);
+    if (params?.type && params.type !== "All") searchParams.set("type", params.type);
+    if (params?.price && params.price !== "All") searchParams.set("priceType", params.price);
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.limit) searchParams.set("limit", String(params.limit));
+    const qs = searchParams.toString();
     return http<CourseListResponse>(`/api/courses${qs ? `?${qs}` : ""}`);
   },
 

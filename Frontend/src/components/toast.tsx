@@ -2,9 +2,7 @@
 import { createContext, useContext, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
-
 import { HiCheckCircle, HiXCircle, HiInformationCircle } from "react-icons/hi2";
-import { IoClose } from "react-icons/io5";
 
 type ToastType = "success" | "error" | "info";
 

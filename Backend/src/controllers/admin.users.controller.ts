@@ -1,4 +1,3 @@
-// controllers/admin.users.controller.ts
 import { Request, Response } from "express";
 import User from "../models/User.model.js";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
@@ -8,8 +7,7 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 export async function listUsers(req: Request, res: Response) {
   try {
     const q = String(req.query.q || "").trim();
-    const role = String(req.query.role || "").trim(); 
-    // student | admin | verified_instructor | unverified_instructor (plus instructor optional)
+    const role = String(req.query.role || "").trim();
 
     const page = clamp(parseInt(String(req.query.page || "1"), 10) || 1, 1, 10_000);
     const limit = clamp(parseInt(String(req.query.limit || "10"), 10) || 10, 1, 100);
@@ -24,7 +22,6 @@ export async function listUsers(req: Request, res: Response) {
       ];
     }
 
-    // ✅ role filter with verified/unverified instructors
     if (role === "student" || role === "admin") {
       filter.role = role;
     } else if (role === "verified_instructor") {
@@ -34,7 +31,6 @@ export async function listUsers(req: Request, res: Response) {
       filter.role = "instructor";
       filter.isVerified = { $ne: true };
     } else if (role === "instructor") {
-      // optional fallback (not used by your UI)
       filter.role = "instructor";
     }
 
@@ -73,7 +69,6 @@ export async function listUsers(req: Request, res: Response) {
   }
 }
 
-
 export async function deleteUser(req: Request, res: Response) {
   try {
     const { id } = req.params;
@@ -92,8 +87,6 @@ export async function deleteUser(req: Request, res: Response) {
   }
 }
 
-
-// controllers/admin.users.controller.ts
 export async function updateUserRole(req: AuthedRequest, res: Response) {
   try {
     const { id } = req.params;
@@ -106,37 +99,26 @@ export async function updateUserRole(req: AuthedRequest, res: Response) {
     const user = await User.findById(id).select("_id role isVerified verificationStatus");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // protect admin accounts from being modified
     if (user.role === "admin") {
       return res.status(400).json({ message: "Admin account role cannot be changed" });
     }
 
-    // protect self (optional but recommended)
     if (req.user?.id && String(user._id) === String(req.user.id)) {
       return res.status(400).json({ message: "You cannot change your own role" });
     }
 
     if (role === "student") {
       user.role = "student";
-      // keep verification fields as-is (harmless)
-    }
-
-    if (role === "admin") {
+    } else if (role === "admin") {
       user.role = "admin";
-      // you may want extra protections here (promotion policy)
-    }
-
-    if (role === "verified_instructor") {
+    } else if (role === "verified_instructor") {
       user.role = "instructor";
       user.isVerified = true;
       user.verificationStatus = "Verified";
-    }
-
-    if (role === "unverified_instructor") {
+    } else if (role === "unverified_instructor") {
       user.role = "instructor";
       user.isVerified = false;
 
-      // if they were verified before, move them off Verified
       if (user.verificationStatus === "Verified") {
         user.verificationStatus = "Pending";
       }

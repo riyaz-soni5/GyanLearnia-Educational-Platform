@@ -1,23 +1,17 @@
-// src/pages/instructor/InstructorVerificationPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   FiUploadCloud,
   FiFileText,
-  FiShield,
   FiCheckCircle,
   FiAlertTriangle,
-  FiX,
   FiClock,
   FiXCircle,
   FiInfo,
   FiEdit2,
   FiEye,
-  FiTrash2,
   FiTrash,
 } from "react-icons/fi";
-
-
 import { http } from "@/services/http";
 import { getUser } from "@/services/session";
 import { useToast } from "@/components/toast";

@@ -43,9 +43,7 @@ const MentorDiscoveryPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTags, setSearchTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-
   const [hasSearched, setHasSearched] = useState(false);
-
   const [incomingPending, setIncomingPending] = useState<MentorConnectionSummary[]>([]);
   const [outgoingPending, setOutgoingPending] = useState<MentorConnectionSummary[]>([]);
   const [acceptedConnections, setAcceptedConnections] = useState<MentorConnectionSummary[]>([]);
@@ -239,9 +237,7 @@ const MentorDiscoveryPage = () => {
       return;
     }
 
-    const normalizedTags = searchTags
-      .map((tag) => String(tag ?? "").trim())
-      .filter(Boolean);
+    const normalizedTags = searchTags.map((tag) => tag.trim()).filter(Boolean);
 
     if (!normalizedTags.length) {
       const message = "Please enter interest tags before searching.";

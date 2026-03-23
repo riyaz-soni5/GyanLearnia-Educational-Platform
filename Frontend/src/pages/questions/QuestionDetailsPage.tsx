@@ -239,8 +239,6 @@ const QuestionDetailsPage = () => {
 
   const [activeReplyBoxFor, setActiveReplyBoxFor] = useState<string | null>(null);
   const [replyDraftMap, setReplyDraftMap] = useState<Record<string, string>>({});
-
-
   const [replyThreadKey, setReplyThreadKey] = useState<Record<string, number>>({});
 
   const [recentQuestions, setRecentQuestions] = useState<Question[]>([]);
@@ -264,10 +262,6 @@ const QuestionDetailsPage = () => {
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const [sort, setSort] = useState<"Top" | "Newest">("Top");
-
-
-  const [openReplyFor, setOpenReplyFor] = useState<Record<string, boolean>>({});
-
   type StoredUser = {
     id: string;
     email: string;
@@ -1011,9 +1005,6 @@ const QuestionDetailsPage = () => {
                     aAuthorId &&
                     String(questionAuthorId) === String(aAuthorId)
                 );
-
-                const isReplyOpen = Boolean(openReplyFor[a.id]);
-
                 return (
                   <article
                     key={a.id}

@@ -21,6 +21,7 @@ const escapeXml = (value) => value
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const slugify = (value) => value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -232,11 +233,47 @@ const ensureInstructorCreditForPurchase = async (purchase, courseTitle) => {
 export async function listPublishedCourses(req, res) {
     try {
         const userId = req.user?.id;
-        const items = await Course.find({ status: "Published" })
+        const searchText = String(req.query.q || req.query.query || "").trim();
+        const level = String(req.query.level || "All").trim();
+        const category = String(req.query.type || req.query.category || "All").trim();
+        const priceType = String(req.query.priceType || req.query.price || "All").trim();
+        const hasPagination = req.query.page !== undefined || req.query.limit !== undefined;
+        const page = Math.max(1, Number.parseInt(String(req.query.page || "1"), 10) || 1);
+        const limit = Math.min(50, Math.max(1, Number.parseInt(String(req.query.limit || "9"), 10) || 9));
+        const filter = { status: "Published" };
+        if (searchText) {
+            const searchRegex = new RegExp(escapeRegex(searchText), "i");
+            filter.$or = [
+                { title: searchRegex },
+                { subtitle: searchRegex },
+                { description: searchRegex },
+                { category: searchRegex },
+                { tags: searchRegex },
+            ];
+        }
+        if (level && level !== "All") {
+            filter.level = new RegExp(`^${escapeRegex(level)}$`, "i");
+        }
+        if (category && category !== "All") {
+            filter.category = new RegExp(`^${escapeRegex(category)}$`, "i");
+        }
+        if (priceType === "Free") {
+            filter.price = { $lte: 0 };
+        }
+        else if (priceType === "Paid") {
+            filter.price = { $gt: 0 };
+        }
+        const query = Course.find(filter)
             .select("title subtitle thumbnailUrl category level language price currency tags totalLectures totalVideoSec createdAt")
             .populate("instructorId", "firstName lastName email avatarUrl")
-            .sort({ createdAt: -1 })
-            .lean();
+            .sort({ createdAt: -1 });
+        if (hasPagination) {
+            query.skip((page - 1) * limit).limit(limit);
+        }
+        const [items, total] = await Promise.all([
+            query.lean(),
+            Course.countDocuments(filter),
+        ]);
         const courseIds = items
             .map((c) => c?._id)
             .filter((id) => Boolean(id))
@@ -267,6 +304,9 @@ export async function listPublishedCourses(req, res) {
                 .lean()).map((row) => String(row.courseId)))
             : new Set();
         return res.json({
+            total,
+            page,
+            limit: hasPagination ? limit : items.length,
             items: items.map((c) => ({
                 ...(ratingMap.get(String(c._id)) || { averageRating: 0, reviewsCount: 0 }),
                 enrolled: enrolledMap.get(String(c._id)) || 0,

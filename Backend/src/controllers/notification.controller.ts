@@ -41,14 +41,14 @@ export async function markNotificationRead(req: AuthedRequest, res: Response) {
     const userId = String(req.user?.id || "").trim();
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const id = String(req.params.id || "").trim();
-    if (!id) return res.status(400).json({ message: "Notification id is required" });
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    const notificationId = String(req.params.id || "").trim();
+    if (!notificationId) return res.status(400).json({ message: "Notification id is required" });
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
       return res.status(400).json({ message: "Invalid notification id" });
     }
 
     await Notification.findOneAndUpdate(
-      { _id: id, userId },
+      { _id: notificationId, userId },
       { $set: { isRead: true, readAt: new Date() } },
       { new: true }
     );

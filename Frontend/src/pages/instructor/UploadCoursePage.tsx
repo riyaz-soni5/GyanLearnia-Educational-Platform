@@ -1,8 +1,6 @@
-// src/pages/instructor/UploadCoursePage.tsx
 import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FiPlus, FiSave, FiTrash2, FiUploadCloud } from "react-icons/fi";
-
 import { useToast } from "@/components/toast";
 import {
   COURSE_CATEGORIES,
@@ -17,7 +15,6 @@ import LessonCard from "@/components/instructor/LessonCard";
 import CourseSubmissionStatusCard from "@/components/instructor/CourseSubmissionStatusCard";
 import CourseCard from "@/components/courses/CourseCard";
 import CertificateEditorCard from "@/components/instructor/CertificateEditorCard";
-
 import {
   createCourse,
   getMyCourseById,
@@ -156,7 +153,7 @@ export default function UploadCoursePage() {
       const parsed = normalizeDraft(JSON.parse(raw));
       if (parsed) setDraft(parsed);
     } catch {
-
+      // ignore broken local draft
     }
   }, [editCourseId]);
 

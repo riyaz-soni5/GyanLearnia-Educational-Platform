@@ -1,4 +1,3 @@
-// controllers/question.controller.ts
 import { Response } from "express";
 import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import type { SortOrder } from "mongoose";
@@ -65,7 +64,6 @@ export const listQuestions = async (req: AuthedRequest, res: Response) => {
 
   if (searchText) {
     const searchRegex = new RegExp(searchText, "i");
-    // Search by title, description(excerpt), and tags.
     filter.$or = [
       { title: searchRegex },
       { excerpt: searchRegex },
@@ -100,71 +98,56 @@ export const listQuestions = async (req: AuthedRequest, res: Response) => {
       : { createdAt: -1 };
 
   const [items, total] = (await Promise.all([
-  Question.find(filter)
-    .sort(sortObj)
-    .skip(skip)
-    .limit(Number(limit))
-    .populate("categoryId", "name")
-    .populate("authorId", "firstName lastName fullName name username role avatarUrl")
-    .lean(),
-  Question.countDocuments(filter),
-])) as any;
+    Question.find(filter)
+      .sort(sortObj)
+      .skip(skip)
+      .limit(Number(limit))
+      .populate("categoryId", "name")
+      .populate("authorId", "firstName lastName fullName name username role avatarUrl")
+      .lean(),
+    Question.countDocuments(filter),
+  ])) as any;
 
   const meId = req.user?.id ? String(req.user.id) : null;
 
   const mapped = items.map((q: any) => {
-  const authorObj = q.authorId as any;
-  const myVote =
-    meId
-      ? (q.voters?.find((v: any) => String(v.userId) === meId)?.value ?? null)
-      : null;
+    const authorObj = q.authorId as any;
+    const myVote =
+      meId ? (q.voters?.find((v: any) => String(v.userId) === meId)?.value ?? null) : null;
 
-  return {
-    id: String(q._id),
-    title: q.title,
-    excerpt: q.excerpt,
-
-    categoryId: q.categoryId?._id
-      ? String(q.categoryId._id)
-      : q.categoryId
-      ? String(q.categoryId)
-      : undefined,
-    categoryName: q.categoryId?.name,
-
-    level: q.level,
-    tags: q.tags ?? [],
-
-    votes: q.votes ?? 0,
-    myVote,
-    views: q.views ?? 0,
-    answersCount: q.answersCount ?? 0,
-    isFastResponse: q.isFastResponse ?? false,
-    fastResponsePrice: Number((Number(q.fastResponsePricePaisa || 0) / 100).toFixed(2)),
-    fastResponseEscrowStatus: String(q.fastResponseEscrowStatus || "none"),
-    hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
-
-    status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
-
-    createdAt: q.createdAt
-      ? new Date(q.createdAt).toISOString()
-      : undefined,
-    updatedAt: q.updatedAt
-      ? new Date(q.updatedAt).toISOString()
-      : undefined,
+    return {
+      id: String(q._id),
+      title: q.title,
+      excerpt: q.excerpt,
+      categoryId: q.categoryId?._id
+        ? String(q.categoryId._id)
+        : q.categoryId
+        ? String(q.categoryId)
+        : undefined,
+      categoryName: q.categoryId?.name,
+      level: q.level,
+      tags: q.tags ?? [],
+      votes: q.votes ?? 0,
+      myVote,
+      views: q.views ?? 0,
+      answersCount: q.answersCount ?? 0,
+      isFastResponse: q.isFastResponse ?? false,
+      fastResponsePrice: Number((Number(q.fastResponsePricePaisa || 0) / 100).toFixed(2)),
+      fastResponseEscrowStatus: String(q.fastResponseEscrowStatus || "none"),
+      hasVerifiedAnswer: q.hasVerifiedAnswer ?? false,
+      status: q.hasVerifiedAnswer ? "Answered" : "Unanswered",
+      createdAt: q.createdAt ? new Date(q.createdAt).toISOString() : undefined,
+      updatedAt: q.updatedAt ? new Date(q.updatedAt).toISOString() : undefined,
       author:
-  authorObj?.firstName && authorObj?.lastName
-    ? `${authorObj.firstName} ${authorObj.lastName}`
-    : authorObj?.fullName ||
-      authorObj?.name ||
-      authorObj?.username ||
-      "Anonymous",
+        authorObj?.firstName && authorObj?.lastName
+          ? `${authorObj.firstName} ${authorObj.lastName}`
+          : authorObj?.fullName || authorObj?.name || authorObj?.username || "Anonymous",
+      authorType: authorObj?.role || "student",
+      authorAvatarUrl: authorObj?.avatarUrl || null,
+    };
+  });
 
-authorType: authorObj?.role || "student",
-    authorAvatarUrl: authorObj?.avatarUrl || null,
-  };
-});
-
-res.json({ items: mapped, total, page: Number(page), limit: Number(limit) });
+  res.json({ items: mapped, total, page: Number(page), limit: Number(limit) });
 };
 
 export const getQuestion = async (req: AuthedRequest, res: Response) => {
@@ -182,13 +165,12 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
 
   let q: any = null;
 
-  // ✅ Logged-in user logic
   if (userId) {
     q = await Question.findOneAndUpdate(
       {
         _id: id,
-        authorId: { $ne: userId },   // owner view should NOT count
-        viewedBy: { $ne: userId },   // already viewed should NOT count
+        authorId: { $ne: userId },
+        viewedBy: { $ne: userId },
       },
       {
         $inc: { views: 1 },
@@ -199,9 +181,7 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
       .populate("categoryId", "name")
       .populate("authorId", "firstName lastName fullName name username role avatarUrl")
       .lean();
-  } 
-  // ✅ Guest logic
-  else {
+  } else {
     q = await Question.findOneAndUpdate(
       {
         _id: id,
@@ -218,7 +198,6 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
       .lean();
   }
 
-  // If not incremented, just fetch normally
   if (!q) {
     q = await Question.findById(id)
       .populate("categoryId", "name")
@@ -229,10 +208,8 @@ export const getQuestion = async (req: AuthedRequest, res: Response) => {
   if (!q) return res.status(404).json({ message: "Question not found" });
   const meId = req.user?.id ? String(req.user.id) : null;
 
-const myVote =
-  meId
-    ? (q.voters?.find((v: any) => String(v.userId) === meId)?.value ?? null)
-    : null;
+  const myVote =
+    meId ? (q.voters?.find((v: any) => String(v.userId) === meId)?.value ?? null) : null;
 
   const authorObj = q.authorId as any;
 
@@ -494,7 +471,6 @@ export const createQuestion = async (req: AuthedRequest, res: Response) => {
     });
   } catch {
     if (walletDebitInfo && walletDebitInfo.amountPaisa > 0) {
-      // best-effort refund if question creation fails after wallet debit
       await creditUserWallet({
         userId,
         amountPaisa: walletDebitInfo.amountPaisa,
@@ -529,7 +505,6 @@ export const updateQuestion = async (req: AuthedRequest, res: Response) => {
   const q = await Question.findById(id);
   if (!q) return res.status(404).json({ message: "Question not found" });
 
-  // ✅ only owner can edit
   if (String(q.authorId) !== String(req.user?.id)) {
     return res.status(403).json({ message: "Not allowed" });
   }
@@ -616,14 +591,12 @@ export const deleteQuestion = async (req: AuthedRequest, res: Response) => {
   return res.json({ message: "Question deleted" });
 };
 
-
 const applyVote = (existing: number | null, next: 1 | -1) => {
   if (existing === next) return { newValue: null, delta: -next };
   if (existing === null) return { newValue: next, delta: next };
   return { newValue: next, delta: next - existing };
 };
 
-// POST /api/questions/:id/upvote
 export const upvoteQuestion = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId } = req.params;
@@ -656,7 +629,6 @@ export const upvoteQuestion = async (req: AuthedRequest, res: Response) => {
   }
 };
 
-// POST /api/questions/:id/downvote
 export const downvoteQuestion = async (req: AuthedRequest, res: Response) => {
   try {
     const { id: questionId } = req.params;

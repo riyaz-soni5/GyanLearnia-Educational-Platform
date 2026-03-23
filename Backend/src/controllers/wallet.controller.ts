@@ -7,10 +7,10 @@ import { creditUserWallet, debitUserWallet } from "../services/wallet.service.js
 
 const KHALTI_INITIATE_URL = "https://dev.khalti.com/api/v2/epayment/initiate/";
 const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
-const MIN_WALLET_AMOUNT_PAISA = 1000; // NPR 10
+const MIN_WALLET_AMOUNT_PAISA = 1000;
 
 const normalizeKhaltiSecretKey = (raw: string): string => {
-  const value = String(raw || "").trim();
+  const value = String(raw ?? "").trim();
   if (!value) return "";
   if (value.startsWith("test_secret_key_")) return value.replace("test_secret_key_", "");
   if (value.startsWith("live_secret_key_")) return value.replace("live_secret_key_", "");
@@ -51,7 +51,7 @@ export async function getWalletSummary(req: AuthedRequest, res: Response) {
     const userId = String(req.user?.id || "").trim();
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
-    const [user, txs] = await Promise.all([
+    const [user, transactions] = await Promise.all([
       User.findById(userId).select("walletBalancePaisa").lean(),
       WalletTransaction.find({ userId }).sort({ createdAt: -1 }).limit(25).lean(),
     ]);
@@ -63,7 +63,7 @@ export async function getWalletSummary(req: AuthedRequest, res: Response) {
     return res.json({
       walletBalancePaisa,
       walletBalance: Number((walletBalancePaisa / 100).toFixed(2)),
-      transactions: txs.map((tx: any) => ({
+      transactions: transactions.map((tx: any) => ({
         id: String(tx._id),
         type: String(tx.type),
         direction: String(tx.direction),

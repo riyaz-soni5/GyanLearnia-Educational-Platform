@@ -1,7 +1,5 @@
-// src/pages/admin/ManageUsersPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { FiSearch, FiUser, FiTrash2, FiRefreshCcw } from "react-icons/fi";
-
+import { FiSearch, FiUser, FiTrash2 } from "react-icons/fi";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useToast } from "@/components/toast";
 import {
@@ -42,7 +40,6 @@ function formatDate(iso: string) {
   return d.toISOString().slice(0, 10);
 }
 
-/** ✅ UI role label (Verified/Unverified Instructor) */
 function getRoleKey(u: AdminUser): AdminRoleKey {
   if (u.role === "admin") return "admin";
   if (u.role === "student") return "student";
@@ -110,9 +107,10 @@ export default function ManageUsersPage() {
         }
         return next;
       });
-    } catch (e: any) {
-      setErr(e?.message || "Failed to load users");
-      showToast(e?.message || "Failed to load users", "error");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to load users";
+      setErr(message);
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
@@ -120,7 +118,6 @@ export default function ManageUsersPage() {
 
   useEffect(() => {
     setPage(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, role]);
 
   useEffect(() => {
@@ -147,9 +144,9 @@ export default function ManageUsersPage() {
         await deleteUserById(u.id);
         showToast("User deleted", "success");
         await load();
-      } catch (e: any) {
+      } catch (e: unknown) {
         setRows(prev);
-        const msg = e?.message || "Delete failed";
+        const msg = e instanceof Error ? e.message : "Delete failed";
         setErr(msg);
         showToast(msg, "error");
         throw e;
@@ -217,11 +214,11 @@ export default function ManageUsersPage() {
       );
 
       showToast(`Role updated to ${roleLabel(nextRoleKey)}`, "success");
-    } catch (e: any) {
+    } catch (e: unknown) {
       // revert both row and dropdown
       setRows(prevRows);
       setRolePick((p) => ({ ...p, [u.id]: prevPick }));
-      const msg = e?.message || "Failed to update role";
+      const msg = e instanceof Error ? e.message : "Failed to update role";
       setErr(msg);
       showToast(msg, "error");
     } finally {
@@ -429,8 +426,8 @@ export default function ManageUsersPage() {
           Promise.resolve()
             .then(confirmAction)
             .then(() => setConfirmOpen(false))
-            .catch((e: any) => {
-              const msg = e?.message || "Delete failed";
+            .catch((e: unknown) => {
+              const msg = e instanceof Error ? e.message : "Delete failed";
               setErr(msg);
               showToast(msg, "error");
             })

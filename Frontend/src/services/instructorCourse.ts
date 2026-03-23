@@ -1,4 +1,3 @@
-
 import { http } from "./http";
 import type { CourseDraft } from "@/app/types/course.type";
 
@@ -24,7 +23,7 @@ export type InstructorEditableCourse = {
 };
 
 export async function createCourse(draft: CourseDraft) {
-  return http<{ item: { id: string; status: string } }>(`/api/instructor/courses`, {
+  return http<{ item: { id: string; status: string } }>("/api/instructor/courses", {
     method: "POST",
     body: JSON.stringify({ draft }),
   });
@@ -38,7 +37,7 @@ export async function resubmitCourse(id: string, draft: CourseDraft) {
 }
 
 export async function listMyCourses() {
-  return http<{ items: MyInstructorCourse[] }>(`/api/instructor/courses/mine`);
+  return http<{ items: MyInstructorCourse[] }>("/api/instructor/courses/mine");
 }
 
 export type InstructorEarningsSummary = {
@@ -49,7 +48,7 @@ export type InstructorEarningsSummary = {
 };
 
 export async function getInstructorEarnings() {
-  return http<InstructorEarningsSummary>(`/api/instructor/courses/earnings`);
+  return http<InstructorEarningsSummary>("/api/instructor/courses/earnings");
 }
 
 export type InstructorAnalytics = {

@@ -1,4 +1,3 @@
-// src/components/ReplyThread.tsx
 import { useEffect, useState } from "react";
 import RichTextEditor from "../RichTextEditor";
 import { useToast } from "../toast";
@@ -116,7 +115,7 @@ type VoteResponse = { votes: number; myVote: 1 | -1 | null };
 
 const isVoteResponse = (x: unknown): x is VoteResponse => {
   if (!x || typeof x !== "object") return false;
-  const obj = x as any;
+  const obj = x as Record<string, unknown>;
   const votesOk = typeof obj.votes === "number";
   const myVoteOk = obj.myVote === null || obj.myVote === 1 || obj.myVote === -1;
   return votesOk && myVoteOk;
@@ -132,21 +131,14 @@ export default function ReplyThread({
   requireLogin: () => boolean;
 }) {
   const { showToast } = useToast();
-
   const [rootReplies, setRootReplies] = useState<ReplyDTO[]>([]);
   const [rootCursor, setRootCursor] = useState<string | null>(null);
   const [rootHasMore, setRootHasMore] = useState(false);
   const [loadingRoot, setLoadingRoot] = useState(false);
-
-  // reply box under answer
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [draft, setDraft] = useState("");
-
-  // per-reply “reply to reply”
   const [activeReplyTo, setActiveReplyTo] = useState<string | null>(null);
   const [replyDraft, setReplyDraft] = useState("");
-
-  // child replies store
   const [childrenMap, setChildrenMap] = useState<Record<string, ReplyDTO[]>>({});
   const [childCursorMap, setChildCursorMap] = useState<Record<string, string | null>>({});
   const [childHasMoreMap, setChildHasMoreMap] = useState<Record<string, boolean>>({});
@@ -169,8 +161,8 @@ export default function ReplyThread({
 
       setRootHasMore(Boolean(r.hasMore));
       setRootCursor(r.nextCursor ?? null);
-    } catch (e: any) {
-      showToast(e?.message || "Failed to load replies", "error");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Failed to load replies", "error");
     } finally {
       setLoadingRoot(false);
     }
@@ -196,15 +188,14 @@ export default function ReplyThread({
 
       setChildHasMoreMap((m) => ({ ...m, [parentReplyId]: Boolean(r.hasMore) }));
       setChildCursorMap((m) => ({ ...m, [parentReplyId]: r.nextCursor ?? null }));
-    } catch (e: any) {
-      showToast(e?.message || "Failed to load replies", "error");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Failed to load replies", "error");
     } finally {
       setLoadingChild((m) => ({ ...m, [parentReplyId]: false }));
     }
   };
 
   useEffect(() => {
-    // initial root load
     loadRoot(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [questionId, answerId]);
@@ -221,8 +212,8 @@ export default function ReplyThread({
       setDraft("");
       setShowReplyBox(false);
       showToast("Reply posted", "success");
-    } catch (e: any) {
-      showToast(e?.message || "Failed to post reply", "error");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Failed to post reply", "error");
     }
   };
 
@@ -244,8 +235,8 @@ export default function ReplyThread({
       setReplyDraft("");
       setActiveReplyTo(null);
       showToast("Reply posted", "success");
-    } catch (e: any) {
-      showToast(e?.message || "Failed to post reply", "error");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Failed to post reply", "error");
     }
   };
 
@@ -280,8 +271,8 @@ export default function ReplyThread({
           [parentReplyId]: apply(m[parentReplyId] || []),
         }));
       }
-    } catch (e: any) {
-      showToast(e?.message || "Failed to vote", "error");
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : "Failed to vote", "error");
     }
   };
 
@@ -342,7 +333,6 @@ export default function ReplyThread({
                   if (!requireLogin()) return;
                   setActiveReplyTo((prev) => (prev === r.id ? null : r.id));
                   setReplyDraft("");
-                  // lazy load children when user tries to reply / expand
                   if (!childrenMap[r.id]) loadChildren(r.id, true);
                 }}
                 className="text-xs font-semibold text-indigo-700 hover:text-indigo-800 dark:text-indigo-300 dark:hover:text-indigo-200"
@@ -353,9 +343,7 @@ export default function ReplyThread({
               <button
                 type="button"
                 onClick={() => {
-                  // toggle children view: if not loaded => load
                   if (!childrenMap[r.id]) loadChildren(r.id, true);
-                  else setChildrenMap((m) => ({ ...m, [r.id]: m[r.id] })); // no-op to keep simple
                 }}
                 className="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white"
               >
@@ -363,7 +351,6 @@ export default function ReplyThread({
               </button>
             </div>
 
-            {/* reply-to-reply editor */}
             {activeReplyTo === r.id ? (
               <div className="mt-3">
                 <div className="rounded-xl border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-gray-950">
@@ -398,7 +385,6 @@ export default function ReplyThread({
               </div>
             ) : null}
 
-            {/* children */}
             {children.length > 0 ? (
               <div className="mt-2">
                 {children.map((c) => renderReply(c, depth + 1, r.id))}
@@ -420,13 +406,7 @@ export default function ReplyThread({
     );
   };
 
-  // Keep the details page clean: don't render an empty replies container.
-  if (
-    rootReplies.length === 0 &&
-    !showReplyBox &&
-    !rootHasMore &&
-    !loadingRoot
-  ) {
+  if (rootReplies.length === 0 && !showReplyBox && !rootHasMore && !loadingRoot) {
     return null;
   }
 

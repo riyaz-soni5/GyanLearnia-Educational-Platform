@@ -4,10 +4,9 @@ import Image from "../models/Image.model.js";
 
 const router = Router();
 
-// ✅ memory storage -> no upload folder
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit (change if you want)
+  limits: { fileSize: 2 * 1024 * 1024 },
 });
 
 router.post("/images", upload.single("image"), async (req, res) => {
@@ -15,12 +14,11 @@ router.post("/images", upload.single("image"), async (req, res) => {
     const file = req.file;
     if (!file) return res.status(400).json({ message: "No image uploaded" });
 
-    // basic type check
     if (!file.mimetype.startsWith("image/")) {
       return res.status(400).json({ message: "Only image files allowed" });
     }
 
-    const doc = await Image.create({
+    const image = await Image.create({
       data: file.buffer,
       contentType: file.mimetype,
       fileName: file.originalname,
@@ -28,11 +26,11 @@ router.post("/images", upload.single("image"), async (req, res) => {
     });
 
     return res.json({
-      id: doc._id,
-      url: `/api/images/${doc._id}`, // frontend will use this
+      id: image._id,
+      url: `/api/images/${image._id}`,
     });
-  } catch (err: any) {
-    return res.status(500).json({ message: err?.message || "Upload failed" });
+  } catch (error: any) {
+    return res.status(500).json({ message: error?.message || "Upload failed" });
   }
 });
 
@@ -42,7 +40,6 @@ router.get("/images/:id", async (req, res) => {
     if (!img) return res.status(404).send("Not found");
 
     res.set("Content-Type", img.contentType);
-    // ✅ caching helps a lot
     res.set("Cache-Control", "public, max-age=31536000, immutable");
     return res.send(img.data);
   } catch {

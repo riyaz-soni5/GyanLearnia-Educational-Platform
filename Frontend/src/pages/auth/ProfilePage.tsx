@@ -16,9 +16,12 @@ const inputBase =
 
 const genderValues = ["", "male", "female", "other", "prefer_not_to_say"] as const;
 type GenderValue = (typeof genderValues)[number];
-const toGenderValue = (value: string): GenderValue =>
-  genderValues.includes(value as GenderValue) ? (value as GenderValue) : "";
-const sanitizeInterests = (values: string[] | undefined): string[] => {
+
+function toGenderValue(value: string): GenderValue {
+  return genderValues.includes(value as GenderValue) ? (value as GenderValue) : "";
+}
+
+function sanitizeInterests(values: string[] | undefined): string[] {
   if (!Array.isArray(values)) return [];
   const unique = new Map<string, string>();
   values.forEach((value) => {
@@ -28,7 +31,7 @@ const sanitizeInterests = (values: string[] | undefined): string[] => {
     if (!unique.has(key)) unique.set(key, trimmed);
   });
   return Array.from(unique.values());
-};
+}
 
 type ProfileTab = "profile" | "learning";
 
@@ -73,7 +76,6 @@ const ProfilePage = () => {
   const [gender, setGender] = useState<GenderValue>(toGenderValue(profile?.gender ?? ""));
   const [expertise, setExpertise] = useState(profile?.expertise ?? "");
   const [institution, setInstitution] = useState(profile?.institution ?? "");
-
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [interests, setInterests] = useState<string[]>(sanitizeInterests(profile?.interests));
   const [interestInput, setInterestInput] = useState("");

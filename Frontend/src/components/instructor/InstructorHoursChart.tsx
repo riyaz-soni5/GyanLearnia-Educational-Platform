@@ -9,22 +9,22 @@ type Props = {
 };
 
 export default function InstructorHoursChart({ items }: Props) {
-  const top = [...items]
+  const topItems = [...items]
     .sort((a, b) => b.totalVideoSec - a.totalVideoSec)
     .slice(0, 5)
-    .map((x) => ({ ...x, hours: Math.round((x.totalVideoSec / 3600) * 10) / 10 }));
+    .map((item) => ({ ...item, hours: Math.round((item.totalVideoSec / 3600) * 10) / 10 }));
 
-  const maxHours = Math.max(1, ...top.map((x) => x.hours));
+  const maxHours = Math.max(1, ...topItems.map((item) => item.hours));
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-base font-bold text-gray-900">Top Content Hours</h3>
 
-      {top.length === 0 ? (
+      {topItems.length === 0 ? (
         <p className="mt-4 text-sm text-gray-600">No course content yet.</p>
       ) : (
         <div className="mt-4 space-y-3">
-          {top.map((item) => {
+          {topItems.map((item) => {
             const width = Math.max(8, Math.round((item.hours / maxHours) * 100));
             return (
               <div key={item.id}>

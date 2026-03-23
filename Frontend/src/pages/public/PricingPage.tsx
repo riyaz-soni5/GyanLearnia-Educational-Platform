@@ -28,8 +28,8 @@ const plans: Plan[] = [
     features: [
       "Browse published courses",
       "Ask and answer in community Q&A",
-      "Basic mentor discovery",
       "Build your learner profile",
+      "Pay for Fast Support"
     ],
     ctaText: "Start Free",
     ctaTo: "/register",
@@ -42,10 +42,10 @@ const plans: Plan[] = [
     badge: "Most Popular",
     highlighted: true,
     features: [
-      "Priority academic support",
-      "Mentor request and private chat",
-      "More verified-answer visibility",
-      "Premium learning experience",
+      "Pro Profile Badge and Recognition",
+      "Ultimate Mentor request and private chat",
+      "Ultimate Fast Support access",
+      "Get Free Courses Montly",
     ],
     ctaText: "Get GyanLearnia Pro",
     ctaTo: "/register",
@@ -174,7 +174,7 @@ const PricingPage = () => {
           persistedInLocal
         );
       } catch {
-
+        // leave the current plan as it is if sync fails
       }
     };
 
@@ -230,7 +230,7 @@ const PricingPage = () => {
               );
             }
           } catch {
-
+            // payment already went through, so we can skip the session refresh
           }
         } else {
           showToast(response.data.error || "Payment verification failed.", "error", {
@@ -262,7 +262,11 @@ const PricingPage = () => {
         cleanUrl.searchParams.delete(key);
       }
 
-      window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+      window.history.replaceState(
+        {},
+        document.title,
+        `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`
+      );
     };
 
     void verifyPayment();
@@ -328,7 +332,6 @@ const PricingPage = () => {
     }
   };
 
-
   return (
     <div className="mx-auto max-w-7xl space-y-14 px-4">
       <Reveal>
@@ -345,8 +348,7 @@ const PricingPage = () => {
                 Upgrade your plan
               </h1>
               <p className="mt-4 max-w-3xl text-sm text-muted sm:text-base">
-                Choose the plan that fits your learning journey. Start anytime, upgrade to
-                GyanLearnia Pro extra features.
+                Choose the plan that fits your learning journey.
               </p>
             </div>
           </div>
@@ -444,10 +446,6 @@ const PricingPage = () => {
             <h2 className="text-3xl font-bold sm:text-4xl">
               Start Free. Upgrade to Pro at Rs 499/month.
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-sm text-indigo-50/95 sm:text-base">
-              Build your profile, join the learning community, and unlock Pro support whenever you
-              need it.
-            </p>
           </div>
         </section>
       </Reveal>

@@ -1,5 +1,4 @@
-// src/server.ts
-import "dotenv/config"; // ✅ loads env BEFORE anything else (ESM-safe)
+import "dotenv/config";
 
 import app from "./app.js";
 import { connectDB } from "./config/db.js";

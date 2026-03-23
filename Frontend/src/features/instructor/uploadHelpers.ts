@@ -5,7 +5,6 @@ export async function uploadFileToCloud(opts: {
   kind: "thumbnail" | "resource" | "video";
 }) {
   const { file, kind } = opts;
-
   const fileName = `${Date.now()}-${file.name}`;
 
   const { data, error } = await supabase.storage
@@ -17,9 +16,7 @@ export async function uploadFileToCloud(opts: {
 
   if (error) throw error;
 
-  const { data: publicUrl } = supabase.storage
-    .from("courses")
-    .getPublicUrl(data.path);
+  const { data: publicUrl } = supabase.storage.from("courses").getPublicUrl(data.path);
 
   return {
     publicUrl: publicUrl.publicUrl,

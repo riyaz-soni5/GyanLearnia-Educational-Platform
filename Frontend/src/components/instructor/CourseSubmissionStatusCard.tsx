@@ -35,10 +35,7 @@ const badgeByStatus = (status: MyInstructorCourse["status"]) => {
 
 export default function CourseSubmissionStatusCard({ course, onEdit }: Props) {
   const meta = badgeByStatus(course.status);
-
-  if (course.status === "Published") {
-    return null;
-  }
+  if (course.status === "Published") return null;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">

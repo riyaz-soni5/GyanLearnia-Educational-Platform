@@ -1,18 +1,16 @@
-
 import { http } from "./http";
 
 export type VerificationStatus = "Pending" | "Verified" | "Rejected";
 
 export type AdminVerificationItem = {
-  id: string; // instructor userId
+  id: string;
   fullName: string;
   email: string;
   expertise: string[];
   institute?: string;
-  submittedAt: string; // ISO
+  submittedAt: string;
   status: VerificationStatus;
   notes?: string;
-
   docs: {
     idCard: boolean;
     certificate: boolean;

@@ -14,8 +14,11 @@ export function getMyVerification() {
 }
 
 export function submitVerification() {
-  return http<{ message: string; status: VerificationStatus }>("/api/instructor-verification/submit", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
+  return http<{ message: string; status: VerificationStatus }>(
+    "/api/instructor-verification/submit",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    }
+  );
 }

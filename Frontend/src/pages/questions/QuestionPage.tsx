@@ -1,9 +1,9 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import QuestionsToolbar from "@/components/questions/QuestionToolbar";
 import QuestionsList from "@/components/questions/QuestionList";
 import Leaderboard from "@/components/Leaderboard";
+import PaginationControls from "@/components/PaginationControls";
 import type { Question } from "@/app/types/question.types";
 import { fetchQuestions, upvoteQuestion } from "@/services/questions";
 import { fetchCategories } from "@/services/category";
@@ -21,6 +21,8 @@ const isVoteResponse = (x: unknown): x is VoteResponse => {
   const myVoteOk = obj.myVote === null || obj.myVote === 1 || obj.myVote === -1;
   return votesOk && myVoteOk;
 };
+
+const QUESTION_PAGE_SIZE = 10;
 
 const QuestionsPage = () => {
   const nav = useNavigate();
@@ -54,7 +56,8 @@ const QuestionsPage = () => {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [votingQuestionIds, setVotingQuestionIds] = useState<Set<string>>(new Set());
-
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const [categories, setCategories] = useState<CategoryDTO[]>([]);
   const [categoryId, setCategoryId] = useState("All");
@@ -63,11 +66,38 @@ const QuestionsPage = () => {
   const [level, setLevel] = useState("All");
   const [sort, setSort] = useState("Newest");
 
-
   const status = useMemo(
     () => (sort === "Answered" || sort === "Unanswered" ? sort : "All"),
     [sort]
   );
+
+  const handleReset = () => {
+    setPage(1);
+    setQuery("");
+    setCategoryId("All");
+    setLevel("All");
+    setSort("Newest");
+  };
+
+  const handleQueryChange = (value: string) => {
+    setPage(1);
+    setQuery(value);
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setPage(1);
+    setCategoryId(value);
+  };
+
+  const handleLevelChange = (value: string) => {
+    setPage(1);
+    setLevel(value);
+  };
+
+  const handleSortChange = (value: string) => {
+    setPage(1);
+    setSort(value);
+  };
 
 
   useEffect(() => {
@@ -79,7 +109,7 @@ const QuestionsPage = () => {
         if (!alive) return;
         setCategories(res.items ?? []);
       } catch {
-
+        // Leave categories empty if the request fails.
       }
     })();
 
@@ -87,7 +117,6 @@ const QuestionsPage = () => {
       alive = false;
     };
   }, []);
-
 
   useEffect(() => {
     let alive = true;
@@ -102,8 +131,8 @@ const QuestionsPage = () => {
           level,
           sort,
           status,
-          page: 1,
-          limit: 30,
+          page,
+          limit: QUESTION_PAGE_SIZE,
         });
         if (!alive) return;
         const latestVoteCache = readVoteCache();
@@ -117,6 +146,7 @@ const QuestionsPage = () => {
                 : latestVoteCache[item.id] ?? null,
           }))
         );
+        setTotal(Number(res.total || 0));
       } catch (e: unknown) {
         if (!alive) return;
         const message = e instanceof Error ? e.message : "Failed to load questions";
@@ -129,13 +159,20 @@ const QuestionsPage = () => {
     return () => {
       alive = false;
     };
-  }, [query, categoryId, level, sort, status, voteCacheKey, readVoteCache]);
+  }, [page, query, categoryId, level, sort, status, voteCacheKey, readVoteCache]);
 
   useEffect(() => {
     sessionStorage.setItem(voteCacheKey, JSON.stringify(voteCache));
   }, [voteCache, voteCacheKey]);
 
-  const filtered = useMemo(() => questions, [questions]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(total / QUESTION_PAGE_SIZE)),
+    [total]
+  );
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   const setVotingState = (questionId: string, isVoting: boolean) => {
     setVotingQuestionIds((prev) => {
@@ -191,18 +228,17 @@ const QuestionsPage = () => {
   return (
     <div className="mx-auto max-w-7xl px-4">
       <div className="space-y-8">
-
         <QuestionsToolbar
           query={query}
-          setQuery={setQuery}
-
+          setQuery={handleQueryChange}
           subject={categoryId}
-          setSubject={setCategoryId}
+          setSubject={handleCategoryChange}
           level={level}
-          setLevel={setLevel}
+          setLevel={handleLevelChange}
           sort={sort}
-          setSort={setSort}
-          count={filtered.length}
+          setSort={handleSortChange}
+          onReset={handleReset}
+          count={total}
           categories={categories}
         />
 
@@ -217,11 +253,14 @@ const QuestionsPage = () => {
                 {err}
               </div>
             ) : (
-              <QuestionsList
-                questions={filtered}
-                onUpvoteQuestion={onUpvoteQuestion}
-                votingQuestionIds={votingQuestionIds}
-              />
+              <div className="space-y-6">
+                <QuestionsList
+                  questions={questions}
+                  onUpvoteQuestion={onUpvoteQuestion}
+                  votingQuestionIds={votingQuestionIds}
+                />
+                <PaginationControls page={page} totalPages={totalPages} onPageChange={setPage} />
+              </div>
             )}
           </div>
 

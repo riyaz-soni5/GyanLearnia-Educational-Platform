@@ -1,4 +1,3 @@
-// controllers/adminVerification.controller.ts
 import { Request, Response } from "express";
 import InstructorDoc from "../models/InstructorDoc.model.js";
 import User from "../models/User.model.js";
@@ -6,53 +5,45 @@ import type { AuthedRequest } from "../middlewares/auth.middleware.js";
 import { createNotification } from "../services/notification.service.js";
 
 type Status = "Pending" | "Verified" | "Rejected";
-
-const toBool = (v: any) => Boolean(v);
+const statusOrder: Record<Status, number> = { Pending: 0, Rejected: 1, Verified: 2 };
 
 export const listInstructorVerifications = async (req: Request, res: Response) => {
   try {
     const q = String(req.query.q || "").trim().toLowerCase();
     const status = String(req.query.status || "All") as Status | "All";
 
-    // Pull docs + user
     const docs = await InstructorDoc.find({})
       .sort({ createdAt: -1 })
       .populate(
         "userId",
         "firstName lastName email role expertise institution isVerified verificationStatus verificationReason"
-        )
+      )
       .lean();
 
-    // Group by user
-    const map = new Map<string, any>();
+    const userMap = new Map<string, any>();
 
-    for (const d of docs) {
-      const user = d.userId as any;
+    for (const doc of docs) {
+      const user = doc.userId as any;
       if (!user) continue;
       if (user.role !== "instructor") continue;
 
       const userId = String(user._id);
 
-      if (!map.has(userId)) {
-        map.set(userId, {
+      if (!userMap.has(userId)) {
+        userMap.set(userId, {
           id: userId,
           fullName: `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Instructor",
           email: user.email,
           expertise: user.expertise ? String(user.expertise).split(",").map((x) => x.trim()).filter(Boolean) : [],
           institute: user.institution || undefined,
-
-          // for UI
-          submittedAt: d.createdAt,
+          submittedAt: doc.createdAt,
           status: (user.verificationStatus || "NotSubmitted") as Status,
           notes: user.verificationReason || undefined,
-
           docs: {
             idCard: false,
             certificate: false,
             experienceLetter: false,
           },
-
-          // include doc ids so modal can preview/download
           docIds: {
             idCard: undefined as string | undefined,
             certificate: undefined as string | undefined,
@@ -61,31 +52,28 @@ export const listInstructorVerifications = async (req: Request, res: Response) =
         });
       }
 
-      const row = map.get(userId);
+      const row = userMap.get(userId);
 
-      // track latest submission time
-      if (new Date(d.createdAt).getTime() > new Date(row.submittedAt).getTime()) {
-        row.submittedAt = d.createdAt;
+      if (new Date(doc.createdAt).getTime() > new Date(row.submittedAt).getTime()) {
+        row.submittedAt = doc.createdAt;
       }
 
-      // detect docs
-      if (d.docType === "idCard") {
+      if (doc.docType === "idCard") {
         row.docs.idCard = true;
-        row.docIds.idCard = String(d._id);
+        row.docIds.idCard = String(doc._id);
       }
-      if (d.docType === "certificate") {
+      if (doc.docType === "certificate") {
         row.docs.certificate = true;
-        row.docIds.certificate = String(d._id);
+        row.docIds.certificate = String(doc._id);
       }
-      if (d.docType === "experienceLetter") {
+      if (doc.docType === "experienceLetter") {
         row.docs.experienceLetter = true;
-        row.docIds.experienceLetter = String(d._id);
+        row.docIds.experienceLetter = String(doc._id);
       }
     }
 
-    let items = Array.from(map.values());
+    let items = Array.from(userMap.values());
 
-    // filter by search
     if (q) {
       items = items.filter((x) => {
         const blob = `${x.fullName} ${x.email} ${(x.expertise || []).join(" ")} ${x.institute || ""}`.toLowerCase();
@@ -93,21 +81,20 @@ export const listInstructorVerifications = async (req: Request, res: Response) =
       });
     }
 
-    // filter by status
     if (status !== "All") items = items.filter((x) => x.status === status);
 
-    // sort: Pending first, then newest
-    const order = { Pending: 0, Rejected: 1, Verified: 2 } as any;
     items.sort((a, b) => {
-      const oa = order[a.status] ?? 9;
-      const ob = order[b.status] ?? 9;
+      const oa = statusOrder[a.status as Status] ?? 9;
+      const ob = statusOrder[b.status as Status] ?? 9;
       if (oa !== ob) return oa - ob;
       return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
     });
 
     return res.json({ items });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Failed to load verification requests" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Failed to load verification requests",
+    });
   }
 };
 
@@ -117,13 +104,13 @@ export const approveInstructor = async (req: Request, res: Response) => {
     const actorId = String(authedReq.user?.id || "").trim();
     const instructorId = String(req.params.id);
 
-    const u = await User.findById(instructorId);
-    if (!u) return res.status(404).json({ message: "Instructor not found" });
+    const user = await User.findById(instructorId);
+    if (!user) return res.status(404).json({ message: "Instructor not found" });
 
-    u.isVerified = true;
-    u.verificationStatus = "Verified";
-    u.verificationReason = undefined;
-    await u.save();
+    user.isVerified = true;
+    user.verificationStatus = "Verified";
+    user.verificationReason = undefined;
+    await user.save();
 
     await InstructorDoc.updateMany(
       { userId: instructorId },
@@ -141,8 +128,10 @@ export const approveInstructor = async (req: Request, res: Response) => {
     });
 
     return res.json({ message: "Instructor approved" });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Approve failed" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Approve failed",
+    });
   }
 };
 
@@ -156,13 +145,13 @@ export const rejectInstructor = async (req: Request, res: Response) => {
     const msg = String(reason || "").trim();
     if (!msg) return res.status(400).json({ message: "Reject reason is required" });
 
-    const u = await User.findById(instructorId);
-    if (!u) return res.status(404).json({ message: "Instructor not found" });
+    const user = await User.findById(instructorId);
+    if (!user) return res.status(404).json({ message: "Instructor not found" });
 
-    u.isVerified = false;
-    u.verificationStatus = "Rejected";
-    u.verificationReason = msg;
-    await u.save();
+    user.isVerified = false;
+    user.verificationStatus = "Rejected";
+    user.verificationReason = msg;
+    await user.save();
 
     await InstructorDoc.updateMany(
       { userId: instructorId },
@@ -180,7 +169,9 @@ export const rejectInstructor = async (req: Request, res: Response) => {
     });
 
     return res.json({ message: "Instructor rejected" });
-  } catch (e: any) {
-    return res.status(500).json({ message: e?.message || "Reject failed" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error instanceof Error ? error.message : "Reject failed",
+    });
   }
 };

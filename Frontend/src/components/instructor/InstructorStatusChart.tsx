@@ -24,6 +24,7 @@ export default function InstructorStatusChart({ draft, pending, published, rejec
         {rows.map((row) => {
           const count = values[row.key];
           const pct = Math.round((count / total) * 100);
+
           return (
             <div key={row.key}>
               <div className="mb-1 flex items-center justify-between text-xs">

@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import User from "../models/User.model.js";
 import Enrollment from "../models/Enrollment.model.js";
-import Certificate from "../models/Certification.model.js";
+import Answer from "../models/Answer.model.js";
 function sanitizeInterests(values) {
     if (!Array.isArray(values))
         return [];
@@ -28,6 +28,15 @@ const getUserPlanSnapshot = (user) => {
         planExpiresAt: expiryValid,
     };
 };
+const ACCEPT_POINTS = 15;
+function formatMonthKey(date) {
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+}
+function formatMonthLabel(date) {
+    return date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+}
 export async function getCurrentUser(req, res) {
     try {
         if (!req.user?.id) {
@@ -37,14 +46,17 @@ export async function getCurrentUser(req, res) {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        const [enrollmentAgg, completedAgg, certificatesCount] = await Promise.all([
+        const [enrollmentAgg, completedAgg, acceptedAnswerEvents] = await Promise.all([
             Enrollment.countDocuments({ userId: user._id }),
             Enrollment.countDocuments({ userId: user._id, completedAt: { $ne: null } }),
-            Certificate.countDocuments({ userId: user._id }),
+            Answer.find({ authorId: user._id, isVerified: true })
+                .select("createdAt")
+                .sort({ createdAt: 1 })
+                .lean(),
         ]);
         const enrollments = await Enrollment.find({ userId: user._id })
             .select("courseId completedAt")
-            .populate("courseId", "title thumbnailUrl status")
+            .populate("courseId", "title thumbnailUrl status certificate.enabled")
             .lean();
         const enrolledCourses = enrollments
             .map((e) => e.courseId)
@@ -62,7 +74,48 @@ export async function getCurrentUser(req, res) {
             title: c.title,
             thumbnailUrl: c.thumbnailUrl,
         }));
+        const certificatesCount = enrollments.filter((e) => Boolean(e?.completedAt) &&
+            Boolean(e?.courseId) &&
+            String(e.courseId?.status || "") === "Published" &&
+            Boolean(e.courseId?.certificate?.enabled)).length;
         const points = Number(user.points ?? 0);
+        const now = new Date();
+        const userCreatedAt = user.createdAt ? new Date(user.createdAt) : now;
+        const timelineStart = Number.isNaN(userCreatedAt.getTime()) ? now : userCreatedAt;
+        const timelineEnd = now;
+        const monthlyIncrements = new Map();
+        for (const item of acceptedAnswerEvents) {
+            if (!item?.createdAt)
+                continue;
+            const eventDate = new Date(item.createdAt);
+            if (Number.isNaN(eventDate.getTime()))
+                continue;
+            const key = formatMonthKey(eventDate);
+            monthlyIncrements.set(key, (monthlyIncrements.get(key) ?? 0) + ACCEPT_POINTS);
+        }
+        const pointsTimeline = [];
+        let cursor = new Date(Date.UTC(timelineStart.getUTCFullYear(), timelineStart.getUTCMonth(), 1));
+        const endCursor = new Date(Date.UTC(timelineEnd.getUTCFullYear(), timelineEnd.getUTCMonth(), 1));
+        let runningPoints = 0;
+        while (cursor.getTime() <= endCursor.getTime()) {
+            const key = formatMonthKey(cursor);
+            runningPoints += monthlyIncrements.get(key) ?? 0;
+            pointsTimeline.push({
+                label: formatMonthLabel(cursor),
+                date: new Date(cursor).toISOString(),
+                points: runningPoints,
+            });
+            cursor = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1));
+        }
+        if (pointsTimeline.length === 0) {
+            pointsTimeline.push({
+                label: formatMonthLabel(now),
+                date: now.toISOString(),
+                points: 0,
+            });
+        }
+        // Keep the final point in sync with the canonical current points value.
+        pointsTimeline[pointsTimeline.length - 1].points = Math.max(0, points);
         let badge = "New Learner";
         if (points >= 1000)
             badge = "Legend";
@@ -115,6 +168,7 @@ export async function getCurrentUser(req, res) {
                 badge,
                 enrolledCourses,
                 completedCourses,
+                pointsTimeline,
             },
         });
     }

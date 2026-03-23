@@ -591,7 +591,7 @@ const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
                         {fastKhaltiPidx ? (
                           <p>
                             Khalti payment reference added. You can now post the question.
-                            <span className="ml-2 font-mono text-xs">{fastKhaltiPidx}</span>
+                            <span className="ml-2 text-xs">{fastKhaltiPidx}</span>
                           </p>
                         ) : (
                           <p>Complete Khalti payment first, then click Post Question.</p>

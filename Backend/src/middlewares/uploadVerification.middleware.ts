@@ -1,7 +1,6 @@
-// middlewares/uploadVerification.middleware.ts
+import fs from "fs";
 import multer from "multer";
 import path from "path";
-import fs from "fs";
 
 const uploadDir = path.join(process.cwd(), "uploads", "verification");
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -29,5 +28,5 @@ const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
 export const uploadVerificationDocs = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 6 * 1024 * 1024 }, // 6MB per file
+  limits: { fileSize: 6 * 1024 * 1024 },
 });

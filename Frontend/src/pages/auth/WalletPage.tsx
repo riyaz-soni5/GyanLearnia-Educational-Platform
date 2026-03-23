@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "@/components/toast";
 import {
@@ -8,6 +8,15 @@ import {
   verifyWalletTopup,
   type WalletTransaction,
 } from "@/services/wallet";
+
+const khaltiQueryKeys = [
+  "pidx",
+  "status",
+  "transaction_id",
+  "purchase_order_id",
+  "purchase_order_name",
+  "total_amount",
+];
 
 const WalletPage = () => {
   const { showToast } = useToast();
@@ -20,7 +29,7 @@ const WalletPage = () => {
   const [processingTopup, setProcessingTopup] = useState(false);
   const [processingCheckout, setProcessingCheckout] = useState(false);
 
-  const loadWallet = async () => {
+  const loadWallet = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchWalletSummary();
@@ -32,11 +41,11 @@ const WalletPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
   useEffect(() => {
     void loadWallet();
-  }, []);
+  }, [loadWallet]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -46,9 +55,7 @@ const WalletPage = () => {
 
     const cleanKhaltiParams = () => {
       const cleanUrl = new URL(window.location.href);
-      ["pidx", "status", "transaction_id", "purchase_order_id", "purchase_order_name", "total_amount"].forEach(
-        (key) => cleanUrl.searchParams.delete(key)
-      );
+      khaltiQueryKeys.forEach((key) => cleanUrl.searchParams.delete(key));
       window.history.replaceState({}, document.title, `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
     };
 
@@ -96,7 +103,7 @@ const WalletPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [showToast]);
+  }, [loadWallet, showToast]);
 
   const onTopup = async () => {
     const amountNpr = Math.floor(Number(topupNpr) || 0);

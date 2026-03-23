@@ -1,5 +1,5 @@
-
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const STORAGE_KEY = "gyanlearnia_user";
 
 export type SessionUser = {
   id: string;
@@ -8,7 +8,7 @@ export type SessionUser = {
   firstName?: string;
   lastName?: string;
   avatarUrl?: string | null;
-  isVerified?: boolean; 
+  isVerified?: boolean;
   verificationStatus?: "NotSubmitted" | "Pending" | "Rejected" | "Verified";
   currentPlan?: "Free" | "Pro";
   planStatus?: "Active" | "Expired";
@@ -18,11 +18,8 @@ export type SessionUser = {
   walletBalance?: number;
 };
 
-
 export function getUser(): SessionUser | null {
-  const raw =
-    localStorage.getItem("gyanlearnia_user") ||
-    sessionStorage.getItem("gyanlearnia_user");
+  const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
 
   if (!raw) return null;
 
@@ -33,32 +30,26 @@ export function getUser(): SessionUser | null {
   }
 }
 
-
 export function isLoggedIn() {
-  const u = getUser();
-  return Boolean(u?.id);
+  return Boolean(getUser()?.id);
 }
-
 
 export function setUser(user: SessionUser, rememberMe: boolean) {
-  // Ensure only one storage source is active at a time.
-  localStorage.removeItem("gyanlearnia_user");
-  sessionStorage.removeItem("gyanlearnia_user");
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
   const storage = rememberMe ? localStorage : sessionStorage;
-  storage.setItem("gyanlearnia_user", JSON.stringify(user));
+  storage.setItem(STORAGE_KEY, JSON.stringify(user));
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("gyanlearnia_user_updated"));
   }
 }
 
-
 export async function logout() {
-  localStorage.removeItem("gyanlearnia_user");
-  sessionStorage.removeItem("gyanlearnia_user");
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(STORAGE_KEY);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("gyanlearnia_user_updated"));
   }
-
 
   try {
     await fetch(`${API_BASE}/api/auth/logout`, {
@@ -66,6 +57,6 @@ export async function logout() {
       credentials: "include",
     });
   } catch {
-
+    // ignore logout request error
   }
 }

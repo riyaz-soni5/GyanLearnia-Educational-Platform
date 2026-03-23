@@ -27,12 +27,6 @@ const shortDate = (isoDay: string) => {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
-const formatDateTime = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
-};
-
 const StatCard = ({
   label,
   value,
@@ -47,7 +41,7 @@ const StatCard = ({
   <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-gray-900 dark:shadow-none">
     <div className="flex items-start justify-between gap-4">
       <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">{label}</p>
+        <p className="text-[11px] font-semibold uppercase text-gray-400">{label}</p>
         <p className="mt-3 text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">{value}</p>
         {hint ? <p className="mt-1 text-sm leading-5 text-gray-500 dark:text-gray-400">{hint}</p> : null}
       </div>
@@ -164,7 +158,6 @@ function UsersLineChart({ points }: { points: LinePoint[] }) {
 }
 
 function UserDonutChart({ segments }: { segments: DonutSegment[] }) {
-  const [activeSlice, setActiveSlice] = useState<(DonutSegment & { fraction: number }) | null>(null);
   const [tooltip, setTooltip] = useState<{
     label: string;
     value: number;
@@ -178,32 +171,39 @@ function UserDonutChart({ segments }: { segments: DonutSegment[] }) {
   const cx = 100;
   const cy = 100;
   const radius = 74;
+  const slices = segments.reduce<{
+    endAngle: number;
+    items: Array<DonutSegment & { fraction: number; path: string }>;
+  }>(
+    (result, seg) => {
+      const startAngle = result.endAngle;
+      const fraction = seg.value / total;
+      const angle = fraction * Math.PI * 2;
+      const endAngle = startAngle + angle;
+      const x1 = cx + radius * Math.cos(startAngle);
+      const y1 = cy + radius * Math.sin(startAngle);
+      const x2 = cx + radius * Math.cos(endAngle);
+      const y2 = cy + radius * Math.sin(endAngle);
+      const largeArcFlag = angle > Math.PI ? 1 : 0;
+      const path = [
+        `M ${cx} ${cy}`,
+        `L ${x1} ${y1}`,
+        `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
+        "Z",
+      ].join(" ");
 
-  let startAngle = -Math.PI / 2;
-  const slices = segments.map((seg) => {
-    const fraction = seg.value / total;
-    const angle = fraction * Math.PI * 2;
-    const endAngle = startAngle + angle;
-    const x1 = cx + radius * Math.cos(startAngle);
-    const y1 = cy + radius * Math.sin(startAngle);
-    const x2 = cx + radius * Math.cos(endAngle);
-    const y2 = cy + radius * Math.sin(endAngle);
-    const largeArcFlag = angle > Math.PI ? 1 : 0;
-    const path = [
-      `M ${cx} ${cy}`,
-      `L ${x1} ${y1}`,
-      `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
-      "Z",
-    ].join(" ");
-    startAngle = endAngle;
-    return {
-      ...seg,
-      fraction,
-      path,
-    };
-  });
+      result.items.push({
+        ...seg,
+        fraction,
+        path,
+      });
+      result.endAngle = endAngle;
+      return result;
+    },
+    { endAngle: -Math.PI / 2, items: [] }
+  ).items;
 
-    return (
+  return (
     <div className="space-y-4">
       <div className="relative mx-auto w-52 max-w-full">
         <svg viewBox="0 0 200 200" className="w-full" aria-label="Pie chart">
@@ -217,7 +217,6 @@ function UserDonutChart({ segments }: { segments: DonutSegment[] }) {
               onMouseEnter={(e) => {
                 const bounds = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
                 const rect = e.currentTarget.getBoundingClientRect();
-                setActiveSlice(slice);
                 if (bounds) {
                   setTooltip({
                     label: slice.label,
@@ -229,13 +228,11 @@ function UserDonutChart({ segments }: { segments: DonutSegment[] }) {
                 }
               }}
               onMouseLeave={() => {
-                setActiveSlice(null);
                 setTooltip(null);
               }}
               onFocus={(e) => {
                 const bounds = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
                 const rect = e.currentTarget.getBoundingClientRect();
-                setActiveSlice(slice);
                 if (bounds) {
                   setTooltip({
                     label: slice.label,
@@ -247,7 +244,6 @@ function UserDonutChart({ segments }: { segments: DonutSegment[] }) {
                 }
               }}
               onBlur={() => {
-                setActiveSlice(null);
                 setTooltip(null);
               }}
               tabIndex={0}

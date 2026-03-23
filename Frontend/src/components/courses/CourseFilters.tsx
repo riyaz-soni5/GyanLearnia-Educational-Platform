@@ -1,4 +1,3 @@
-// src/components/courses/CourseFilters.tsx
 type Props = {
   query: string;
   setQuery: (v: string) => void;
@@ -24,9 +23,13 @@ const CourseFilters = ({
   onReset,
   resultCount,
 }: Props) => {
+  const hasQuery = query.trim().length > 0;
+  const hasActiveFilters =
+    hasQuery || level !== "All" || type !== "All" || price !== "All";
+
   return (
-    <div className="rounded-2xl bg-white p-8 shadow-sm dark:bg-gray-900 dark:border dark:border-gray-800">
-      <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl dark:text-white">Explore</h1>
+    <div className="rounded-2xl bg-white p-8 shadow-sm dark:border dark:border-gray-800 dark:bg-gray-900">
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white sm:text-3xl">Explore</h1>
       <div className="mt-6 grid gap-4 lg:grid-cols-12">
         <div className="lg:col-span-5">
           <label className="text-xs font-medium text-gray-700 dark:text-gray-200">Search</label>
@@ -43,7 +46,7 @@ const CourseFilters = ({
           <select
             value={level}
             onChange={(e) => setLevel(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-indigo-900"
+            className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-indigo-900"
           >
             <option>All</option>
             <option>Class 8</option>
@@ -59,7 +62,7 @@ const CourseFilters = ({
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-indigo-900"
+            className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-indigo-900"
           >
             <option>All</option>
             <option>Academic</option>
@@ -73,7 +76,7 @@ const CourseFilters = ({
           <select
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-indigo-900"
+            className="mt-2 w-full cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-indigo-900"
           >
             <option>All</option>
             <option>Free</option>
@@ -88,13 +91,15 @@ const CourseFilters = ({
           course(s)
         </span>
 
-        <button
-          type="button"
-          onClick={onReset}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-        >
-          Reset
-        </button>
+        {hasActiveFilters ? (
+          <button
+            type="button"
+            onClick={onReset}
+            className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+          >
+            Clear
+          </button>
+        ) : null}
       </div>
     </div>
   );
