@@ -7,7 +7,7 @@ import Course from "../models/Course.model.js";
 import Enrollment from "../models/Enrollment.model.js";
 import { creditUserWallet, debitUserWallet } from "../services/wallet.service.js";
 import { createNotification } from "../services/notification.service.js";
-const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
+const KHALTI_LOOKUP_URL = "https://khalti.com/api/v2/epayment/lookup/";
 const MIN_FAST_RESPONSE_PRICE_NPR = 10;
 const normalizeKhaltiSecretKey = (raw) => {
     const value = String(raw || "").trim();
@@ -369,14 +369,14 @@ export const createQuestion = async (req, res) => {
                         message: "This Khalti payment reference is already used",
                     });
                 }
-                const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
-                if (!khaltiTestSecretKey) {
-                    return res.status(500).json({ message: "Khalti test secret key is missing" });
+                const khaltiSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_SECRET_KEY ?? process.env.KHALTI_TEST_SECRET_KEY ?? "");
+                if (!khaltiSecretKey) {
+                    return res.status(500).json({ message: "Khalti secret key is missing" });
                 }
                 try {
                     const lookup = await axios.post(KHALTI_LOOKUP_URL, { pidx }, {
                         headers: {
-                            Authorization: `Key ${khaltiTestSecretKey}`,
+                            Authorization: `Key ${khaltiSecretKey}`,
                             "Content-Type": "application/json",
                         },
                         timeout: 15000,

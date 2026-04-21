@@ -1,3 +1,7 @@
+import { FiGrid, FiList } from "react-icons/fi";
+
+type CourseViewMode = "card" | "list";
+
 type Props = {
   query: string;
   setQuery: (v: string) => void;
@@ -9,6 +13,8 @@ type Props = {
   setPrice: (v: string) => void;
   onReset: () => void;
   resultCount: number;
+  viewMode: CourseViewMode;
+  onViewModeChange: (viewMode: CourseViewMode) => void;
 };
 
 const CourseFilters = ({
@@ -22,6 +28,8 @@ const CourseFilters = ({
   setPrice,
   onReset,
   resultCount,
+  viewMode,
+  onViewModeChange,
 }: Props) => {
   const hasQuery = query.trim().length > 0;
   const hasActiveFilters =
@@ -85,21 +93,55 @@ const CourseFilters = ({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between text-sm text-gray-600 dark:text-gray-300">
+      <div className="mt-4 flex flex-col gap-3 text-sm text-gray-600 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
         <span>
           Showing <span className="font-medium text-gray-900 dark:text-white">{resultCount}</span>{" "}
           course(s)
         </span>
 
-        {hasActiveFilters ? (
-          <button
-            type="button"
-            onClick={onReset}
-            className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
-          >
-            Clear
-          </button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={onReset}
+              className="cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800"
+            >
+              Clear
+            </button>
+          ) : null}
+
+          <div className="inline-flex items-center gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-950">
+            <button
+              type="button"
+              onClick={() => onViewModeChange("card")}
+              className={[
+                "inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition",
+                viewMode === "card"
+                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-white"
+                  : "text-gray-600 hover:bg-white/70 dark:text-gray-300 dark:hover:bg-gray-900/70",
+              ].join(" ")}
+              aria-pressed={viewMode === "card"}
+            >
+              <FiGrid className="h-4 w-4" />
+              <span>Card</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onViewModeChange("list")}
+              className={[
+                "inline-flex cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition",
+                viewMode === "list"
+                  ? "bg-white text-gray-900 shadow-sm dark:bg-gray-900 dark:text-white"
+                  : "text-gray-600 hover:bg-white/70 dark:text-gray-300 dark:hover:bg-gray-900/70",
+              ].join(" ")}
+              aria-pressed={viewMode === "list"}
+            >
+              <FiList className="h-4 w-4" />
+              <span>List</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

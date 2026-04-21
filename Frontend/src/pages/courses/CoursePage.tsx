@@ -16,6 +16,9 @@ type CourseListResponse =
   | { items?: CourseListRow[]; total?: number; page?: number; limit?: number };
 
 const COURSE_PAGE_SIZE = 9;
+const COURSE_VIEW_STORAGE_KEY = "courses-page-view-mode";
+
+type CourseViewMode = "card" | "list";
 
 const normalizeCourseList = (payload: CourseListResponse) => {
   if (Array.isArray(payload)) {
@@ -42,6 +45,11 @@ const CoursesPage = () => {
   const [error, setError] = useState<string>("");
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<CourseViewMode>(() => {
+    if (typeof window === "undefined") return "card";
+    const saved = window.localStorage.getItem(COURSE_VIEW_STORAGE_KEY);
+    return saved === "list" ? "list" : "card";
+  });
 
   const [query, setQuery] = useState("");
   const [level, setLevel] = useState<string>("All");
@@ -122,6 +130,11 @@ const CoursesPage = () => {
     setPage((current) => Math.min(current, totalPages));
   }, [totalPages]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(COURSE_VIEW_STORAGE_KEY, viewMode);
+  }, [viewMode]);
+
   return (
     <div className="mx-auto max-w-7xl px-4">
       <div className="space-y-8">
@@ -136,6 +149,8 @@ const CoursesPage = () => {
           setPrice={handlePriceChange}
           onReset={handleReset}
           resultCount={total}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
 
         {loading ? (
@@ -151,9 +166,15 @@ const CoursesPage = () => {
             No courses found.
           </div>
         ) : (
-          <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <section
+            className={
+              viewMode === "card"
+                ? "grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "flex flex-col gap-4"
+            }
+          >
             {courses.map((course) => (
-              <CourseCard key={course.id} course={course} />
+              <CourseCard key={course.id} course={course} viewMode={viewMode} size="compact" />
             ))}
           </section>
         )}

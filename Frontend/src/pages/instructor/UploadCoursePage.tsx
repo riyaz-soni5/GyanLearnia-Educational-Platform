@@ -574,7 +574,7 @@ export default function UploadCoursePage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-12">
+      <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
         <div className="space-y-6 lg:col-span-8">
           <section className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
             <div>
@@ -914,7 +914,7 @@ export default function UploadCoursePage() {
           </section>
         </div>
 
-        <aside className="space-y-6 lg:col-span-4">
+        <aside className="space-y-6 lg:col-span-4 lg:sticky lg:top-24 lg:self-start lg:h-fit">
           {reviewCourse ? (
             <CourseSubmissionStatusCard
               course={reviewCourse}

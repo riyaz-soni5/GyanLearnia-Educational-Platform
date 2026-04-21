@@ -609,7 +609,7 @@ const MentorDiscoveryPage = () => {
         <section className="rounded-2xl border border-base bg-surface p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-basec">Mentor Chat</h2>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-[280px,1fr]">
+          <div className="mt-4 grid items-start gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
 
             <div className="space-y-2 rounded-xl border border-base p-3">
               {acceptedConnections.map((connection) => {
@@ -642,7 +642,7 @@ const MentorDiscoveryPage = () => {
             </div>
 
 
-            <div className="rounded-xl border border-base p-3">
+            <div className="min-w-0 rounded-xl border border-base p-3">
               {activeConnection ? (
                 <>
                   <div className="border-b border-base pb-3">

@@ -1,5 +1,4 @@
-// src/pages/CourseDetailsPage.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   FiBarChart2,
@@ -12,7 +11,6 @@ import {
   FiHelpCircle,
   FiPaperclip,
   FiPlayCircle,
-  FiShield,
   FiStar,
   FiUsers,
   FiX,
@@ -25,7 +23,7 @@ import {
   type CourseQuizResult,
   type CourseReview,
 } from "@/app/api/courses.api";
-import { getUser } from "@/services/session";
+import { clearUser, refreshSessionUser } from "@/services/session";
 import {
   type CourseListResponse,
   type CourseUiModel,
@@ -42,6 +40,52 @@ const lessonIcon = (type: LectureKind) => {
   if (type === "Video") return <FiPlayCircle className="h-4 w-4" />;
   if (type === "File") return <FiPaperclip className="h-4 w-4" />;
   return <FiHelpCircle className="h-4 w-4" />;
+};
+
+const formatReviewTimeAgo = (value?: string | null) => {
+  if (!value) return "";
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return "";
+  const diffMs = Date.now() - timestamp;
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 1) return "Just now";
+  if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+
+  const diffWeeks = Math.floor(diffDays / 7);
+  if (diffWeeks < 5) return `${diffWeeks} week${diffWeeks === 1 ? "" : "s"} ago`;
+
+  const diffMonths = Math.floor(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
+
+  const diffYears = Math.floor(diffDays / 365);
+  return `${diffYears} year${diffYears === 1 ? "" : "s"} ago`;
+};
+
+const getInitials = (name?: string) => {
+  const safeName = String(name || "").trim();
+  if (!safeName) return "U";
+  return (
+    safeName
+      .split(" ")
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase())
+      .join("") || "U"
+  );
+};
+
+const isAuthErrorMessage = (message: string) => {
+  const normalized = String(message || "").trim().toLowerCase();
+  return (
+    normalized.includes("unauthorized") ||
+    (normalized.includes("token") && (normalized.includes("invalid") || normalized.includes("expired")))
+  );
 };
 
 const CourseDetailsPage = () => {
@@ -73,6 +117,7 @@ const CourseDetailsPage = () => {
   const [reviewAverageRating, setReviewAverageRating] = useState(0);
   const [reviewsCount, setReviewsCount] = useState(0);
   const [purchaseProcessing, setPurchaseProcessing] = useState(false);
+  const autoBuyIntentRef = useRef("");
 
   useEffect(() => {
     if (!id) return;
@@ -154,6 +199,11 @@ const CourseDetailsPage = () => {
       try {
         setPurchaseProcessing(true);
         setActionError("");
+        const sessionUser = await refreshSessionUser();
+        if (!sessionUser?.id) {
+          if (!cancelled) redirectToLogin();
+          return;
+        }
         const res = await coursesApi.verifyPurchase(course.id, pidx);
         if (cancelled) return;
         setIsEnrolled(true);
@@ -161,7 +211,12 @@ const CourseDetailsPage = () => {
         clearPaymentParams();
       } catch (e: unknown) {
         if (cancelled) return;
-        setActionError(parseApiError(e, "Failed to verify payment"));
+        const message = parseApiError(e, "Failed to verify payment");
+        if (isAuthErrorMessage(message)) {
+          redirectToLogin();
+          return;
+        }
+        setActionError(message);
       } finally {
         if (!cancelled) setPurchaseProcessing(false);
       }
@@ -249,14 +304,6 @@ const CourseDetailsPage = () => {
     };
   }, [course]);
 
-  const totalPreviewLectures = useMemo(() => {
-    if (!course) return 0;
-    return course.sections.reduce(
-      (acc, s) => acc + s.lectures.filter((l) => l.isPreview).length,
-      0
-    );
-  }, [course]);
-
   const curriculumMinutes = useMemo(() => {
     if (!course) return 0;
     return course.sections.reduce(
@@ -264,6 +311,26 @@ const CourseDetailsPage = () => {
       0
     );
   }, [course]);
+
+  const sortedReviews = useMemo(
+    () =>
+      [...reviews].sort(
+        (a, b) =>
+          new Date(b.updatedAt || b.createdAt || 0).getTime() -
+          new Date(a.updatedAt || a.createdAt || 0).getTime()
+      ),
+    [reviews]
+  );
+
+  const ratingBreakdown = useMemo(
+    () =>
+      [5, 4, 3, 2, 1].map((stars) => {
+        const count = reviews.filter((review) => Math.round(Number(review.rating || 0)) === stars).length;
+        const percent = reviewsCount > 0 ? Math.round((count / reviewsCount) * 100) : 0;
+        return { stars, count, percent };
+      }),
+    [reviews, reviewsCount]
+  );
 
   const toggleSection = (sectionId: string) => {
     setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
@@ -274,15 +341,36 @@ const CourseDetailsPage = () => {
     navigate(`/courses/${course.id}/learn`);
   };
 
+  const buildReturnPath = (options?: { buyNow?: boolean }) => {
+    const params = new URLSearchParams(location.search);
+    if (options?.buyNow) {
+      params.set("buyNow", "1");
+    }
+    const nextSearch = params.toString();
+    return `${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+  };
+
+  const redirectToLogin = (options?: { buyNow?: boolean }) => {
+    clearUser();
+    navigate("/login", {
+      state: { from: buildReturnPath(options) || (course ? `/courses/${course.id}` : "/courses") },
+    });
+  };
+
   const enrollCourse = async () => {
     if (!course || purchaseProcessing || progressLoading || isEnrolled) return;
     setActionError("");
 
-    const me = getUser();
+    let me = null;
+    try {
+      me = await refreshSessionUser();
+    } catch (e: unknown) {
+      setActionError(parseApiError(e, "Failed to verify your session"));
+      return;
+    }
+
     if (!me?.id) {
-      navigate("/login", {
-        state: { from: `${location.pathname}${location.search}` || `/courses/${course.id}` },
-      });
+      redirectToLogin({ buyNow: course.priceType !== "Free" });
       return;
     }
 
@@ -292,7 +380,12 @@ const CourseDetailsPage = () => {
         setIsEnrolled(true);
         setProgress(res.item);
       } catch (e: unknown) {
-        setActionError(parseApiError(e, "Failed to enroll"));
+        const message = parseApiError(e, "Failed to enroll");
+        if (isAuthErrorMessage(message)) {
+          redirectToLogin();
+          return;
+        }
+        setActionError(message);
       }
       return;
     }
@@ -311,10 +404,32 @@ const CourseDetailsPage = () => {
 
       window.location.assign(paymentUrl);
     } catch (e: unknown) {
+      const message = parseApiError(e, "Failed to start payment");
       setPurchaseProcessing(false);
-      setActionError(parseApiError(e, "Failed to start payment"));
+      if (isAuthErrorMessage(message)) {
+        redirectToLogin({ buyNow: true });
+        return;
+      }
+      setActionError(message);
     }
   };
+
+  useEffect(() => {
+    if (!course?.id || isEnrolled || purchaseProcessing || progressLoading) return;
+
+    const params = new URLSearchParams(location.search);
+    if (params.get("buyNow") !== "1") return;
+
+    const intentKey = `${course.id}|${location.search}`;
+    if (autoBuyIntentRef.current === intentKey) return;
+    autoBuyIntentRef.current = intentKey;
+
+    params.delete("buyNow");
+    const nextSearch = params.toString();
+    navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`, { replace: true });
+
+    void enrollCourse();
+  }, [course?.id, isEnrolled, location.pathname, location.search, navigate, progressLoading, purchaseProcessing]);
 
   const completeLecture = async (lectureId: string) => {
     if (!course) return;
@@ -449,6 +564,7 @@ const CourseDetailsPage = () => {
 
   const priceText = course.priceType === "Free" ? "Free" : `NPR ${course.priceNpr.toLocaleString()}`;
   const completedLectureSet = new Set(progress?.completedLectureIds ?? []);
+  const hasStudentFeedback = reviewsCount > 0 || reviews.length > 0;
 
   return (
     <div className="mx-auto max-w-7xl px-4">
@@ -555,25 +671,6 @@ const CourseDetailsPage = () => {
                   : "Buy Now"}
               </button>
 
-              <div className="mt-5 space-y-3 text-sm text-gray-700">
-                <p className="inline-flex items-center gap-2">
-                  <FiCheckCircle className="h-4 w-4 text-green-600" />
-                  {course.lessons} on-demand lectures
-                </p>
-                <p className="inline-flex items-center gap-2">
-                  <FiClock className="h-4 w-4 text-green-600" />
-                  {formatMin(curriculumMinutes)} of content
-                </p>
-                <p className="inline-flex items-center gap-2">
-                  <FiShield className="h-4 w-4 text-green-600" />
-                  {totalPreviewLectures} free preview lessons
-                </p>
-                <p className="inline-flex items-center gap-2">
-                  <FiGlobe className="h-4 w-4 text-green-600" />
-                  Language: {course.language}
-                </p>
-              </div>
-
               {progress?.enrolled ? (
                 <div className="mt-5 rounded-xl border border-gray-200 p-3">
                   <div className="mb-2 flex items-center justify-between">
@@ -605,18 +702,18 @@ const CourseDetailsPage = () => {
                 </p>
               ))}
             </div>
-          </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">Requirements</h2>
-            <ul className="mt-4 space-y-2 text-sm text-gray-700">
-              {course.requirements.map((item, idx) => (
-                <li key={`${item}-${idx}`} className="inline-flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 rounded-full bg-gray-500" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-8">
+              <h2 className="text-xl font-bold text-gray-900">Requirements</h2>
+              <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                {course.requirements.map((item, idx) => (
+                  <li key={`${item}-${idx}`} className="inline-flex items-start gap-2">
+                    <span className="mt-1 h-1.5 w-1.5 rounded-full bg-gray-500" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </section>
 
           <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -713,41 +810,132 @@ const CourseDetailsPage = () => {
             <p className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-700">{course.description}</p>
           </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-bold text-gray-900">Reviews</h2>
-            <p className="mt-2 text-sm text-gray-600">
-              {reviewsCount > 0 ? `${reviewAverageRating.toFixed(1)} average from ${reviewsCount} review(s)` : "No reviews yet"}
-            </p>
-            <p className="mt-3 text-sm text-gray-500">
-              Reviews can be submitted from the learning page after the course is completed.
-            </p>
+          {hasStudentFeedback ? (
+            <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-950/50">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Student feedback</h2>
 
-            <div className="mt-4 space-y-3">
-              {reviewsLoading ? (
-                <p className="text-sm text-gray-600">Loading reviews...</p>
-              ) : reviewsError ? (
-                <p className="text-sm text-red-700">{reviewsError}</p>
-              ) : reviews.length === 0 ? (
-                <p className="text-sm text-gray-600">No reviews yet.</p>
-              ) : (
-                reviews.map((review) => (
-                  <div key={review.id} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-gray-900">{review.user.name}</p>
-                      <p className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
-                        <FiStar className="h-3.5 w-3.5" />
-                        {Number(review.rating || 0).toFixed(1)}
-                      </p>
+                <div className="mt-6 grid gap-8 lg:grid-cols-[220px_minmax(0,1fr)]">
+                  <div className="text-center lg:text-left">
+                    <p className="text-7xl font-bold leading-none text-amber-600 dark:text-amber-300">
+                      {reviewAverageRating.toFixed(1)}
+                    </p>
+                    <div className="mt-4 flex items-center justify-center gap-1 lg:justify-start">
+                      {Array.from({ length: 5 }).map((_, idx) => (
+                        <FiStar
+                          key={idx}
+                          className={[
+                            "h-5 w-5",
+                            idx < Math.round(reviewAverageRating)
+                              ? "fill-current text-amber-500"
+                              : "text-amber-300/70 dark:text-amber-100/30",
+                          ].join(" ")}
+                        />
+                      ))}
                     </div>
-                    <p className="mt-2 text-sm text-gray-700">{review.comment}</p>
-                    <p className="mt-2 text-xs text-gray-500">
-                      {review.updatedAt ? new Date(review.updatedAt).toLocaleDateString() : ""}
+                    <p className="mt-3 text-lg font-semibold text-amber-700 dark:text-amber-200">
+                      Course rating
+                    </p>
+                    <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+                      {reviewsCount.toLocaleString()} review{reviewsCount === 1 ? "" : "s"}
                     </p>
                   </div>
-                ))
-              )}
-            </div>
-          </section>
+
+                  <div className="space-y-4">
+                    {ratingBreakdown.map((item) => (
+                      <div key={item.stars} className="grid grid-cols-[minmax(0,1fr)_160px] items-center gap-4">
+                        <div className="h-3 overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-slate-400 dark:bg-slate-300/70"
+                            style={{ width: `${item.percent}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <div className="flex items-center gap-1 text-amber-500">
+                            {Array.from({ length: 5 }).map((_, idx) => (
+                              <FiStar
+                                key={idx}
+                                className={[
+                                  "h-4 w-4",
+                                  idx < item.stars
+                                    ? "fill-current"
+                                    : "text-amber-300/60 dark:text-amber-100/20",
+                                ].join(" ")}
+                              />
+                            ))}
+                          </div>
+                          <span className="min-w-10 text-right font-semibold text-indigo-700 dark:text-indigo-300">
+                            {item.percent}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 border-t border-gray-200 pt-6 dark:border-white/10">
+                {reviewsLoading ? (
+                  <p className="text-sm text-gray-600 dark:text-slate-300">Loading reviews...</p>
+                ) : reviewsError ? (
+                  <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+                    {reviewsError}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-gray-200 dark:divide-white/10">
+                    {sortedReviews.map((review, index) => (
+                      <div
+                        key={review.id}
+                        className={index === 0 ? "pb-1" : "pt-6 pb-1"}
+                      >
+                        <div className="flex items-start gap-4">
+                          {review.user.avatarUrl ? (
+                            <img
+                              src={review.user.avatarUrl}
+                              alt={review.user.name}
+                              className="h-14 w-14 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/10"
+                            />
+                          ) : (
+                            <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-gray-900 text-lg font-bold text-white dark:bg-white dark:text-slate-950">
+                              {getInitials(review.user.name)}
+                            </div>
+                          )}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                              <p className="text-xl font-semibold text-gray-900 dark:text-white">
+                                {review.user.name}
+                              </p>
+                              <div className="flex items-center gap-1 text-amber-500">
+                                {Array.from({ length: 5 }).map((_, idx) => (
+                                  <FiStar
+                                    key={idx}
+                                    className={[
+                                      "h-4 w-4",
+                                      idx < Math.round(Number(review.rating || 0))
+                                        ? "fill-current"
+                                        : "text-amber-300/60 dark:text-amber-100/20",
+                                    ].join(" ")}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-sm text-gray-500 dark:text-slate-400">
+                                {formatReviewTimeAgo(review.updatedAt || review.createdAt)}
+                              </span>
+                            </div>
+
+                            <p className="mt-4 text-base leading-8 text-gray-700 dark:text-slate-300">
+                              {review.comment}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </section>
+          ) : null}
           </main>
 
           <aside className="space-y-6 lg:col-span-4">

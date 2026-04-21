@@ -93,8 +93,8 @@ const toReviewItem = (review, currentUserId) => {
         isMine: Boolean(currentUserId && String(user?._id || "") === String(currentUserId)),
     };
 };
-const KHALTI_INITIATE_URL = "https://dev.khalti.com/api/v2/epayment/initiate/";
-const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
+const KHALTI_INITIATE_URL = "https://khalti.com/api/v2/epayment/initiate/";
+const KHALTI_LOOKUP_URL = "https://khalti.com/api/v2/epayment/lookup/";
 const normalizeKhaltiSecretKey = (raw) => {
     const value = String(raw || "").trim();
     if (!value)
@@ -528,9 +528,9 @@ export async function initiateCoursePurchase(req, res) {
         if (!websiteUrl || !isValidHttpUrl(websiteUrl)) {
             return res.status(400).json({ message: "Valid websiteUrl is required" });
         }
-        const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
-        if (!khaltiTestSecretKey) {
-            return res.status(500).json({ message: "Khalti test secret key is missing" });
+        const khaltiSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_SECRET_KEY ?? process.env.KHALTI_TEST_SECRET_KEY ?? "");
+        if (!khaltiSecretKey) {
+            return res.status(500).json({ message: "Khalti secret key is missing" });
         }
         const course = await Course.findOne({ _id: courseId, status: "Published" })
             .select("title price currency instructorId")
@@ -572,7 +572,7 @@ export async function initiateCoursePurchase(req, res) {
             ...(customerInfo ? { customer_info: customerInfo } : {}),
         }, {
             headers: {
-                Authorization: `Key ${khaltiTestSecretKey}`,
+                Authorization: `Key ${khaltiSecretKey}`,
                 "Content-Type": "application/json",
             },
             timeout: 15000,
@@ -665,9 +665,9 @@ export async function verifyCoursePurchase(req, res) {
             return res.status(401).json({ message: "Unauthorized" });
         if (!pidx)
             return res.status(400).json({ message: "pidx is required" });
-        const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
-        if (!khaltiTestSecretKey) {
-            return res.status(500).json({ message: "Khalti test secret key is missing" });
+        const khaltiSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_SECRET_KEY ?? process.env.KHALTI_TEST_SECRET_KEY ?? "");
+        if (!khaltiSecretKey) {
+            return res.status(500).json({ message: "Khalti secret key is missing" });
         }
         const course = await Course.findOne({ _id: courseId, status: "Published" })
             .select("title sections")
@@ -719,7 +719,7 @@ export async function verifyCoursePurchase(req, res) {
         }
         const lookup = await axios.post(KHALTI_LOOKUP_URL, { pidx }, {
             headers: {
-                Authorization: `Key ${khaltiTestSecretKey}`,
+                Authorization: `Key ${khaltiSecretKey}`,
                 "Content-Type": "application/json",
             },
             timeout: 15000,

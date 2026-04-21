@@ -99,9 +99,13 @@ const WalletPage = () => {
       }
     };
 
-    void verify();
+    const verifyTimer = window.setTimeout(() => {
+      void verify();
+    }, 0);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(verifyTimer);
     };
   }, [loadWallet, showToast]);
 

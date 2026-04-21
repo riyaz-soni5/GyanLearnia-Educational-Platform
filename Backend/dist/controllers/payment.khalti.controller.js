@@ -1,8 +1,8 @@
 import axios from "axios";
 import User from "../models/User.model.js";
 import { createNotification } from "../services/notification.service.js";
-const KHALTI_INITIATE_URL = "https://dev.khalti.com/api/v2/epayment/initiate/";
-const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
+const KHALTI_INITIATE_URL = "https://khalti.com/api/v2/epayment/initiate/";
+const KHALTI_LOOKUP_URL = "https://khalti.com/api/v2/epayment/lookup/";
 const normalizeKhaltiSecretKey = (raw) => {
     const value = String(raw ?? "").trim();
     if (!value)
@@ -42,7 +42,7 @@ export async function verifyKhaltiPayment(req, res) {
     const authedReq = req;
     const userId = authedReq.user?.id;
     const pidx = String(req.body?.pidx ?? "").trim();
-    const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
+    const khaltiSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_SECRET_KEY ?? process.env.KHALTI_TEST_SECRET_KEY ?? "");
     if (!userId) {
         return res.status(401).json({
             success: false,
@@ -55,16 +55,16 @@ export async function verifyKhaltiPayment(req, res) {
             error: "pidx is required",
         });
     }
-    if (!khaltiTestSecretKey) {
+    if (!khaltiSecretKey) {
         return res.status(500).json({
             success: false,
-            error: "Khalti test secret key is missing",
+            error: "Khalti secret key is missing",
         });
     }
     try {
         const lookup = await axios.post(KHALTI_LOOKUP_URL, { pidx }, {
             headers: {
-                Authorization: `Key ${khaltiTestSecretKey}`,
+                Authorization: `Key ${khaltiSecretKey}`,
                 "Content-Type": "application/json",
             },
             timeout: 15000,
@@ -146,7 +146,7 @@ export async function initiateKhaltiPayment(req, res) {
     const purchaseOrderId = String(req.body?.purchaseOrderId ?? "").trim();
     const purchaseOrderName = String(req.body?.purchaseOrderName ?? "").trim();
     const customerInfoRaw = req.body?.customerInfo;
-    const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
+    const khaltiSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_SECRET_KEY ?? process.env.KHALTI_TEST_SECRET_KEY ?? "");
     if (!userId) {
         return res.status(401).json({
             success: false,
@@ -183,10 +183,10 @@ export async function initiateKhaltiPayment(req, res) {
             error: "purchaseOrderName is required",
         });
     }
-    if (!khaltiTestSecretKey) {
+    if (!khaltiSecretKey) {
         return res.status(500).json({
             success: false,
-            error: "Khalti test secret key is missing",
+            error: "Khalti secret key is missing",
         });
     }
     const rawCustomerInfo = customerInfoRaw && typeof customerInfoRaw === "object"
@@ -213,7 +213,7 @@ export async function initiateKhaltiPayment(req, res) {
             ...(customerInfo ? { customer_info: customerInfo } : {}),
         }, {
             headers: {
-                Authorization: `Key ${khaltiTestSecretKey}`,
+                Authorization: `Key ${khaltiSecretKey}`,
                 "Content-Type": "application/json",
             },
             timeout: 15000,

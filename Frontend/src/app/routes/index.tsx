@@ -2,7 +2,7 @@ import { createBrowserRouter, redirect } from "react-router-dom";
 import AdminLayout from "@/layouts/AdminLayout";
 import AuthLayout from "@/layouts/AuthLayout";
 import MainLayout from "@/layouts/MainLayout";
-import { ensureSessionUser, getUser, isLoggedIn } from "@/services/session";
+import { ensureSessionUser, getUser, refreshSessionUser } from "@/services/session";
 import AdminDashboardPage from "@/pages/admin/Dashboard";
 import CourseApprovalsPage from "@/pages/admin/CourseApprovalsPage";
 import ManageUsersPage from "@/pages/admin/ManageUserPage";
@@ -21,31 +21,48 @@ import UploadCoursePage from "@/pages/instructor/UploadCoursePage";
 import AboutPage from "@/pages/public/AboutPage";
 import HomePage from "@/pages/public/HomePage";
 import MentorsPage from "@/pages/public/MentorsDiscovryPage";
+import NotFoundPage from "@/pages/public/NotFoundPage";
 import PricingPage from "@/pages/public/PricingPage";
+import UnauthorizedPage from "@/pages/public/UnauthorizedPage";
 import AskQuestionPage from "@/pages/questions/AskQuestionPage";
 import QuestionDetailsPage from "@/pages/questions/QuestionDetailsPage";
 import QuestionsPage from "@/pages/questions/QuestionPage";
 
 type UserRole = "student" | "instructor" | "admin";
 
+const resolveRouteUser = async () => {
+  const cachedUser = getUser();
+  try {
+    if (cachedUser?.id) {
+      return await refreshSessionUser();
+    }
+    return await ensureSessionUser();
+  } catch {
+    return cachedUser ?? null;
+  }
+};
+
 const redirectIfLoggedIn = async () => {
-  if (isLoggedIn()) return redirect("/courses");
-  const user = await ensureSessionUser();
-  if (user?.id) return redirect("/courses");
+  const cachedUser = getUser();
+  try {
+    const user = cachedUser?.id ? await refreshSessionUser() : await ensureSessionUser();
+    if (user?.id) return redirect("/courses");
+  } catch {
+    // If session validation fails, let the user see the auth page instead of bouncing away.
+  }
   return null;
 };
 
 const requireAuth = async () => {
-  if (isLoggedIn()) return null;
-  const user = await ensureSessionUser();
+  const user = await resolveRouteUser();
   if (!user?.id) return redirect("/login");
   return null;
 };
 
 const requireRole = async (...roles: UserRole[]) => {
-  const user = getUser() || (await ensureSessionUser());
+  const user = await resolveRouteUser();
   if (!user) return redirect("/login");
-  if (!roles.includes(user.role)) return redirect("/");
+  if (!roles.includes(user.role)) return redirect("/unauthorized");
   return null;
 };
 
@@ -73,6 +90,7 @@ export const router = createBrowserRouter([
       { path: "mentors", element: <MentorsPage />, loader: requireAuth },
       { path: "pricing", element: <PricingPage /> },
       { path: "about", element: <AboutPage /> },
+      { path: "unauthorized", element: <UnauthorizedPage /> },
       { path: "profile", element: <ProfilePage />, loader: requireAuth },
       { path: "wallet", element: <WalletPage />, loader: requireAuth },
       {
@@ -85,6 +103,7 @@ export const router = createBrowserRouter([
         element: <InstructorDashboardPage />,
         loader: () => requireRole("instructor"),
       },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
   {

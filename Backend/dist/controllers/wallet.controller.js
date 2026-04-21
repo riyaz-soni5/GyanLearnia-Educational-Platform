@@ -2,8 +2,8 @@ import axios from "axios";
 import User from "../models/User.model.js";
 import WalletTransaction from "../models/WalletTransaction.model.js";
 import { creditUserWallet, debitUserWallet } from "../services/wallet.service.js";
-const KHALTI_INITIATE_URL = "https://dev.khalti.com/api/v2/epayment/initiate/";
-const KHALTI_LOOKUP_URL = "https://dev.khalti.com/api/v2/epayment/lookup/";
+const KHALTI_INITIATE_URL = "https://khalti.com/api/v2/epayment/initiate/";
+const KHALTI_LOOKUP_URL = "https://khalti.com/api/v2/epayment/lookup/";
 const MIN_WALLET_AMOUNT_PAISA = 1000;
 const normalizeKhaltiSecretKey = (raw) => {
     const value = String(raw ?? "").trim();
@@ -88,7 +88,7 @@ export async function initiateWalletTopup(req, res) {
         const amountPaisa = asPaisa(req.body?.amountPaisa);
         const returnUrl = String(req.body?.returnUrl || "").trim();
         const websiteUrl = String(req.body?.websiteUrl || "").trim();
-        const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
+        const khaltiSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_SECRET_KEY ?? process.env.KHALTI_TEST_SECRET_KEY ?? "");
         if (amountPaisa < MIN_WALLET_AMOUNT_PAISA) {
             return res.status(400).json({
                 success: false,
@@ -101,8 +101,8 @@ export async function initiateWalletTopup(req, res) {
         if (!websiteUrl || !isValidHttpUrl(websiteUrl)) {
             return res.status(400).json({ success: false, error: "Valid websiteUrl is required" });
         }
-        if (!khaltiTestSecretKey) {
-            return res.status(500).json({ success: false, error: "Khalti test secret key is missing" });
+        if (!khaltiSecretKey) {
+            return res.status(500).json({ success: false, error: "Khalti secret key is missing" });
         }
         const purchaseOrderId = `wallet-${userId}-${Date.now()}`;
         const initiate = await axios.post(KHALTI_INITIATE_URL, {
@@ -113,7 +113,7 @@ export async function initiateWalletTopup(req, res) {
             purchase_order_name: "Wallet Topup",
         }, {
             headers: {
-                Authorization: `Key ${khaltiTestSecretKey}`,
+                Authorization: `Key ${khaltiSecretKey}`,
                 "Content-Type": "application/json",
             },
             timeout: 15000,
@@ -155,9 +155,9 @@ export async function verifyWalletTopup(req, res) {
         const pidx = String(req.body?.pidx || "").trim();
         if (!pidx)
             return res.status(400).json({ success: false, error: "pidx is required" });
-        const khaltiTestSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_TEST_SECRET_KEY ?? "");
-        if (!khaltiTestSecretKey) {
-            return res.status(500).json({ success: false, error: "Khalti test secret key is missing" });
+        const khaltiSecretKey = normalizeKhaltiSecretKey(process.env.KHALTI_SECRET_KEY ?? process.env.KHALTI_TEST_SECRET_KEY ?? "");
+        if (!khaltiSecretKey) {
+            return res.status(500).json({ success: false, error: "Khalti secret key is missing" });
         }
         const existing = await WalletTransaction.findOne({
             type: "wallet_topup",
@@ -184,7 +184,7 @@ export async function verifyWalletTopup(req, res) {
         }
         const lookup = await axios.post(KHALTI_LOOKUP_URL, { pidx }, {
             headers: {
-                Authorization: `Key ${khaltiTestSecretKey}`,
+                Authorization: `Key ${khaltiSecretKey}`,
                 "Content-Type": "application/json",
             },
             timeout: 15000,
